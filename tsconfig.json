@@ -17,6 +17,5 @@
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true
-  },
-  "include": ["src/**/*.ts", "../../env.d.ts"]
+  }
 }
