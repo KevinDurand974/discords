@@ -1,0 +1,56 @@
+import { SlashCommandBuilder } from "discord.js";
+import type { CommandDefinition } from "@/core/command.ts";
+import { handleCreateClaim, itemChoices } from "./create-claim.ts";
+import { handleRedeem } from "./redeem.ts";
+
+export const slaCommand = {
+  data: new SlashCommandBuilder()
+    .setName("sla")
+    .setDescription("Solo Leveling: ARISE tools")
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("redeem")
+        .setDescription("Redeem a coupon code")
+        .addStringOption((option) =>
+          option.setName("coupon").setDescription("Coupon code").setRequired(true),
+        )
+        .addStringOption((option) =>
+          option.setName("pid").setDescription("Personal ID (Member code)").setRequired(true),
+        ),
+    )
+    .addSubcommand((subcommand) => {
+      subcommand
+        .setName("create")
+        .setDescription("Create a coupon claim")
+        .addStringOption((option) =>
+          option.setName("code").setDescription("Coupon code").setRequired(true).setMaxLength(80),
+        );
+
+      return Array.from({ length: 4 }, (_, index) => index + 1).reduce(
+        (builder, position) =>
+          builder
+            .addStringOption((option) =>
+              option
+                .setName(`item_${position}`)
+                .setDescription(`Reward item ${position}`)
+                .addChoices(itemChoices),
+            )
+            .addIntegerOption((option) =>
+              option
+                .setName(`quantity_${position}`)
+                .setDescription(`Reward quantity ${position}`)
+                .setMinValue(1),
+            ),
+        subcommand,
+      );
+    }),
+
+  async execute(interaction) {
+    switch (interaction.options.getSubcommand()) {
+      case "redeem":
+        return handleRedeem(interaction);
+      case "create":
+        return handleCreateClaim(interaction);
+    }
+  },
+} satisfies CommandDefinition;

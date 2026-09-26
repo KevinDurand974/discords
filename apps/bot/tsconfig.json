@@ -2,8 +2,8 @@
   "compilerOptions": {
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "target": "es2024",
-    "lib": ["es2024"],
+    "target": "esnext",
+    "lib": ["esnext"],
     "types": ["node", "@nubjs/types"],
     "moduleDetection": "force",
     "allowImportingTsExtensions": true,
@@ -16,7 +16,13 @@
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "exactOptionalPropertyTypes": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/core/*": ["./src/core/*"],
+      "@/features/*": ["./src/features/*"],
+      "@/shared/*": ["./src/shared/*"]
+    }
   },
-  "include": ["src/**/*.ts", "../../env.d.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "./env.d.ts", "./discord.d.ts"]
 }
