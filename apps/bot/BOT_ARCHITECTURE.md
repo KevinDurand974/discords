@@ -157,12 +157,12 @@ Logging is disabled by default. The logger sends nothing until a server administ
 /setup logs
 ```
 
-The command requires the **Manage Server** permission. It offers two configuration paths:
+The command requires the **Manage Channels** permission. It offers two configuration paths:
 
 - select an existing text channel with the optional `channel` option;
 - leave `channel` empty to open a modal, choose a name (default: `bot-command-logs`), and create a new text channel.
 
-The selected channel ID is persisted locally in `data/log-channels.json`; this runtime configuration file is ignored by Git. If a server has no configured channel, command logs are silently skipped.
+A newly created channel denies `View Channel` to `@everyone`, explicitly allows the bot to send embeds, and allows roles with **Manage Channels** to view it. The selected channel ID is persisted locally in `data/log-channels.json`; this runtime configuration file is ignored by Git. If a server has no configured channel, command logs are silently skipped.
 
 ## Current packages
 

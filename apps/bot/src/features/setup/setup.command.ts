@@ -25,8 +25,8 @@ const assertCanConfigureLogs = (
   if (!interaction.inGuild() || !interaction.guild) {
     throw new Error("This command can only be used in a server.");
   }
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    throw new Error("You need the Manage Server permission to configure command logs.");
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
+    throw new Error("You need the Manage Channels permission to configure command logs.");
   }
 };
 
@@ -60,9 +60,37 @@ const createLogChannel = async (
   const channelName = interaction.fields.getTextInputValue(CHANNEL_NAME_INPUT_ID).trim();
   if (!channelName) throw new Error("The log channel name cannot be empty.");
 
+  const botUserId = interaction.client.user?.id;
+  if (!botUserId) throw new Error("The bot user is not available.");
+
+  const managerRoleOverwrites = [...(await guild.roles.fetch()).values()]
+    .filter(
+      (role) => role.id !== guild.id && role.permissions.has(PermissionFlagsBits.ManageChannels),
+    )
+    .map((role) => ({
+      id: role.id,
+      allow: [PermissionFlagsBits.ViewChannel],
+    }));
+
   const channel = await guild.channels.create({
     name: channelName,
     type: ChannelType.GuildText,
+    permissionOverwrites: [
+      {
+        id: guild.id,
+        deny: [PermissionFlagsBits.ViewChannel],
+      },
+      {
+        id: botUserId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.EmbedLinks,
+          PermissionFlagsBits.ReadMessageHistory,
+        ],
+      },
+      ...managerRoleOverwrites,
+    ],
     reason: `Command log channel configured by ${interaction.user.tag}`,
   });
 
@@ -80,7 +108,7 @@ export const setupCommand = {
   data: new SlashCommandBuilder()
     .setName("setup")
     .setDescription("Configure the bot")
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("logs")
