@@ -147,6 +147,23 @@ export const CLAIM_MODAL_PREFIX = "sla:claim-modal:";
 
 The central router delegates an interaction based on its `customId` prefix. This prevents one large, unmaintainable component handler.
 
+## Command logging
+
+All chat-input command executions are logged by `core/command-logger.ts` after they succeed or fail. A log contains the command path, user, status, and timestamp; command option values are deliberately excluded to avoid recording sensitive inputs such as coupon codes or PIDs.
+
+Logging is disabled by default. The logger sends nothing until a server administrator configures it with:
+
+```text
+/setup logs
+```
+
+The command requires the **Manage Server** permission. It offers two configuration paths:
+
+- select an existing text channel with the optional `channel` option;
+- leave `channel` empty to open a modal, choose a name (default: `bot-command-logs`), and create a new text channel.
+
+The selected channel ID is persisted locally in `data/log-channels.json`; this runtime configuration file is ignored by Git. If a server has no configured channel, command logs are silently skipped.
+
 ## Current packages
 
 | Package           | Recommended location      | Purpose                                          |

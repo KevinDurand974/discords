@@ -9,12 +9,32 @@ import type {
 
 export type ComponentInteraction = ButtonInteraction | ModalSubmitInteraction;
 
+export type CommandLogEntry = {
+  guildId: string;
+  command: string;
+  userId: string;
+  userTag: string;
+  status: "success" | "error";
+};
+
+export type CommandLogger = {
+  setChannel(guildId: string, channelId: string): Promise<void>;
+  log(entry: CommandLogEntry): Promise<void>;
+};
+
+export type CommandExecutionContext = {
+  commandLogger: CommandLogger;
+};
+
 export type CommandDefinition = {
   data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
-  execute(interaction: ChatInputCommandInteraction): Promise<void>;
+  execute(
+    interaction: ChatInputCommandInteraction,
+    context: CommandExecutionContext,
+  ): Promise<void>;
 };
 
 export type ComponentHandler = {
   matches(customId: string): boolean;
-  execute(interaction: ComponentInteraction): Promise<void>;
+  execute(interaction: ComponentInteraction, context: CommandExecutionContext): Promise<void>;
 };
