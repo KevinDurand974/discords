@@ -90,6 +90,10 @@ export const slaCommand = {
 
 Each subcommand's options belong in its `addSubcommand` callback.
 
+### Optional slash-command input
+
+A command may accept optional slash-command options while still requiring the information to execute. In that case, open one modal containing every missing value (or all required values prefilled with the options already supplied). Discord modals support up to five input fields, so `/sla redeem` collects both the coupon code and PID in one modal when either slash option is absent. The modal submit handler then performs the same redemption flow as the direct command path.
+
 ## Command interface
 
 The command interface remains deliberately small: callers only need a Discord command definition and its handler.

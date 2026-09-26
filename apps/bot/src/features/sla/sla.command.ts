@@ -12,10 +12,10 @@ export const slaCommand = {
         .setName("redeem")
         .setDescription("Redeem a coupon code")
         .addStringOption((option) =>
-          option.setName("coupon").setDescription("Coupon code").setRequired(true),
+          option.setName("coupon").setDescription("Coupon code (optional)"),
         )
         .addStringOption((option) =>
-          option.setName("pid").setDescription("Personal ID (Member code)").setRequired(true),
+          option.setName("pid").setDescription("Personal ID (Member code, optional)"),
         ),
     )
     .addSubcommand((subcommand) => {

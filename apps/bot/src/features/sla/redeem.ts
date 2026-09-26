@@ -1,9 +1,52 @@
-import { EmbedType, MessageFlags, type ChatInputCommandInteraction } from "discord.js";
+import {
+  EmbedType,
+  LabelBuilder,
+  MessageFlags,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  type ChatInputCommandInteraction,
+  type ModalSubmitInteraction,
+} from "discord.js";
+import type { ComponentHandler } from "@/core/command.ts";
 import { redeemCoupon, type CouponSuccess } from "./coupon.client.ts";
 
-export const handleRedeem = async (interaction: ChatInputCommandInteraction) => {
-  const pid = interaction.options.getString("pid", true);
-  const couponCode = interaction.options.getString("coupon", true);
+const REDEEM_MODAL_ID = "sla:redeem";
+const COUPON_INPUT_ID = "coupon";
+const PID_INPUT_ID = "pid";
+
+type RedeemInteraction = ChatInputCommandInteraction | ModalSubmitInteraction;
+
+const createRedeemModal = (couponCode: string | null, pid: string | null) => {
+  const couponInput = new TextInputBuilder()
+    .setCustomId(COUPON_INPUT_ID)
+    .setPlaceholder("Enter your coupon code")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(80);
+  const pidInput = new TextInputBuilder()
+    .setCustomId(PID_INPUT_ID)
+    .setPlaceholder("Enter your PID (Member code)")
+    .setStyle(TextInputStyle.Short)
+    .setRequired(true)
+    .setMaxLength(80);
+
+  if (couponCode) couponInput.setValue(couponCode);
+  if (pid) pidInput.setValue(pid);
+
+  return new ModalBuilder()
+    .setCustomId(REDEEM_MODAL_ID)
+    .setTitle("Redeem a coupon")
+    .addLabelComponents(
+      new LabelBuilder().setLabel("Coupon code").setTextInputComponent(couponInput),
+      new LabelBuilder()
+        .setLabel("PID")
+        .setDescription("Your player ID (Member code)")
+        .setTextInputComponent(pidInput),
+    );
+};
+
+const redeem = async (interaction: RedeemInteraction, couponCode: string, pid: string) => {
   const data = await redeemCoupon(couponCode, pid);
 
   if (data.errorCode === 24004) {
@@ -29,4 +72,29 @@ export const handleRedeem = async (interaction: ChatInputCommandInteraction) => 
       },
     ],
   });
+};
+
+export const handleRedeem = async (interaction: ChatInputCommandInteraction) => {
+  const couponCode = interaction.options.getString("coupon");
+  const pid = interaction.options.getString("pid");
+
+  if (!couponCode || !pid) {
+    await interaction.showModal(createRedeemModal(couponCode, pid));
+    return;
+  }
+
+  await redeem(interaction, couponCode, pid);
+};
+
+export const redeemComponentHandler: ComponentHandler = {
+  matches: (customId) => customId === REDEEM_MODAL_ID,
+
+  async execute(interaction) {
+    if (!interaction.isModalSubmit()) return;
+
+    const couponCode = interaction.fields.getTextInputValue(COUPON_INPUT_ID).trim();
+    const pid = interaction.fields.getTextInputValue(PID_INPUT_ID).trim();
+
+    await redeem(interaction, couponCode, pid);
+  },
 };
