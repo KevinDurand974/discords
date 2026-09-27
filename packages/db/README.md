@@ -1,12 +1,12 @@
 # Shared news database
 
-The shared PostgreSQL schema covers source news and per-guild publication state. The API imports `@discords/db` now; the bot will import it in later phases. The API owns `news_categories`, `source_articles`, and `source_article_media`; the bot owns `netmarble_news_settings`, `netmarble_news_categories`, and `netmarble_articles`.
+The shared PostgreSQL schema covers source news and per-guild publication state. The API and bot import `@discords/db`. The API owns `news_categories`, `source_articles`, and `source_article_media`; the bot owns `netmarble_news_settings`, `netmarble_news_categories`, and `netmarble_articles`.
 
 ## Local workflow
 
-1. Copy `.env.example` at the repository root to an untracked `.env`, and choose a local password.
-2. Run `docker compose up -d postgres` and wait for the health check.
-3. Set `DATABASE_URL` to `postgresql://discords:<password>@localhost:5432/discords` in your shell (URL-encode special characters in the password).
+1. Copy `apps/api/.env.example` to `apps/api/.env` and set matching `POSTGRES_PASSWORD` and host `DATABASE_URL` credentials.
+2. Run `node scripts/docker.mjs up -d postgres` and wait for the health check.
+3. Export the host `DATABASE_URL` from `apps/api/.env` in your shell (URL-encode special characters in the password).
 4. Run `nub run db:migrate`. Re-running applies only pending migrations.
 5. Run `nub run test` and `nub --cwd packages/db run typecheck`.
 

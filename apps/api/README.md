@@ -4,9 +4,9 @@ Phase 2 exposes read-only news routes on the Node adapter. Source ingestion runs
 
 ## Run locally
 
-For Docker Compose, copy the root `.env.example` to `.env`, use matching local credentials in `POSTGRES_PASSWORD` and `API_DATABASE_URL`, then run `docker compose up -d --build postgres api`. The API is at `http://localhost:3000`. For host-side migrations use `DATABASE_URL=postgresql://discords:<password>@localhost:5432/discords` and `nub run db:migrate`. URL-encode any special characters in passwords.
+Copy `apps/api/.env.example` to the untracked `apps/api/.env`. Set `POSTGRES_PASSWORD` for the Compose PostgreSQL service and `DATABASE_URL` for host-side access (`localhost:5432`), using matching credentials. `POSTGRES_USER` and `POSTGRES_DB` default to `discords`; `PORT` defaults to 3000. URL-encode special characters in the `DATABASE_URL` password.
 
-For local API runs, copy `apps/api/.env.example` to the untracked `apps/api/.env` and set `DATABASE_URL` for the host-accessible database. Varlock loads and validates `apps/api/.env.schema` at startup: `DATABASE_URL` is a required URL and `PORT` is an optional port defaulting to 3000. Compose supplies the same values through container environment variables; it does not require `apps/api/.env`.
+Run `nub run start` from the repository root. The root scripts load and validate `apps/api/.env.schema` through Varlock, build a separate container `DATABASE_URL` using `postgres:5432`, and start the API and PostgreSQL. The API is at `http://localhost:3000` (or the configured `PORT`). A root `.env` is not needed. For host-side migrations, export the local `DATABASE_URL` and run `nub run db:migrate`; the Compose API service migrates automatically on startup. If an existing database volume uses different credentials, keep those credentials or migrate the volume explicitly.
 
 - `GET /v1/news/categories`: source categories and last successful category sync.
 - `GET /v1/news/articles?menuSeq=32&limit=20&cursor=...`: newest first; `menuSeq` is optional, `limit` is 1–50, and the cursor is scoped to the category filter.

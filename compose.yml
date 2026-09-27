@@ -6,27 +6,36 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL to the postgres service URL}
-      PORT: 3000
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in apps/api/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in apps/api/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in apps/api/.env}
+      PORT: ${PORT:-3000}
     command: ["sh", "-c", "nub run db:migrate && nub --cwd apps/api run start"]
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/v1/news/categories').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: discords
-      POSTGRES_USER: discords
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in an untracked .env file}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in apps/api/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in apps/api/.env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in apps/api/.env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U discords -d discords"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 3s
       retries: 10
