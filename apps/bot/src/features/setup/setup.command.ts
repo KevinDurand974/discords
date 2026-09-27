@@ -9,6 +9,10 @@ import {
   type ChatInputCommandInteraction,
   type ModalSubmitInteraction,
 } from "discord.js";
+import {
+  configureNewsGroup,
+  handleNewsSetup,
+} from "@/features/netmarble-news/news-setup-command.ts";
 import type {
   CommandDefinition,
   CommandExecutionContext,
@@ -109,6 +113,7 @@ export const setupCommand = {
     .setName("setup")
     .setDescription("Configure the bot")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
+    .addSubcommandGroup(configureNewsGroup)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("logs")
@@ -122,6 +127,10 @@ export const setupCommand = {
     ),
 
   async execute(interaction, context) {
+    if (interaction.options.getSubcommandGroup(false) === "news") {
+      await handleNewsSetup(interaction);
+      return;
+    }
     assertCanConfigureLogs(interaction);
     const channel = interaction.options.getChannel("channel");
 
