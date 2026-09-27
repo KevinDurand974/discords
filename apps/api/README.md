@@ -4,7 +4,9 @@ Phase 2 exposes read-only news routes on the Node adapter. Source ingestion runs
 
 ## Run locally
 
-Copy the root `.env.example` to `.env`, use matching local credentials in `POSTGRES_PASSWORD` and `API_DATABASE_URL`, then run `docker compose up -d --build postgres api`. The API is at `http://localhost:3000`. For host-side migrations use `DATABASE_URL=postgresql://discords:<password>@localhost:5432/discords` and `nub run db:migrate`. URL-encode any special characters in passwords.
+For Docker Compose, copy the root `.env.example` to `.env`, use matching local credentials in `POSTGRES_PASSWORD` and `API_DATABASE_URL`, then run `docker compose up -d --build postgres api`. The API is at `http://localhost:3000`. For host-side migrations use `DATABASE_URL=postgresql://discords:<password>@localhost:5432/discords` and `nub run db:migrate`. URL-encode any special characters in passwords.
+
+For local API runs, copy `apps/api/.env.example` to the untracked `apps/api/.env` and set `DATABASE_URL` for the host-accessible database. Varlock loads and validates `apps/api/.env.schema` at startup: `DATABASE_URL` is a required URL and `PORT` is an optional port defaulting to 3000. Compose supplies the same values through container environment variables; it does not require `apps/api/.env`.
 
 - `GET /v1/news/categories`: source categories and last successful category sync.
 - `GET /v1/news/articles?menuSeq=32&limit=20&cursor=...`: newest first; `menuSeq` is optional, `limit` is 1–50, and the cursor is scoped to the category filter.
@@ -12,4 +14,4 @@ Copy the root `.env.example` to `.env`, use matching local credentials in `POSTG
 
 Public responses contain no Discord configuration. Pagination is by `createdAt DESC, id DESC`. The Netmarble client's `rows`/`start` are independent of the public database cursor. Source pin state comes solely from `recommendList`, never `recommendDate` or `type`.
 
-Run `nub --cwd apps/api run test` and `nub --cwd apps/api run typecheck` to verify the service. Operational rate limiting, CORS, and backup procedures belong to Phase 7.
+Run `nub --cwd apps/api run test` and `nub --cwd apps/api run typecheck` with a valid `DATABASE_URL` (from `apps/api/.env` or the environment) to verify the service; no live database is required for these checks. Operational rate limiting, CORS, and backup procedures belong to Phase 7.

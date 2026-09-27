@@ -1,15 +1,14 @@
 import { Cron } from "croner";
 import { createDatabase } from "@discords/db";
+import { ENV } from "./config.ts";
 import { createIngestion } from "./news/ingestion.ts";
 import { createNewsReader } from "./news/repository.ts";
 import { createNewsApp } from "./routes/news.ts";
 
-const databaseUrl = process.env.DATABASE_URL;
-if (!databaseUrl) throw new Error("DATABASE_URL is required");
-const { db } = createDatabase(databaseUrl);
+const { db } = createDatabase(ENV.DATABASE_URL);
 const ingestion = createIngestion(db);
-const port = Number(process.env.PORT ?? 3000);
-if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("Invalid PORT");
+const port = ENV.PORT;
+if (port === 0) throw new Error("PORT must be between 1 and 65535");
 
 async function synchronize() {
   const result = await ingestion.syncAll();

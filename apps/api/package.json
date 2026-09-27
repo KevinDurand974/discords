@@ -13,7 +13,8 @@
     "@discords/db": "workspace:*",
     "@elysiajs/node": "1.4.5",
     "croner": "10.0.1",
-    "elysia": "1.4.30"
+    "elysia": "1.4.30",
+    "varlock": "^1.19.0"
   },
   "devDependencies": {
     "@types/node": "^26",

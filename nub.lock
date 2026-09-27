@@ -35,6 +35,9 @@ importers:
       elysia:
         specifier: 1.4.30
         version: 1.4.30(@sinclair/typebox@0.34.52)(exact-mirror@0.2.7(@sinclair/typebox@0.34.52))(file-type@22.1.1)(openapi-types@12.1.3)(typescript@7.0.2)
+      varlock:
+        specifier: ^1.19.0
+        version: 1.19.0
     devDependencies:
       '@types/node':
         specifier: ^26
