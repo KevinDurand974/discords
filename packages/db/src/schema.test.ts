@@ -31,5 +31,7 @@ describe("news database schema", () => {
     ]);
     expect(netmarbleArticles.threadId.notNull).toBe(false);
     expect(netmarbleNewsSettings.pollIntervalMinutes.default).toBe(30);
+    expect(netmarbleNewsSettings.initialBackfillCount.default).toBe(10);
+    expect(netmarbleNewsSettings.initialImportCompletedAt.notNull).toBe(false);
   });
 });

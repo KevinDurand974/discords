@@ -8,6 +8,7 @@ import {
   type SlashCommandSubcommandGroupBuilder,
 } from "discord.js";
 import { createNewsSetupRepository } from "./news-setup-repository.ts";
+import { createNewsRuntime } from "./news-runtime.ts";
 import {
   createNewsSetup,
   disableNewsSetup,
@@ -22,7 +23,37 @@ export function configureNewsGroup(group: SlashCommandSubcommandGroupBuilder) {
     .setName("news")
     .setDescription("Configure Netmarble news")
     .addSubcommand((subcommand) =>
-      subcommand.setName("create").setDescription("Create or reactivate the news Forum"),
+      subcommand
+        .setName("create")
+        .setDescription("Create or reactivate the news Forum")
+        .addStringOption((option) =>
+          option
+            .setName("import-mode")
+            .setDescription("Import historical news or start with future articles")
+            .addChoices(
+              { name: "backfill", value: "backfill" },
+              { name: "future-only", value: "future_only" },
+            ),
+        )
+        .addIntegerOption((option) =>
+          option
+            .setName("backfill-count")
+            .setDescription("Newest articles to import (default: 10)")
+            .setMinValue(1)
+            .setMaxValue(50),
+        ),
+    )
+    .addSubcommand((subcommand) =>
+      subcommand
+        .setName("backfill")
+        .setDescription("Import historical articles without notifying roles")
+        .addIntegerOption((option) =>
+          option
+            .setName("count")
+            .setDescription("Newest articles to import (default: 10)")
+            .setMinValue(1)
+            .setMaxValue(50),
+        ),
     )
     .addSubcommand((subcommand) =>
       subcommand.setName("status").setDescription("Show news Forum configuration"),
@@ -161,7 +192,7 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: setup
-        ? `News is **${setup.enabled ? "enabled" : "disabled"}** in <#${setup.forumChannelId}>.\n${setup.mappings
+        ? `News is **${setup.enabled ? "enabled" : "disabled"}** in <#${setup.forumChannelId}>. Initial import: ${setup.initialImportCompleted ? "complete" : `pending (${setup.initialImportMode}, ${setup.initialBackfillCount} newest)`}.\n${setup.mappings
             .map(
               ({ menuSeq, tagId, notificationRoleId }) =>
                 `${NEWS_TAGS.find((tag) => tag.menuSeq === menuSeq)?.name ?? menuSeq}: tag ${tagId}, <@&${notificationRoleId}>`,
@@ -179,20 +210,42 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
     });
     return;
   }
+  if (action === "backfill") {
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const result = await createNewsRuntime(interaction.client).synchronizer.syncGuild(
+      interaction.guildId,
+      { mode: "backfill", count: interaction.options.getInteger("count") ?? 10 },
+    );
+    await interaction.editReply({
+      content: `Backfill: ${result.published} published. ${result.failures.length} failed.${result.failures.length ? ` IDs: ${result.failures.join("; ").slice(0, 1000)}` : ""}`,
+    });
+    return;
+  }
   if (action !== "create") throw new Error("Unknown news setup action.");
   const botId = interaction.client.user?.id;
   if (!botId) throw new Error("The bot user is not available.");
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const mode =
+    interaction.options.getString("import-mode") === "future_only" ? "future_only" : "backfill";
+  const count = interaction.options.getInteger("backfill-count") ?? 10;
   const setup = await createNewsSetup(
     createNewsGuildGateway(interaction.guild, botId, interaction.user.tag),
     store,
+    mode,
+    count,
   );
+  const result = setup.initialImportCompleted
+    ? null
+    : await createNewsRuntime(interaction.client).synchronizer.syncGuild(interaction.guildId);
+  const summary = result
+    ? `Initial import: ${result.published} published, ${result.skipped} skipped, ${result.failures.length} failed.${result.failures.length ? ` IDs: ${result.failures.join("; ").slice(0, 800)}` : ""}`
+    : "Already imported; future synchronization remains active.";
   await interaction.editReply({
     content: `News Forum ready: <#${setup.forumChannelId}>.\n${setup.mappings
       .map(
         ({ menuSeq, notificationRoleId }) =>
           `${NEWS_TAGS.find((tag) => tag.menuSeq === menuSeq)?.name ?? menuSeq}: <@&${notificationRoleId}>`,
       )
-      .join("\n")}\nArticles are not published until Phase 4.`,
+      .join("\n")}\n${summary}`,
   });
 }

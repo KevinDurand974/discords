@@ -50,14 +50,19 @@ function fixtures() {
 }
 
 describe("news Forum setup", () => {
-  it("registers all three news subcommands alongside existing log setup", () => {
+  it("registers publishing subcommands alongside existing log setup", () => {
     const options = setupCommand.data.toJSON().options ?? [];
     expect(options.map(({ name }) => name)).toEqual(["news", "logs"]);
     const news = options[0];
     expect(news?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
     if (news?.type !== ApplicationCommandOptionType.SubcommandGroup)
       throw new Error("News group missing");
-    expect(news.options?.map(({ name }) => name)).toEqual(["create", "status", "disable"]);
+    expect(news.options?.map(({ name }) => name)).toEqual([
+      "create",
+      "backfill",
+      "status",
+      "disable",
+    ]);
   });
 
   it("creates five manual roles, tags and a single persisted Forum", async () => {

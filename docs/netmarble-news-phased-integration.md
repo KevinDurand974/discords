@@ -95,7 +95,7 @@ Publish text-only Netmarble articles from the public API.
 - Add `/setup news backfill [count]`.
 - In future-only mode, record current normal article IDs as skipped without publishing them.
 - Convert simple HTML paragraph, line-break, heading, list, bold, italic, and link content to Discord Markdown.
-- Create a tagged Forum post with a preview and full Markdown detail messages.
+- Create a tagged Forum post with a plain-text preview message (no embed) and full Markdown detail messages.
 - Add one **Read on Netmarble** link button using:
 
 ```text
@@ -109,7 +109,7 @@ https://forum.netmarble.com/slv_en/view/{menuSeq}/{articleId}
 
 - Native Discord media upload.
 - Advanced HTML edge cases.
-- Pin reconciliation after the initial publish.
+- Pin reconciliation after the initial publish (initial imports prefer a source-pinned Notices article over other source pins).
 
 ### Acceptance criteria
 
@@ -125,14 +125,14 @@ https://forum.netmarble.com/slv_en/view/{menuSeq}/{articleId}
 
 - Store Discord thread IDs for imported source articles.
 - On every synchronization, compare source `recommendList` with stored articles.
-- Call `thread.pin()` for source-pinned articles and `thread.unpin()` when the source removes the pin.
+- Keep the Forum pin aligned with the preferred source-pinned article: the newest pinned Notices article, otherwise the newest source pin. Unpin it when the source removes the pin.
 - Complete Discord-safe HTML-to-Markdown conversion.
 - Safely split long content at Discord's message limit without invalid Markdown.
 - Improve errors, retries, logging, and per-category failure isolation.
 
 ### Acceptance criteria
 
-- A source pin and unpin is reflected in Discord without reposting the article.
+- Source pin changes are reflected in Discord without reposting; Notices takes priority over other pinned categories.
 - Long articles are fully readable in the Discord thread.
 - Invalid or unexpected HTML does not prevent later articles/categories from importing.
 
@@ -143,7 +143,7 @@ https://forum.netmarble.com/slv_en/view/{menuSeq}/{articleId}
 - Download `thumbnailUrl` and `attachFileInfo[].originalUrl` media.
 - Validate MIME type and file size before upload.
 - Upload supported media as native Discord attachments.
-- Use the uploaded preview image in the initial post embed.
+- Attach the uploaded preview image to the initial post message without an embed.
 - Attach remaining media to the appropriate detail messages in source order.
 - Fall back to a labelled source URL for unavailable, unsafe, unsupported, or oversized media.
 
@@ -170,6 +170,24 @@ https://forum.netmarble.com/slv_en/view/{menuSeq}/{articleId}
 - Public API abuse does not affect Discord publishing reliability.
 - Operators can identify last successful source ingestion and last successful guild publication.
 
+## Phase 8 — Complete News Setup Cleanup
+
+### Scope
+
+- Add an administrator-only `/setup news clean` command with an explicit destructive confirmation that names the Forum, roles, and publication history to be removed.
+- Stop new synchronization for this guild and wait for any in-flight publication to finish before deleting resources.
+- Delete only the Forum Channel and notification roles recorded for this guild's news setup by their stored IDs. Deleting the Forum also deletes its posts, comments, and attachments; deleting the roles removes any member assignments. Do not delete resources merely because their names match.
+- After Discord resources are removed, delete the guild's news settings; cascading deletion removes its category mappings and imported-article records. A later `/setup news create` starts with a fresh import state.
+- Keep the global source article/category/media tables and every other guild's data untouched.
+- Treat missing Discord resources as already removed. On partial Discord/API failure, report what remains and retain the stored IDs/state needed to retry safely; do not delete the database settings prematurely.
+
+### Acceptance criteria
+
+- Without explicit confirmation or administrator permission, the command changes nothing.
+- Cleanup prevents concurrent scheduled/manual publication and removes the configured Forum, roles, and guild-specific news records without affecting unrelated resources or global API data.
+- A second cleanup is harmless; a cleanup interrupted after only some resources were removed can be retried to completion.
+- Re-running `/setup news create` after successful cleanup creates fresh resources and performs its configured initial import again.
+
 ## Recommended Delivery Order
 
 1. Phase 1
@@ -179,5 +197,6 @@ https://forum.netmarble.com/slv_en/view/{menuSeq}/{articleId}
 5. Phase 5
 6. Phase 6
 7. Phase 7
+8. Phase 8
 
-Phases 1–4 produce the first useful production feature: configured Discord Forum posts containing Netmarble news, text detail, tags, notifications, deduplication, and a canonical source link. Later phases improve correctness, presentation, and operations without changing that core workflow.
+Phases 1–4 produce the first useful production feature: configured Discord Forum posts containing Netmarble news, text detail, tags, notifications, deduplication, and a canonical source link. Later phases improve correctness, presentation, operations, and safe teardown without changing that core workflow.

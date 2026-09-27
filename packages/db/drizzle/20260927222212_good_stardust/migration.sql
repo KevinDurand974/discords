@@ -1,0 +1,2 @@
+ALTER TABLE "netmarble_news_settings" ADD COLUMN "initial_backfill_count" integer DEFAULT 10 NOT NULL;--> statement-breakpoint
+ALTER TABLE "netmarble_news_settings" ADD CONSTRAINT "netmarble_news_settings_backfill_count_check" CHECK ("initial_backfill_count" BETWEEN 1 AND 50);

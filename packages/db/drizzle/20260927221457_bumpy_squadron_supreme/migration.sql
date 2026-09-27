@@ -1,0 +1,1 @@
+ALTER TABLE "netmarble_news_settings" ADD COLUMN "initial_import_completed_at" timestamp with time zone;

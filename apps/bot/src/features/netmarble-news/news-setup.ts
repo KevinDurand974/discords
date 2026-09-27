@@ -1,17 +1,22 @@
 export const NEWS_FORUM_NAME = "Solo Leveling: Arise - News";
+export const NOTICES_MENU_SEQ = 32;
 export const NEWS_TAGS = [
-  { menuSeq: 32, name: "Notices" },
+  { menuSeq: NOTICES_MENU_SEQ, name: "Notices" },
   { menuSeq: 13, name: "Developer Notes" },
   { menuSeq: 14, name: "Updates" },
   { menuSeq: 1, name: "Official News" },
   { menuSeq: 46, name: "Hunter: Origin" },
 ] as const;
 
+export type NewsImportMode = "backfill" | "future_only";
 export type NewsMapping = { menuSeq: number; tagId: string; notificationRoleId: string };
 export type NewsSetup = {
   guildId: string;
   forumChannelId: string;
   enabled: boolean;
+  initialImportMode: NewsImportMode;
+  initialBackfillCount: number;
+  initialImportCompleted: boolean;
   mappings: NewsMapping[];
 };
 
@@ -34,7 +39,15 @@ export type NewsGuildGateway = {
 export async function createNewsSetup(
   guild: NewsGuildGateway,
   store: NewsSetupStore,
+  initialImportMode: NewsImportMode = "backfill",
+  initialBackfillCount = 10,
 ): Promise<NewsSetup> {
+  if (
+    !Number.isInteger(initialBackfillCount) ||
+    initialBackfillCount < 1 ||
+    initialBackfillCount > 50
+  )
+    throw new RangeError("Backfill count must be between 1 and 50.");
   const current = await store.get(guild.guildId);
   if (current?.enabled) throw new Error("News is already configured for this server.");
   await guild.preflight();
@@ -70,7 +83,15 @@ export async function createNewsSetup(
     if (new Set(mappings.map(({ tagId }) => tagId)).size !== NEWS_TAGS.length) {
       throw new Error("Forum tags are not unique.");
     }
-    const setup = { guildId: guild.guildId, forumChannelId: forum.id, enabled: true, mappings };
+    const setup: NewsSetup = {
+      guildId: guild.guildId,
+      forumChannelId: forum.id,
+      enabled: true,
+      initialImportMode,
+      initialBackfillCount,
+      initialImportCompleted: false,
+      mappings,
+    };
     await store.save(setup);
     return setup;
   } catch (error) {

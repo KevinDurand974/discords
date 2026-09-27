@@ -38,9 +38,12 @@ export const netmarbleNewsSettings = pgTable("netmarble_news_settings", {
   enabled: boolean("enabled").notNull().default(true),
   pollIntervalMinutes: integer("poll_interval_minutes").notNull().default(30),
   initialImportMode: text("initial_import_mode").notNull().default("backfill"),
+  initialBackfillCount: integer("initial_backfill_count").notNull().default(10),
+  initialImportCompletedAt: timestamp("initial_import_completed_at", { withTimezone: true }),
 }, (table) => [
   check("netmarble_news_settings_poll_interval_check", sql`${table.pollIntervalMinutes} > 0`),
   check("netmarble_news_settings_import_mode_check", sql`${table.initialImportMode} IN ('backfill', 'future_only')`),
+  check("netmarble_news_settings_backfill_count_check", sql`${table.initialBackfillCount} BETWEEN 1 AND 50`),
 ]);
 
 export const netmarbleNewsCategories = pgTable("netmarble_news_categories", {

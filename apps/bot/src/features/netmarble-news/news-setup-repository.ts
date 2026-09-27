@@ -26,6 +26,10 @@ export function createNewsSetupRepository(): NewsSetupStore {
         guildId,
         forumChannelId: settings.forumChannelId,
         enabled: settings.enabled,
+        initialImportMode:
+          settings.initialImportMode === "future_only" ? "future_only" : "backfill",
+        initialBackfillCount: settings.initialBackfillCount,
+        initialImportCompleted: settings.initialImportCompletedAt !== null,
         mappings: mappings.map(({ menuSeq, tagId, notificationRoleId }) => ({
           menuSeq,
           tagId,
@@ -38,6 +42,8 @@ export function createNewsSetupRepository(): NewsSetupStore {
         await tx.insert(netmarbleNewsSettings).values({
           guildId: setup.guildId,
           forumChannelId: setup.forumChannelId,
+          initialImportMode: setup.initialImportMode,
+          initialBackfillCount: setup.initialBackfillCount,
         });
         await tx.insert(netmarbleNewsCategories).values(
           setup.mappings.map((mapping) => ({
