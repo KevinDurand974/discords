@@ -1,0 +1,1 @@
+CREATE INDEX "source_articles_menu_date_id_idx" ON "source_articles" ("menu_seq","created_at" DESC NULLS LAST,"id" DESC NULLS LAST);

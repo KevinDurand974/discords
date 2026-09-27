@@ -1,0 +1,23 @@
+{
+  "name": "@discords/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "nub src/index.ts",
+    "dev": "nub watch src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@discords/db": "workspace:*",
+    "@elysiajs/node": "1.4.5",
+    "croner": "10.0.1",
+    "elysia": "1.4.30"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "typescript": "^7",
+    "vitest": "5.0.2"
+  }
+}

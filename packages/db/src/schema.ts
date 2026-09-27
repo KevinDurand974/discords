@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, integer, pgTable, primaryKey, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, pgTable, primaryKey, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
 
 export const newsCategories = pgTable("news_categories", {
   menuSeq: integer("menu_seq").primaryKey(),
@@ -19,7 +19,7 @@ export const sourceArticles = pgTable("source_articles", {
   updatedAt: timestamp("updated_at", { withTimezone: true }),
   isSourcePinned: boolean("is_source_pinned").notNull().default(false),
   ingestedAt: timestamp("ingested_at", { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [index("source_articles_menu_date_id_idx").on(table.menuSeq, table.createdAt.desc(), table.id.desc())]);
 
 export const sourceArticleMedia = pgTable("source_article_media", {
   articleId: integer("article_id").notNull().references(() => sourceArticles.id, { onDelete: "cascade" }),

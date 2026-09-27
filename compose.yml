@@ -1,4 +1,19 @@
 services:
+  api:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL to the postgres service URL}
+      PORT: 3000
+    command: ["sh", "-c", "nub run db:migrate && nub --cwd apps/api run start"]
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
