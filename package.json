@@ -11,7 +11,13 @@
     }
   },
   "scripts": {
-    "start": "nub index.ts",
+    "start": "nub run docker:up",
+    "stop": "nub run docker:down",
+    "docker:up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build",
+    "docker:ps": "docker compose ps",
+    "docker:logs": "docker compose logs --tail=100",
     "test": "nub --cwd packages/db run test",
     "db:generate": "nub --cwd packages/db run db:generate",
     "db:migrate": "nub --cwd packages/db run db:migrate"
