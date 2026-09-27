@@ -1,0 +1,27 @@
+{
+  "name": "@discords/db",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/client.ts",
+    "./schema": "./src/schema.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "drizzle-orm": "1.0.0-rc.4",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "1.0.0-rc.4",
+    "typescript": "^7",
+    "vitest": "5.0.2"
+  }
+}

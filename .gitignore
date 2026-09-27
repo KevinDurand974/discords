@@ -1,4 +1,5 @@
 node_modules
+.pi/tasks/
 .env*
 env.d.ts
 !.env.example
