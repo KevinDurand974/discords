@@ -4,20 +4,6 @@ import { fileURLToPath } from "node:url";
 
 const projectRoot = fileURLToPath(new URL("..", import.meta.url));
 
-function loadVarlockEnvironment() {
-  const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "nub";
-  const args = process.platform === "win32"
-    ? ["/d", "/s", "/c", "nub --cwd apps/api exec varlock load --format json"]
-    : ["--cwd", "apps/api", "exec", "varlock", "load", "--format", "json"];
-  const result = spawnSync(command, args, { cwd: projectRoot, encoding: "utf8" });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    if (result.stderr) process.stderr.write(result.stderr);
-    throw new Error("Varlock could not validate apps/api/.env.schema and apps/api/.env.");
-  }
-  return JSON.parse(result.stdout);
-}
-
 export function composeEnvironment(values) {
   const user = values.POSTGRES_USER;
   const database = values.POSTGRES_DB;
@@ -44,7 +30,9 @@ export function composeEnvironment(values) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const config = composeEnvironment(loadVarlockEnvironment());
+    // The root package script invokes this file through `varlock run --inject vars`.
+    // Do not parse `varlock load` output: sensitive values there may be redacted.
+    const config = composeEnvironment(process.env);
     const result = spawnSync("docker", ["compose", ...process.argv.slice(2)], {
       cwd: projectRoot,
       env: { ...process.env, ...config },

@@ -13,11 +13,11 @@
   "scripts": {
     "start": "nub run docker:up",
     "stop": "nub run docker:down",
-    "docker:up": "node scripts/docker.mjs up -d --build --wait --wait-timeout 120",
-    "docker:down": "node scripts/docker.mjs down",
-    "docker:build": "node scripts/docker.mjs build",
-    "docker:ps": "node scripts/docker.mjs ps",
-    "docker:logs": "node scripts/docker.mjs logs --tail=100",
+    "docker:up": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs up -d --build --wait --wait-timeout 120",
+    "docker:down": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs down",
+    "docker:build": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs build",
+    "docker:ps": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs ps",
+    "docker:logs": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs logs --tail=100",
     "test": "nub --cwd packages/db run test && node --test scripts/docker.test.mjs",
     "db:generate": "nub --cwd packages/db run db:generate",
     "db:migrate": "nub --cwd packages/db run db:migrate"
