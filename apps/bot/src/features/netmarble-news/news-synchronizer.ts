@@ -29,9 +29,10 @@ export function createNewsSynchronizer(
       try {
         const setup = await setups.get(guildId);
         if (!setup?.enabled) throw new Error("News publishing is not enabled in this server.");
-        const [articles, knownRows] = await Promise.all([source.list(), store.known(guildId)]);
-        const known = new Map(knownRows.map(({ id, state }) => [id, state]));
-        // A forum has one pinned post: prefer a Notices article, then the newest source pin.
+        const [listing, knownRows] = await Promise.all([source.list(), store.known(guildId)]);
+        const { articles } = listing;
+        const known = new Map(knownRows.map((row) => [row.id, row]));
+        // Prefer a Notices article, then the newest source pin.
         const pinnedWinnerId = (
           articles.find(
             (article) => article.isSourcePinned && article.menuSeq === NOTICES_MENU_SEQ,
@@ -49,7 +50,8 @@ export function createNewsSynchronizer(
             : initial
               ? article.isSourcePinned ||
                 (setup.initialImportMode === "backfill" && latest.has(article.id))
-              : !known.has(article.id),
+              : !known.has(article.id) ||
+                (article.isSourcePinned && known.get(article.id)?.state === "skipped"),
         );
         let skipped = 0;
         if (initial) {
@@ -59,16 +61,27 @@ export function createNewsSynchronizer(
             .reduce<Promise<void>>(async (previous, article) => {
               await previous;
               await store.skip(guildId, article);
-              known.set(article.id, "skipped");
+              known.set(article.id, {
+                id: article.id,
+                state: "skipped",
+                threadId: null,
+                discordPinned: false,
+              });
               skipped += 1;
             }, Promise.resolve());
         }
-        const failures: string[] = [];
+        const failures: string[] = [...listing.failures];
         let published = 0;
         await selected.reduce<Promise<void>>(async (previous, article: NewsArticle) => {
           await previous;
-          if (known.get(article.id) === "published") return;
-          if (known.get(article.id) === "skipped" && !initial && !manual) return;
+          if (known.get(article.id)?.state === "published") return;
+          if (
+            known.get(article.id)?.state === "skipped" &&
+            !initial &&
+            !manual &&
+            !article.isSourcePinned
+          )
+            return;
           try {
             const detail = await source.detail(article.id, article.menuSeq);
             if (detail.id !== article.id || detail.menuSeq !== article.menuSeq)
@@ -76,18 +89,63 @@ export function createNewsSynchronizer(
             const threadId = await publisher.publish(
               setup,
               { ...detail, isSourcePinned: article.isSourcePinned },
-              !initial && !manual,
-              article.id === pinnedWinnerId,
+              !initial && !manual && known.get(article.id)?.state !== "skipped",
             );
             await store.publish(guildId, article, threadId);
-            known.set(article.id, "published");
+            known.set(article.id, {
+              id: article.id,
+              state: "published",
+              threadId,
+              discordPinned: false,
+            });
             published += 1;
           } catch (error) {
             failures.push(
               `${article.id} (${article.menuSeq}): ${error instanceof Error ? error.message : String(error)}`,
             );
+            console.error(`News article ${article.id} failed in ${guildId}`, error);
           }
         }, Promise.resolve());
+        if (listing.failures.length === 0) {
+          await store.updateSourcePins(
+            guildId,
+            articles.filter((article) => article.isSourcePinned).map((article) => article.id),
+          );
+          const unpinFailed = await Array.from(known.values())
+            .filter((row): row is typeof row & { threadId: string } =>
+              Boolean(row.discordPinned && row.id !== pinnedWinnerId && row.threadId),
+            )
+            .reduce<Promise<boolean>>(async (previous, row) => {
+              const failed = await previous;
+              try {
+                await publisher.setPin(setup, row.threadId, false);
+                await store.setDiscordPinned(guildId, row.id, false);
+                row.discordPinned = false;
+                return failed;
+              } catch (error) {
+                failures.push(
+                  `Unpin ${row.id}: ${error instanceof Error ? error.message : String(error)}`,
+                );
+                console.error(`Could not unpin news article ${row.id} in ${guildId}`, error);
+                return true;
+              }
+            }, Promise.resolve(false));
+          const winner = pinnedWinnerId === undefined ? undefined : known.get(pinnedWinnerId);
+          if (!unpinFailed && winner?.state === "published" && winner.threadId) {
+            try {
+              await publisher.setPin(setup, winner.threadId, true);
+              if (!winner.discordPinned) {
+                await store.setDiscordPinned(guildId, winner.id, true);
+                winner.discordPinned = true;
+              }
+            } catch (error) {
+              failures.push(
+                `Pin ${winner.id}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+              console.error(`Could not pin news article ${winner.id} in ${guildId}`, error);
+            }
+          }
+        }
         if (initial && failures.length === 0) await store.completeInitial(guildId);
         return { published, skipped, failures, initial };
       } finally {

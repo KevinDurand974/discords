@@ -61,6 +61,7 @@ export const netmarbleArticles = pgTable("netmarble_articles", {
   syncState: text("sync_state").notNull(),
   threadId: varchar("thread_id", { length: 20 }),
   isSourcePinned: boolean("is_source_pinned").notNull().default(false),
+  isDiscordPinned: boolean("is_discord_pinned").notNull().default(false),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 }, (table) => [

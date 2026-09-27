@@ -1,0 +1,2 @@
+ALTER TABLE "netmarble_articles" ADD COLUMN "is_discord_pinned" boolean DEFAULT false NOT NULL;
+UPDATE "netmarble_articles" SET "is_discord_pinned" = "is_source_pinned" WHERE "sync_state" = 'published';

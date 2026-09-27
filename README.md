@@ -1,6 +1,6 @@
 # discords
 
-Netmarble news integration is being delivered in phases: see `docs/netmarble-news-phased-integration.md`. Phases 1–4 provide the shared PostgreSQL schema, public Netmarble news API, Discord Forum setup, and text-only article publication from the API. Media uploads and later pin reconciliation remain for subsequent phases.
+Netmarble news integration is being delivered in phases: see `docs/netmarble-news-phased-integration.md`. Phases 1–5 provide the shared PostgreSQL schema, public Netmarble news API, Discord Forum setup, text-only article publication, and pin reconciliation. Native media uploads remain for a subsequent phase.
 
 For local database setup, migrations, and tests, see `packages/db/README.md`. For the API, see `apps/api/README.md`. For Forum setup and article publication, see `apps/bot/README.md`.
 

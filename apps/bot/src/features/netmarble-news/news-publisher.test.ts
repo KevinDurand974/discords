@@ -27,6 +27,18 @@ const setup: NewsSetup = {
 function fixture() {
   const send = vi.fn(async () => ({}));
   const pin = vi.fn(async () => ({}));
+  const unpin = vi.fn(async () => ({}));
+  const thread = {
+    id: "thread",
+    type: ChannelType.GuildPublicThread,
+    guildId: "guild",
+    parentId: "forum",
+    isThread: () => true,
+    flags: { has: vi.fn(() => false) },
+    send,
+    pin,
+    unpin,
+  };
   const create = vi.fn(
     async (_options: {
       appliedTags: string[];
@@ -35,24 +47,30 @@ function fixture() {
         allowedMentions: unknown;
         components: { components: { data: unknown }[] }[];
       };
-    }) => ({ id: "thread", send, pin }),
+    }) => thread,
   );
   const client = {
     channels: {
-      fetch: vi.fn(async () => ({
-        type: ChannelType.GuildForum,
-        guildId: "guild",
-        threads: { create },
-      })),
+      fetch: vi.fn(async (id: string) =>
+        id === "missing"
+          ? null
+          : id === "forum"
+            ? {
+                type: ChannelType.GuildForum,
+                guildId: "guild",
+                threads: { create },
+              }
+            : thread,
+      ),
     },
   } as unknown as Client;
-  return { publisher: createNewsPublisher(client), create, send, pin };
+  return { publisher: createNewsPublisher(client), create, send, pin, unpin, thread };
 }
 
 describe("Forum publishing", () => {
   it("uses the tag, full detail, one canonical link button, and only the live role", async () => {
     const f = fixture();
-    expect(await f.publisher.publish(setup, article, true, false)).toBe("thread");
+    expect(await f.publisher.publish(setup, article, true)).toBe("thread");
     const options = f.create.mock.calls[0]![0];
     expect(options.appliedTags).toEqual(["tag"]);
     expect(options.message.content).toContain("<@&role>\n**Server update**");
@@ -71,13 +89,33 @@ describe("Forum publishing", () => {
     });
   });
 
-  it("does not ping on historical posts and pins initial source-pinned imports", async () => {
+  it("does not ping on historical posts and reconciles pins separately", async () => {
     const f = fixture();
-    await f.publisher.publish(setup, { ...article, isSourcePinned: true }, false, true);
+    await f.publisher.publish(setup, { ...article, isSourcePinned: true }, false);
     expect(f.create.mock.calls[0]![0].message.content).toContain("**Server update**");
     expect(f.create.mock.calls[0]![0].message.content).not.toContain("<@&role>");
     expect(f.create.mock.calls[0]![0].message.allowedMentions).toEqual({ parse: [], roles: [] });
-    expect(f.pin).toHaveBeenCalledOnce();
     expect(f.create.mock.calls[0]![0].message).not.toHaveProperty("embeds");
+    expect(f.pin).not.toHaveBeenCalled();
+    await f.publisher.setPin(setup, "thread", true);
+    expect(f.pin).toHaveBeenCalledOnce();
+    f.thread.flags.has.mockReturnValue(true);
+    await f.publisher.setPin(setup, "thread", true);
+    expect(f.pin).toHaveBeenCalledOnce();
+    await f.publisher.setPin(setup, "thread", false);
+    expect(f.unpin).toHaveBeenCalledOnce();
+  });
+
+  it("treats a deleted thread as already unpinned", async () => {
+    const f = fixture();
+    await expect(f.publisher.setPin(setup, "missing", false)).resolves.toBeUndefined();
+    await expect(f.publisher.setPin(setup, "missing", true)).rejects.toThrow("missing");
+  });
+
+  it("rejects a thread from another Forum", async () => {
+    const f = fixture();
+    f.thread.parentId = "different";
+    await expect(f.publisher.setPin(setup, "thread", true)).rejects.toThrow("another Forum");
+    expect(f.pin).not.toHaveBeenCalled();
   });
 });

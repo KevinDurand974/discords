@@ -18,6 +18,7 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
     isSourcePinned: index === 0,
   })).reverse();
   const saved = new Map<number, KnownArticle["state"]>();
+  const pinned = new Set<number>();
   const setup: NewsSetup = {
     guildId: "guild",
     forumChannelId: "forum",
@@ -32,7 +33,7 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
     })),
   };
   const source: NewsSource = {
-    list: vi.fn(async () => articles),
+    list: vi.fn(async () => ({ articles, failures: [] })),
     detail: vi.fn(async (id) => articles.find((a) => a.id === id)!),
   };
   const setups: NewsSetupStore = {
@@ -42,7 +43,19 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
   };
   const store: NewsPublicationStore = {
     enabledGuildIds: vi.fn(async () => ["guild"]),
-    known: vi.fn(async () => [...saved].map(([id, state]) => ({ id, state }))),
+    known: vi.fn(async () =>
+      [...saved].map(([id, state]) => ({
+        id,
+        state,
+        threadId: state === "published" ? `thread-${id}` : null,
+        discordPinned: pinned.has(id),
+      })),
+    ),
+    updateSourcePins: vi.fn(async () => {}),
+    setDiscordPinned: vi.fn(async (_, id, value) => {
+      if (value) pinned.add(id);
+      else pinned.delete(id);
+    }),
     skip: vi.fn(async (_, article) => {
       if (!saved.has(article.id)) saved.set(article.id, "skipped");
     }),
@@ -53,10 +66,14 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
       setup.initialImportCompleted = true;
     }),
   };
-  const publisher: NewsPublisher = { publish: vi.fn(async (_, article) => `thread-${article.id}`) };
+  const publisher: NewsPublisher = {
+    publish: vi.fn(async (_, article) => `thread-${article.id}`),
+    setPin: vi.fn(async () => {}),
+  };
   return {
     articles,
     saved,
+    pinned,
     setup,
     source,
     setups,
@@ -85,9 +102,8 @@ describe("news synchronization", () => {
     f.setup.initialBackfillCount = 2;
     f.articles[0]!.isSourcePinned = true;
     await f.sync.syncGuild("guild");
-    const calls = vi.mocked(f.publisher.publish).mock.calls;
-    expect(calls.filter(([, , , pin]) => pin).map(([, article]) => article.id)).toEqual([1]);
-    expect(calls.find(([, article]) => article.id === 15)?.[3]).toBe(false);
+    expect(f.publisher.setPin).toHaveBeenCalledWith(f.setup, "thread-1", true);
+    expect(f.publisher.setPin).not.toHaveBeenCalledWith(f.setup, "thread-15", true);
   });
 
   it("pins the newest source pin when no Notices article is pinned", async () => {
@@ -95,12 +111,81 @@ describe("news synchronization", () => {
     f.articles.find((article) => article.id === 1)!.isSourcePinned = false;
     f.articles[0]!.isSourcePinned = true;
     await f.sync.syncGuild("guild");
-    expect(
-      vi
-        .mocked(f.publisher.publish)
-        .mock.calls.filter(([, , , pin]) => pin)
-        .map(([, article]) => article.id),
-    ).toEqual([15]);
+    expect(f.publisher.setPin).toHaveBeenCalledWith(f.setup, "thread-15", true);
+  });
+
+  it("unpins a previously imported post and pins the new preferred post without reposting", async () => {
+    const f = fixture();
+    await f.sync.syncGuild("guild");
+    expect(f.pinned.has(1)).toBe(true);
+    f.articles.find((article) => article.id === 1)!.isSourcePinned = false;
+    f.articles.find((article) => article.id === 11)!.isSourcePinned = true; // Also Notices.
+    vi.mocked(f.publisher.publish).mockClear();
+    await f.sync.syncGuild("guild");
+    expect(f.publisher.publish).not.toHaveBeenCalled();
+    expect(f.publisher.setPin).toHaveBeenCalledWith(f.setup, "thread-1", false);
+    expect(f.publisher.setPin).toHaveBeenCalledWith(f.setup, "thread-11", true);
+    expect([...f.pinned]).toEqual([11]);
+  });
+
+  it("does not pin a replacement until the previous pin can be removed", async () => {
+    const f = fixture();
+    await f.sync.syncGuild("guild");
+    f.articles.find((article) => article.id === 1)!.isSourcePinned = false;
+    f.articles.find((article) => article.id === 11)!.isSourcePinned = true;
+    vi.mocked(f.publisher.setPin).mockClear().mockRejectedValueOnce(new Error("No access"));
+    const first = await f.sync.syncGuild("guild");
+    expect(first.failures).toEqual(["Unpin 1: No access"]);
+    expect(f.publisher.setPin).not.toHaveBeenCalledWith(f.setup, "thread-11", true);
+    expect(f.pinned.has(1)).toBe(true);
+    const second = await f.sync.syncGuild("guild");
+    expect(second.failures).toEqual([]);
+    expect([...f.pinned]).toEqual([11]);
+  });
+
+  it("retries a failed pin on the existing thread and continues publishing other articles", async () => {
+    const f = fixture();
+    vi.mocked(f.publisher.setPin).mockRejectedValueOnce(new Error("Missing permission"));
+    const first = await f.sync.syncGuild("guild");
+    expect(first.published).toBe(11);
+    expect(first.failures).toEqual(["Pin 1: Missing permission"]);
+    expect(f.store.completeInitial).not.toHaveBeenCalled();
+    vi.mocked(f.publisher.publish).mockClear();
+    const second = await f.sync.syncGuild("guild");
+    expect(second.failures).toEqual([]);
+    expect(f.publisher.publish).not.toHaveBeenCalled();
+    expect(f.pinned.has(1)).toBe(true);
+  });
+
+  it("imports an older skipped article if it becomes source-pinned, without a role mention", async () => {
+    const f = fixture("future_only");
+    await f.sync.syncGuild("guild");
+    f.articles.find((article) => article.id === 6)!.isSourcePinned = true;
+    await f.sync.syncGuild("guild");
+    expect(f.saved.get(6)).toBe("published");
+    expect(vi.mocked(f.publisher.publish).mock.lastCall?.[2]).toBe(false);
+  });
+
+  it("publishes healthy categories without clearing pins when another category fails", async () => {
+    const f = fixture();
+    vi.mocked(f.source.list).mockResolvedValueOnce({
+      articles: f.articles.filter((article) => article.menuSeq === 32),
+      failures: ["Category 13: API unavailable"],
+    });
+    const result = await f.sync.syncGuild("guild");
+    expect(result.published).toBeGreaterThan(0);
+    expect(result.failures).toEqual(["Category 13: API unavailable"]);
+    expect(f.store.updateSourcePins).not.toHaveBeenCalled();
+    expect(f.store.completeInitial).not.toHaveBeenCalled();
+  });
+
+  it("keeps importing later articles when one detail request fails", async () => {
+    const f = fixture();
+    vi.mocked(f.source.detail).mockRejectedValueOnce(new Error("Bad HTML upstream"));
+    const result = await f.sync.syncGuild("guild");
+    expect(result.failures).toHaveLength(1);
+    expect(result.published).toBe(10);
+    expect(f.publisher.publish).toHaveBeenCalledTimes(10);
   });
 
   it("persists and honors a custom initial backfill count on scheduled runs", async () => {

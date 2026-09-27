@@ -1,0 +1,844 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "e2892d8a-39c5-4a47-b215-79a5052b5192",
+  "prevIds": [
+    "bbee082a-5f20-45de-b87f-cff4b559d253"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_articles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_news_categories",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_news_settings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "news_categories",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "source_article_media",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "source_articles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_article_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sync_state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_source_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_discord_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "first_seen_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tag_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "notification_role_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "forum_channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "enabled",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "30",
+      "generated": null,
+      "identity": null,
+      "name": "poll_interval_minutes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'backfill'",
+      "generated": null,
+      "identity": null,
+      "name": "initial_import_mode",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "10",
+      "generated": null,
+      "identity": null,
+      "name": "initial_backfill_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "initial_import_completed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_synced_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "article_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "position",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "original_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "media_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "filename",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "excerpt",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "body_html",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thumbnail_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "canonical_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_source_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "ingested_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "menu_seq",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "source_articles_menu_date_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "netmarble_news_settings",
+      "columnsTo": [
+        "guild_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "netmarble_articles_8xOa7mup0VOf_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "source_article_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "source_articles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_articles_source_article_id_source_articles_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_articles_menu_seq_news_categories_menu_seq_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "netmarble_news_settings",
+      "columnsTo": [
+        "guild_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "netmarble_news_categories_wk0FZ4hZurC2_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_news_categories_v0glLGw6YzdU_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "article_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "source_articles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "source_article_media_article_id_source_articles_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "source_articles_menu_seq_news_categories_menu_seq_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "source_article_id"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_articles_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "menu_seq"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_news_categories_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "columns": [
+        "article_id",
+        "position"
+      ],
+      "nameExplicit": false,
+      "name": "source_article_media_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "columns": [
+        "guild_id"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_news_settings_pkey",
+      "schema": "public",
+      "table": "netmarble_news_settings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "menu_seq"
+      ],
+      "nameExplicit": false,
+      "name": "news_categories_pkey",
+      "schema": "public",
+      "table": "news_categories",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "source_articles_pkey",
+      "schema": "public",
+      "table": "source_articles",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "thread_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "netmarble_articles_thread_id_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "value": "\"sync_state\" IN ('published', 'skipped')",
+      "name": "netmarble_articles_sync_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "value": "(\"sync_state\" = 'published' AND \"thread_id\" IS NOT NULL AND \"published_at\" IS NOT NULL) OR (\"sync_state\" = 'skipped' AND \"thread_id\" IS NULL AND \"published_at\" IS NULL)",
+      "name": "netmarble_articles_publication_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "value": "\"poll_interval_minutes\" > 0",
+      "name": "netmarble_news_settings_poll_interval_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"initial_import_mode\" IN ('backfill', 'future_only')",
+      "name": "netmarble_news_settings_import_mode_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"initial_backfill_count\" BETWEEN 1 AND 50",
+      "name": "netmarble_news_settings_backfill_count_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"menu_seq\" IN (1, 13, 14, 32, 46)",
+      "name": "news_categories_menu_seq_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "value": "\"position\" >= 0",
+      "name": "source_article_media_position_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "source_article_media"
+    }
+  ],
+  "renames": []
+}

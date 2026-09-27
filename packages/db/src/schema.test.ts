@@ -27,7 +27,7 @@ describe("news database schema", () => {
   it("tracks per-guild article publication and pin reconciliation", () => {
     expect(columnNames(netmarbleArticles)).toEqual([
       "guildId", "sourceArticleId", "menuSeq", "sourceCreatedAt", "syncState",
-      "threadId", "isSourcePinned", "firstSeenAt", "publishedAt",
+      "threadId", "isSourcePinned", "isDiscordPinned", "firstSeenAt", "publishedAt",
     ]);
     expect(netmarbleArticles.threadId.notNull).toBe(false);
     expect(netmarbleNewsSettings.pollIntervalMinutes.default).toBe(30);

@@ -2,6 +2,7 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ChannelFlags,
   ChannelType,
   type Client,
   type ForumChannel,
@@ -11,12 +12,13 @@ import { NEWS_TAGS, type NewsSetup } from "./news-setup.ts";
 import type { NewsArticle } from "./news-api.ts";
 
 export type NewsPublisher = {
-  publish(setup: NewsSetup, article: NewsArticle, notify: boolean, pin: boolean): Promise<string>;
+  publish(setup: NewsSetup, article: NewsArticle, notify: boolean): Promise<string>;
+  setPin(setup: NewsSetup, threadId: string, pinned: boolean): Promise<void>;
 };
 
 export function createNewsPublisher(client: Client): NewsPublisher {
   return {
-    async publish(setup, article, notify, pin) {
+    async publish(setup, article, notify) {
       const channel = await client.channels.fetch(setup.forumChannelId);
       if (channel?.type !== ChannelType.GuildForum || channel.guildId !== setup.guildId)
         throw new Error(`News Forum ${setup.forumChannelId} is missing or invalid.`);
@@ -47,13 +49,34 @@ export function createNewsPublisher(client: Client): NewsPublisher {
         await previous;
         await thread.send({ content, allowedMentions: { parse: [] } });
       }, Promise.resolve());
-      if (pin) {
-        // Phase 5 reconciles later pin changes; a failed pin must not repost the thread.
-        await thread.pin("Pinned on Netmarble").catch((error: unknown) => {
-          console.error(`Could not pin Netmarble article ${article.id}`, error);
-        });
-      }
       return thread.id;
+    },
+    async setPin(setup, threadId, pinned) {
+      let channel;
+      try {
+        channel = await client.channels.fetch(threadId);
+      } catch (error) {
+        if (
+          !pinned &&
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === 10003
+        )
+          return;
+        throw error;
+      }
+      if (!channel && !pinned) return;
+      if (
+        !channel?.isThread() ||
+        channel.type !== ChannelType.GuildPublicThread ||
+        channel.guildId !== setup.guildId ||
+        channel.parentId !== setup.forumChannelId
+      )
+        throw new Error(`News thread ${threadId} is missing or belongs to another Forum.`);
+      if (channel.flags.has(ChannelFlags.Pinned) === pinned) return;
+      if (pinned) await channel.pin("Pinned on Netmarble");
+      else await channel.unpin("Unpinned on Netmarble");
     },
   };
 }
