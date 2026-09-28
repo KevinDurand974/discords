@@ -7,6 +7,13 @@ export type NewsArticle = {
   canonicalUrl: string;
   createdAt: string;
   isSourcePinned: boolean;
+  thumbnailUrl?: string | null;
+  media?: {
+    position: number;
+    originalUrl: string;
+    mediaType: string | null;
+    filename: string | null;
+  }[];
 };
 
 export type NewsListing = { articles: NewsArticle[]; failures: string[] };

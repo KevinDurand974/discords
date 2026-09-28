@@ -40,7 +40,7 @@ export function createNewsSynchronizer(
         )?.id;
         const initial = !setup.initialImportCompleted && options.mode !== "backfill";
         const manual = options.mode === "backfill";
-        const count = initial ? setup.initialBackfillCount : (options.count ?? 10);
+        const count = initial ? setup.initialBackfillCount : manual ? (options.count ?? 10) : 10;
         if (!Number.isInteger(count) || count < 1 || count > 50)
           throw new RangeError("Backfill count must be between 1 and 50.");
         const latest = new Set(articles.slice(0, count).map(({ id }) => id));
@@ -50,8 +50,9 @@ export function createNewsSynchronizer(
             : initial
               ? article.isSourcePinned ||
                 (setup.initialImportMode === "backfill" && latest.has(article.id))
-              : !known.has(article.id) ||
-                (article.isSourcePinned && known.get(article.id)?.state === "skipped"),
+              : latest.has(article.id) &&
+                (!known.has(article.id) ||
+                  (article.isSourcePinned && known.get(article.id)?.state === "skipped")),
         );
         let skipped = 0;
         if (initial) {
@@ -133,10 +134,10 @@ export function createNewsSynchronizer(
           const winner = pinnedWinnerId === undefined ? undefined : known.get(pinnedWinnerId);
           if (!unpinFailed && winner?.state === "published" && winner.threadId) {
             try {
-              await publisher.setPin(setup, winner.threadId, true);
-              if (!winner.discordPinned) {
-                await store.setDiscordPinned(guildId, winner.id, true);
-                winner.discordPinned = true;
+              const exists = await publisher.setPin(setup, winner.threadId, true);
+              if (winner.discordPinned !== exists) {
+                await store.setDiscordPinned(guildId, winner.id, exists);
+                winner.discordPinned = exists;
               }
             } catch (error) {
               failures.push(

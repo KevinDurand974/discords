@@ -68,7 +68,7 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
   };
   const publisher: NewsPublisher = {
     publish: vi.fn(async (_, article) => `thread-${article.id}`),
-    setPin: vi.fn(async () => {}),
+    setPin: vi.fn(async () => true),
   };
   return {
     articles,
@@ -95,6 +95,31 @@ describe("news synchronization", () => {
     ).toBe(true);
     expect((await f.sync.syncGuild("guild")).published).toBe(0);
     expect(f.publisher.publish).toHaveBeenCalledTimes(11);
+  });
+
+  it("limits scheduled imports to the ten newest articles across all categories", async () => {
+    const f = fixture();
+    f.setup.initialImportCompleted = true;
+    const result = await f.sync.syncGuild("guild");
+    expect(result).toMatchObject({ published: 10, skipped: 0, initial: false });
+    expect([...f.saved.keys()].sort((a, b) => a - b)).toEqual([6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
+    expect(f.source.detail).toHaveBeenCalledTimes(10);
+    expect(f.saved.has(1)).toBe(false); // Even a source pin outside the ten is not posted.
+    expect((await f.sync.syncGuild("guild")).published).toBe(0);
+  });
+
+  it("does not import older missing articles when the newest ten span multiple categories", async () => {
+    const f = fixture();
+    f.setup.initialImportCompleted = true;
+    f.articles.unshift(
+      { ...f.articles[0]!, id: 17, menuSeq: NEWS_TAGS[0]!.menuSeq },
+      { ...f.articles[0]!, id: 16, menuSeq: NEWS_TAGS[0]!.menuSeq },
+    );
+    await f.sync.syncGuild("guild");
+    expect([...f.saved.keys()].sort((a, b) => a - b)).toEqual([
+      8, 9, 10, 11, 12, 13, 14, 15, 16, 17,
+    ]);
+    expect(f.publisher.publish).toHaveBeenCalledTimes(10);
   });
 
   it("pins a Notices article ahead of newer pinned categories", async () => {
@@ -143,6 +168,30 @@ describe("news synchronization", () => {
     expect([...f.pinned]).toEqual([11]);
   });
 
+  it("does not report or record a pin for a manually deleted Discord thread", async () => {
+    const f = fixture();
+    vi.mocked(f.publisher.setPin).mockResolvedValue(false);
+    const first = await f.sync.syncGuild("guild");
+    expect(first.failures).toEqual([]);
+    expect(f.store.setDiscordPinned).not.toHaveBeenCalledWith("guild", 1, true);
+    expect(f.pinned.has(1)).toBe(false);
+    expect(f.store.completeInitial).toHaveBeenCalledOnce();
+    const second = await f.sync.syncGuild("guild");
+    expect(second.failures).toEqual([]);
+    expect(f.publisher.publish).toHaveBeenCalledTimes(11);
+  });
+
+  it("clears a previously recorded pin if its Discord thread was deleted", async () => {
+    const f = fixture();
+    await f.sync.syncGuild("guild");
+    expect(f.pinned.has(1)).toBe(true);
+    vi.mocked(f.publisher.setPin).mockResolvedValue(false);
+    const result = await f.sync.syncGuild("guild");
+    expect(result.failures).toEqual([]);
+    expect(f.store.setDiscordPinned).toHaveBeenCalledWith("guild", 1, false);
+    expect(f.pinned.has(1)).toBe(false);
+  });
+
   it("retries a failed pin on the existing thread and continues publishing other articles", async () => {
     const f = fixture();
     vi.mocked(f.publisher.setPin).mockRejectedValueOnce(new Error("Missing permission"));
@@ -157,12 +206,14 @@ describe("news synchronization", () => {
     expect(f.pinned.has(1)).toBe(true);
   });
 
-  it("imports an older skipped article if it becomes source-pinned, without a role mention", async () => {
+  it("imports a skipped article in the latest ten if it becomes source-pinned, without a role mention", async () => {
     const f = fixture("future_only");
     await f.sync.syncGuild("guild");
-    f.articles.find((article) => article.id === 6)!.isSourcePinned = true;
+    f.articles.find((article) => article.id === 11)!.isSourcePinned = true;
+    f.articles.find((article) => article.id === 5)!.isSourcePinned = true;
     await f.sync.syncGuild("guild");
-    expect(f.saved.get(6)).toBe("published");
+    expect(f.saved.get(11)).toBe("published");
+    expect(f.saved.get(5)).toBe("skipped");
     expect(vi.mocked(f.publisher.publish).mock.lastCall?.[2]).toBe(false);
   });
 
