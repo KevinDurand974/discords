@@ -12,4 +12,4 @@ The shared PostgreSQL schema covers source news and per-guild publication state.
 
 After changing `src/schema.ts`, run `nub run db:generate`, review and commit the generated SQL and journal, then run `nub run db:migrate`. Never use a schema push against production. `docker compose down` preserves the named `postgres_data` volume; `docker compose down -v` deletes it.
 
-The API Compose service migrates the database before startup. The bot Dockerfile remains a runtime foundation; bot Compose startup and Discord publishing arrive in later phases.
+The API Compose service migrates the database before startup; the opt-in bot Compose profile waits for API readiness. For disposable PostgreSQL migration/persistence tests run `nub run test:integration`; backup, restore and recovery procedures are in `docs/netmarble-news-operations.md`.

@@ -20,7 +20,9 @@
     "docker:logs": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs logs --tail=100",
     "test": "nub --cwd packages/db run test && node --test scripts/docker.test.mjs",
     "db:generate": "nub --cwd packages/db run db:generate",
-    "db:migrate": "nub --cwd packages/db run db:migrate"
+    "db:migrate": "nub --cwd packages/db run db:migrate",
+    "test:integration": "node scripts/test-integration.mjs",
+    "docker:bot:up": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs --profile bot up -d --build --wait --wait-timeout 180"
   },
   "devDependencies": {
     "@nubjs/types": ">=0.4.13 <=0.9.2",

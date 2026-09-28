@@ -20,7 +20,10 @@ export function createNewsRuntime(client: Client) {
   const setups = createNewsSetupRepository();
   const publications = createNewsPublicationRepository();
   const synchronizer = createNewsSynchronizer(
-    createNewsSource(process.env.NEWS_API_URL ?? "http://localhost:3000"),
+    createNewsSource(
+      process.env.NEWS_API_URL ?? "http://localhost:3000",
+      process.env.NEWS_INTERNAL_TOKEN,
+    ),
     setups,
     publications,
     createNewsPublisher(client),
@@ -45,6 +48,13 @@ export function startNewsScheduler(client: Client) {
             const result = await synchronizer.syncGuild(guildId);
             if (result.failures.length)
               console.error(`News synchronization failed in ${guildId}`, result.failures);
+            else
+              console.info("News guild synchronization succeeded", {
+                guildId,
+                published: result.published,
+                skipped: result.skipped,
+                at: new Date().toISOString(),
+              });
           } catch (error) {
             console.error(`News synchronization failed in ${guildId}`, error);
           }

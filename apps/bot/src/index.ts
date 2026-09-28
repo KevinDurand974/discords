@@ -4,11 +4,18 @@ import { createCommandLogger } from "@/core/command-logger.ts";
 import type { CommandDefinition } from "@/core/command.ts";
 import { commands, componentHandlers } from "@/core/command-registry.ts";
 import { ENV } from "@/core/config.ts";
+import { createBotHealthServer } from "@/core/health.ts";
 import { registerInteractionRouter } from "@/core/interaction-router.ts";
 import { startNewsScheduler } from "@/features/netmarble-news/news-runtime.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
 
 const client = createDiscordClient();
+const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
+if (!Number.isInteger(healthPort) || healthPort < 1 || healthPort > 65535)
+  throw new Error("BOT_HEALTH_PORT must be between 1 and 65535");
+createBotHealthServer(client, process.env.DATABASE_URL).listen(healthPort, "127.0.0.1", () => {
+  console.info(`Bot health listening on 127.0.0.1:${healthPort}`);
+});
 const commandLogger = await createCommandLogger(client);
 const commandsByName = new Collection<string, CommandDefinition>();
 
@@ -21,7 +28,6 @@ registerInteractionRouter(client, commandsByName, componentHandlers, {
 });
 
 client.once(Events.ClientReady, async (readyClient) => {
-  console.clear();
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
   startNewsScheduler(readyClient);

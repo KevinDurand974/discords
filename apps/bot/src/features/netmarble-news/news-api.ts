@@ -22,13 +22,16 @@ export type NewsSource = {
   detail(id: number, menuSeq: number): Promise<NewsArticle>;
 };
 
-export function createNewsSource(baseUrl: string): NewsSource {
+export function createNewsSource(baseUrl: string, internalToken?: string): NewsSource {
   const base = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
   const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
   const get = async <T>(path: string, attempt = 0): Promise<T> => {
     let response: Response;
     try {
-      response = await fetch(new URL(path, base), { signal: AbortSignal.timeout(15_000) });
+      response = await fetch(new URL(path, base), {
+        signal: AbortSignal.timeout(15_000),
+        ...(internalToken ? { headers: { Authorization: `Bearer ${internalToken}` } } : {}),
+      });
     } catch (error) {
       if (attempt === 2) throw error;
       await wait(250 * 2 ** attempt);

@@ -25,6 +25,8 @@ export function composeEnvironment(values) {
     POSTGRES_PASSWORD: password,
     PORT: String(port),
     API_DATABASE_URL: dockerUrl.toString(),
+    NEWS_CORS_ORIGINS: values.NEWS_CORS_ORIGINS ?? "",
+    NEWS_INTERNAL_TOKEN: values.NEWS_INTERNAL_TOKEN ?? "",
   };
 }
 
@@ -33,7 +35,10 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     // The root package script invokes this file through `varlock run --inject vars`.
     // Do not parse `varlock load` output: sensitive values there may be redacted.
     const config = composeEnvironment(process.env);
-    const result = spawnSync("docker", ["compose", ...process.argv.slice(2)], {
+    const args = process.argv.slice(2);
+    if (args.includes("--profile") && args.includes("bot") && !config.NEWS_INTERNAL_TOKEN)
+      throw new Error("Set NEWS_INTERNAL_TOKEN in apps/api/.env before starting the bot profile.");
+    const result = spawnSync("docker", ["compose", ...args], {
       cwd: projectRoot,
       env: { ...process.env, ...config },
       stdio: "inherit",

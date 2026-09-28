@@ -10,6 +10,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in apps/api/.env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in apps/api/.env}
       PORT: ${PORT:-3000}
+      NEWS_CORS_ORIGINS: ${NEWS_CORS_ORIGINS:-}
+      NEWS_INTERNAL_TOKEN: ${NEWS_INTERNAL_TOKEN:-}
     command: ["sh", "-c", "nub run db:migrate && nub --cwd apps/api run start"]
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
@@ -17,11 +19,36 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/v1/news/categories').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:' + process.env.PORT + '/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
       timeout: 5s
       retries: 6
       start_period: 30s
+
+  bot:
+    profiles: ["bot"]
+    build:
+      context: .
+      target: bot
+    restart: unless-stopped
+    env_file:
+      - apps/bot/.env
+    environment:
+      DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL to the postgres service URL}
+      NEWS_API_URL: http://api:${PORT:-3000}
+      NEWS_INTERNAL_TOKEN: ${NEWS_INTERNAL_TOKEN:-}
+      BOT_HEALTH_PORT: "3001"
+    volumes:
+      - bot_data:/app/apps/bot/data
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
 
   postgres:
     image: postgres:17-alpine
@@ -42,3 +69,4 @@ services:
 
 volumes:
   postgres_data:
+  bot_data:
