@@ -12,6 +12,8 @@ export type SyncResult = {
 };
 export type NetmarbleNewsSynchronizer = {
   syncGuild(guildId: string, options?: SyncOptions): Promise<SyncResult>;
+  withGuildCleanup<T>(guildId: string, cleanup: () => Promise<T>): Promise<T>;
+  withGuildSetup<T>(guildId: string, operation: () => Promise<T>): Promise<T>;
 };
 
 export function createNewsSynchronizer(
@@ -20,12 +22,49 @@ export function createNewsSynchronizer(
   store: NewsPublicationStore,
   publisher: NewsPublisher,
 ): NetmarbleNewsSynchronizer {
-  const inFlight = new Set<string>();
+  const inFlight = new Map<string, Promise<void>>();
+  const setupOperations = new Map<string, Promise<void>>();
+  const cleaning = new Set<string>();
   return {
+    async withGuildSetup(guildId, operation) {
+      if (cleaning.has(guildId)) throw new Error(`News cleanup is running for ${guildId}.`);
+      if (setupOperations.has(guildId))
+        throw new Error(`News setup is already running for ${guildId}.`);
+      let resolve!: () => void;
+      setupOperations.set(
+        guildId,
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+      );
+      try {
+        return await operation();
+      } finally {
+        setupOperations.delete(guildId);
+        resolve();
+      }
+    },
+    async withGuildCleanup(guildId, cleanup) {
+      if (cleaning.has(guildId)) throw new Error(`News cleanup is already running for ${guildId}.`);
+      cleaning.add(guildId);
+      try {
+        await Promise.all([inFlight.get(guildId), setupOperations.get(guildId)]);
+        return await cleanup();
+      } finally {
+        cleaning.delete(guildId);
+      }
+    },
     async syncGuild(guildId, options = {}) {
+      if (cleaning.has(guildId)) throw new Error(`News cleanup is running for ${guildId}.`);
       if (inFlight.has(guildId))
         throw new Error(`News synchronization is already running for ${guildId}.`);
-      inFlight.add(guildId);
+      let resolve!: () => void;
+      inFlight.set(
+        guildId,
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+      );
       try {
         const setup = await setups.get(guildId);
         if (!setup?.enabled) throw new Error("News publishing is not enabled in this server.");
@@ -151,6 +190,7 @@ export function createNewsSynchronizer(
         return { published, skipped, failures, initial };
       } finally {
         inFlight.delete(guildId);
+        resolve();
       }
     },
   };

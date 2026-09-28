@@ -40,6 +40,8 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
     get: vi.fn(async () => setup),
     save: vi.fn(),
     setEnabled: vi.fn(),
+    publicationCount: vi.fn(async () => 0),
+    delete: vi.fn(async () => true),
   };
   const store: NewsPublicationStore = {
     enabledGuildIds: vi.fn(async () => ["guild"]),
@@ -84,6 +86,50 @@ function fixture(mode: NewsSetup["initialImportMode"] = "backfill") {
 }
 
 describe("news synchronization", () => {
+  it("pauses new publication and waits for in-flight work before cleanup", async () => {
+    const f = fixture();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(f.publisher.publish).mockImplementationOnce(async (_, article) => {
+      await pending;
+      return `thread-${article.id}`;
+    });
+    const syncing = f.sync.syncGuild("guild");
+    await vi.waitFor(() => expect(f.publisher.publish).toHaveBeenCalledOnce());
+    const cleanup = vi.fn(async () => {
+      expect(f.store.publish).toHaveBeenCalledTimes(11);
+      return "removed";
+    });
+    const cleaning = f.sync.withGuildCleanup("guild", cleanup);
+    await expect(f.sync.syncGuild("guild", { mode: "backfill" })).rejects.toThrow(
+      "cleanup is running",
+    );
+    await expect(f.sync.withGuildSetup("guild", async () => {})).rejects.toThrow(
+      "cleanup is running",
+    );
+    expect(cleanup).not.toHaveBeenCalled();
+    release();
+    await syncing;
+    expect(await cleaning).toBe("removed");
+    await expect(f.sync.withGuildCleanup("guild", async () => "again")).resolves.toBe("again");
+  });
+
+  it("waits for an ongoing setup operation before cleanup", async () => {
+    const f = fixture();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const setup = f.sync.withGuildSetup("guild", () => pending);
+    const cleanup = vi.fn(async () => true);
+    const cleaning = f.sync.withGuildCleanup("guild", cleanup);
+    expect(cleanup).not.toHaveBeenCalled();
+    release();
+    await setup;
+    expect(await cleaning).toBe(true);
+  });
   it("imports the latest ten plus older pinned without notifying, then deduplicates", async () => {
     const f = fixture();
     const first = await f.sync.syncGuild("guild");

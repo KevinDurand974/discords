@@ -24,6 +24,8 @@ export type NewsSetupStore = {
   get(guildId: string): Promise<NewsSetup | null>;
   save(setup: NewsSetup): Promise<void>;
   setEnabled(guildId: string, enabled: boolean): Promise<boolean>;
+  publicationCount(guildId: string): Promise<number>;
+  delete(guildId: string, forumChannelId: string): Promise<boolean>;
 };
 
 export type NewsGuildGateway = {
@@ -113,4 +115,54 @@ export async function createNewsSetup(
 export async function disableNewsSetup(guildId: string, store: NewsSetupStore) {
   if (!(await store.setEnabled(guildId, false)))
     throw new Error("News is not configured for this server.");
+}
+
+export async function cleanNewsSetup(
+  guild: NewsGuildGateway,
+  store: NewsSetupStore,
+  synchronizer: {
+    withGuildCleanup(guildId: string, cleanup: () => Promise<boolean>): Promise<boolean>;
+  },
+  expectedForumId: string,
+  expectedRoleIds: string[],
+): Promise<boolean> {
+  return synchronizer.withGuildCleanup(guild.guildId, async () => {
+    const setup = await store.get(guild.guildId);
+    if (!setup) return false;
+    const roleIds = [
+      ...new Set(setup.mappings.map(({ notificationRoleId }) => notificationRoleId)),
+    ].sort();
+    if (
+      setup.forumChannelId !== expectedForumId ||
+      roleIds.length !== expectedRoleIds.length ||
+      roleIds.some((id, index) => id !== expectedRoleIds[index])
+    ) {
+      throw new Error("News resources changed since confirmation; run /setup news clean again.");
+    }
+    if (!(await store.setEnabled(guild.guildId, false)))
+      throw new Error("News configuration changed during cleanup; retry after checking status.");
+    try {
+      await guild.deleteForum(setup.forumChannelId);
+    } catch (error) {
+      throw new Error(
+        `Could not delete Forum ${setup.forumChannelId}; configuration and roles remain for retry.`,
+        { cause: error },
+      );
+    }
+    const removals = await Promise.allSettled(
+      [...new Set(roleIds)].map((id) => guild.deleteRole(id)),
+    );
+    const failed = [...new Set(roleIds)].filter(
+      (_, index) => removals[index]?.status === "rejected",
+    );
+    if (failed.length)
+      throw new Error(
+        `Could not delete roles ${failed.join(", ")}; saved Forum and role IDs remain for retry.`,
+      );
+    if (!(await store.delete(guild.guildId, setup.forumChannelId)))
+      throw new Error(
+        "News resources were removed but settings could not be deleted; check the saved IDs before retrying.",
+      );
+    return true;
+  });
 }

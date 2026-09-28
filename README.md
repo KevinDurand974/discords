@@ -1,6 +1,6 @@
 # discords
 
-Netmarble news integration is being delivered in phases: see `docs/netmarble-news-phased-integration.md`. Phases 1–7 provide the shared PostgreSQL schema, news API, Discord Forum publication with inline media, pin reconciliation, and Docker operational controls. For backups, recovery and isolated PostgreSQL integration tests, see `docs/netmarble-news-operations.md`.
+Netmarble news integration is being delivered in phases: see `docs/netmarble-news-phased-integration.md`. Phases 1–8 provide the shared PostgreSQL schema, news API, Discord Forum publication with inline media, pin reconciliation, Docker operational controls, and administrator-confirmed cleanup. For backups, recovery and isolated PostgreSQL integration tests, see `docs/netmarble-news-operations.md`.
 
 For local database setup, migrations, and tests, see `packages/db/README.md`. For the API, see `apps/api/README.md`. For Forum setup and article publication, see `apps/bot/README.md`.
 

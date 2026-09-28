@@ -3,6 +3,7 @@ import { ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
 import { setupCommand } from "../setup/setup.command.ts";
 import { newsForumPermissions } from "./news-setup-command.ts";
 import {
+  cleanNewsSetup,
   createNewsSetup,
   disableNewsSetup,
   NEWS_TAGS,
@@ -45,6 +46,12 @@ function fixtures() {
       saved = { ...saved, enabled };
       return true;
     }),
+    publicationCount: vi.fn(async () => 2),
+    delete: vi.fn(async (_, forumId) => {
+      if (!saved || saved.forumChannelId !== forumId) return false;
+      saved = null;
+      return true;
+    }),
   };
   return { guild, store, createdRoles, removedRoles, removedForums };
 }
@@ -62,6 +69,7 @@ describe("news Forum setup", () => {
       "backfill",
       "status",
       "disable",
+      "clean",
     ]);
   });
 
@@ -114,6 +122,65 @@ describe("news Forum setup", () => {
     );
     expect(f.removedForums).toEqual(["forum"]);
     expect(f.removedRoles).toHaveLength(5);
+  });
+
+  it("deletes only saved resources and permits a fresh initial import afterward", async () => {
+    const f = fixtures();
+    const setup = await createNewsSetup(f.guild, f.store);
+    const gate = {
+      withGuildCleanup: vi.fn(async (_: string, work: () => Promise<boolean>) => work()),
+    };
+    const roles = setup.mappings.map(({ notificationRoleId }) => notificationRoleId);
+    expect(await cleanNewsSetup(f.guild, f.store, gate, setup.forumChannelId, roles)).toBe(true);
+    expect(f.removedForums).toEqual(["forum"]);
+    expect(f.removedRoles).toEqual(roles);
+    expect(await f.store.get("123")).toBeNull();
+    expect(await cleanNewsSetup(f.guild, f.store, gate, setup.forumChannelId, roles)).toBe(false);
+    const recreated = await createNewsSetup(f.guild, f.store);
+    expect(recreated.initialImportCompleted).toBe(false);
+    expect(recreated.mappings[0]?.notificationRoleId).toBe("6");
+  });
+
+  it("rejects stale confirmation without disabling or removing resources", async () => {
+    const f = fixtures();
+    const setup = await createNewsSetup(f.guild, f.store);
+    const gate = { withGuildCleanup: async (_: string, work: () => Promise<boolean>) => work() };
+    await expect(cleanNewsSetup(f.guild, f.store, gate, "other-forum", [])).rejects.toThrow(
+      "changed since confirmation",
+    );
+    expect((await f.store.get("123"))?.enabled).toBe(true);
+    expect(f.removedForums).toEqual([]);
+    expect(f.store.delete).not.toHaveBeenCalled();
+    expect(setup.forumChannelId).toBe("forum");
+  });
+
+  it("retains saved IDs on partial Discord failure and retries missing resources", async () => {
+    const f = fixtures();
+    const setup = await createNewsSetup(f.guild, f.store);
+    const roles = setup.mappings.map(({ notificationRoleId }) => notificationRoleId);
+    const gate = { withGuildCleanup: async (_: string, work: () => Promise<boolean>) => work() };
+    vi.mocked(f.guild.deleteRole).mockRejectedValueOnce(new Error("Discord denied role deletion"));
+    await expect(cleanNewsSetup(f.guild, f.store, gate, "forum", roles)).rejects.toThrow(
+      "Could not delete roles 1",
+    );
+    expect((await f.store.get("123"))?.enabled).toBe(false);
+    expect(f.store.delete).not.toHaveBeenCalled();
+    expect(await cleanNewsSetup(f.guild, f.store, gate, "forum", roles)).toBe(true);
+    expect(await f.store.get("123")).toBeNull();
+    expect(f.removedForums).toEqual(["forum", "forum"]);
+  });
+
+  it("does not delete roles if the Forum deletion fails", async () => {
+    const f = fixtures();
+    const setup = await createNewsSetup(f.guild, f.store);
+    const roles = setup.mappings.map(({ notificationRoleId }) => notificationRoleId);
+    const gate = { withGuildCleanup: async (_: string, work: () => Promise<boolean>) => work() };
+    vi.mocked(f.guild.deleteForum).mockRejectedValueOnce(new Error("Discord unavailable"));
+    await expect(cleanNewsSetup(f.guild, f.store, gate, "forum", roles)).rejects.toThrow(
+      "Could not delete Forum forum",
+    );
+    expect(f.removedRoles).toEqual([]);
+    expect(f.store.delete).not.toHaveBeenCalled();
   });
 
   it("allows comments but denies member-created posts", () => {

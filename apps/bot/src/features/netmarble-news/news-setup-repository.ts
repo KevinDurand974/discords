@@ -1,6 +1,10 @@
 import { createDatabase } from "@discords/db";
-import { eq } from "@discords/db/orm";
-import { netmarbleNewsCategories, netmarbleNewsSettings } from "@discords/db/schema";
+import { and, eq, sql } from "@discords/db/orm";
+import {
+  netmarbleArticles,
+  netmarbleNewsCategories,
+  netmarbleNewsSettings,
+} from "@discords/db/schema";
 import type { NewsSetupStore } from "./news-setup.ts";
 
 let database: ReturnType<typeof createDatabase> | undefined;
@@ -58,6 +62,25 @@ export function createNewsSetupRepository(): NewsSetupStore {
         .update(netmarbleNewsSettings)
         .set({ enabled })
         .where(eq(netmarbleNewsSettings.guildId, guildId))
+        .returning({ guildId: netmarbleNewsSettings.guildId });
+      return rows.length > 0;
+    },
+    async publicationCount(guildId) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(netmarbleArticles)
+        .where(eq(netmarbleArticles.guildId, guildId));
+      return row?.count ?? 0;
+    },
+    async delete(guildId, forumChannelId) {
+      const rows = await db
+        .delete(netmarbleNewsSettings)
+        .where(
+          and(
+            eq(netmarbleNewsSettings.guildId, guildId),
+            eq(netmarbleNewsSettings.forumChannelId, forumChannelId),
+          ),
+        )
         .returning({ guildId: netmarbleNewsSettings.guildId });
       return rows.length > 0;
     },

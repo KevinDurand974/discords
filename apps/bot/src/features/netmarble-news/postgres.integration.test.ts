@@ -1,8 +1,16 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { createDatabase } from "@discords/db";
-import { newsCategories, netmarbleNewsSettings, sourceArticles } from "@discords/db/schema";
+import {
+  newsCategories,
+  netmarbleNewsCategories,
+  netmarbleNewsSettings,
+  sourceArticles,
+} from "@discords/db/schema";
+import { eq } from "@discords/db/orm";
 import { createNewsPublicationRepository } from "./news-publication-repository.ts";
 import { createBotHealthServer } from "../../core/health.ts";
+import { cleanNewsSetup } from "./news-setup.ts";
+import { createNewsSetupRepository } from "./news-setup-repository.ts";
 import type { NewsArticle } from "./news-api.ts";
 
 const url = process.env.TEST_DATABASE_URL;
@@ -66,5 +74,52 @@ describe.skipIf(!database)("PostgreSQL guild publication recovery", () => {
     } finally {
       await new Promise<void>((resolve) => health.close(() => resolve()));
     }
+    await database!.db.insert(netmarbleNewsCategories).values({
+      guildId: "integration-guild",
+      menuSeq: 32,
+      tagId: "tag-1",
+      notificationRoleId: "role-1",
+    });
+    await database!.db.insert(netmarbleNewsSettings).values({
+      guildId: "other-guild",
+      forumChannelId: "other-forum",
+    });
+    await database!.db.insert(netmarbleNewsCategories).values({
+      guildId: "other-guild",
+      menuSeq: 32,
+      tagId: "other-tag",
+      notificationRoleId: "other-role",
+    });
+    await recovered.publish("other-guild", article, "other-thread");
+    const setups = createNewsSetupRepository();
+    const gateway = {
+      guildId: "integration-guild",
+      preflight: async () => {},
+      resourcesExist: async () => true,
+      createRole: async () => "unused",
+      deleteRole: async () => {},
+      createForum: async () => ({ id: "unused", tags: [] }),
+      deleteForum: async () => {},
+    };
+    const gate = { withGuildCleanup: async (_: string, work: () => Promise<boolean>) => work() };
+    expect(await setups.publicationCount("integration-guild")).toBe(1);
+    expect(await cleanNewsSetup(gateway, setups, gate, "forum-1", ["role-1"])).toBe(true);
+    expect(await setups.get("integration-guild")).toBeNull();
+    expect(await recovered.known("integration-guild")).toEqual([]);
+    expect(await recovered.known("other-guild")).toHaveLength(1);
+    expect(
+      await database!.db.select().from(sourceArticles).where(eq(sourceArticles.id, article.id)),
+    ).toHaveLength(1);
+    await setups.save({
+      guildId: "integration-guild",
+      forumChannelId: "fresh-forum",
+      enabled: true,
+      initialImportMode: "backfill",
+      initialBackfillCount: 10,
+      initialImportCompleted: false,
+      mappings: [{ menuSeq: 32, tagId: "fresh-tag", notificationRoleId: "fresh-role" }],
+    });
+    expect((await setups.get("integration-guild"))?.initialImportCompleted).toBe(false);
+    expect(await setups.publicationCount("integration-guild")).toBe(0);
   });
 });
