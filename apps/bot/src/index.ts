@@ -6,11 +6,9 @@ import { commands, componentHandlers } from "@/core/command-registry.ts";
 import { ENV } from "@/core/config.ts";
 import { registerInteractionRouter } from "@/core/interaction-router.ts";
 import { startNewsScheduler } from "@/features/netmarble-news/news-runtime.ts";
-import { registerGracefulShutdown } from "@/core/graceful-shutdown.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
 
 const client = createDiscordClient();
-registerGracefulShutdown(client);
 const commandLogger = await createCommandLogger(client);
 const commandsByName = new Collection<string, CommandDefinition>();
 
