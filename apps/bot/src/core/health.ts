@@ -1,15 +1,39 @@
 import { createServer } from "node:http";
 import { createDatabase } from "@discords/db";
 
+export type BotJobHandlers = {
+  token?: string | undefined;
+  synchronizeNews?: (() => Promise<void>) | undefined;
+};
+
 export function createBotHealthServer(
   client: { isReady(): boolean },
   databaseUrl: string | undefined,
+  jobs: BotJobHandlers = {},
 ) {
   const database = databaseUrl ? createDatabase(databaseUrl, { max: 2 }) : null;
   const server = createServer(async (request, response) => {
     response.setHeader("Content-Type", "application/json");
     if (request.url === "/health/live") {
       response.end(JSON.stringify({ status: "ok" }));
+      return;
+    }
+    if (request.method === "POST" && request.url === "/internal/jobs/news-publication") {
+      if (!jobs.token || request.headers.authorization !== `Bearer ${jobs.token}`) {
+        response.writeHead(401).end(JSON.stringify({ error: "Unauthorized" }));
+        return;
+      }
+      if (!jobs.synchronizeNews) {
+        response.writeHead(503).end(JSON.stringify({ error: "Job handler unavailable" }));
+        return;
+      }
+      try {
+        await jobs.synchronizeNews();
+        response.writeHead(204).end();
+      } catch (error) {
+        console.error("News publication job failed", error);
+        response.writeHead(500).end(JSON.stringify({ error: "News publication failed" }));
+      }
       return;
     }
     if (request.url !== "/health/ready") {

@@ -22,6 +22,8 @@ export type NewsAppOptions = {
   allowedOrigins?: string[];
   internalToken?: string | undefined;
   internalReader?: NewsReader | undefined;
+  jobToken?: string | undefined;
+  synchronize?: (() => Promise<void>) | undefined;
 };
 
 export function createNewsApp(reader: NewsReader, options: NewsAppOptions = {}) {
@@ -33,6 +35,10 @@ export function createNewsApp(reader: NewsReader, options: NewsAppOptions = {}) 
     );
   const source = (request: Request) =>
     authorized(request) ? (options.internalReader ?? reader) : reader;
+  const jobAuthorized = (request: Request) =>
+    Boolean(
+      options.jobToken && request.headers.get("authorization") === `Bearer ${options.jobToken}`,
+    );
   return new Elysia({ adapter: node() })
     .onRequest(({ request, set }) => {
       const url = new URL(request.url);
@@ -62,6 +68,12 @@ export function createNewsApp(reader: NewsReader, options: NewsAppOptions = {}) 
       }
     })
     .get("/health/live", () => ({ status: "ok" }))
+    .post("/internal/jobs/news-ingestion", async ({ request, status }) => {
+      if (!jobAuthorized(request)) return status(401, { error: "Unauthorized" });
+      if (!options.synchronize) return status(503, { error: "Job handler unavailable" });
+      await options.synchronize();
+      return status(204);
+    })
     .get("/health/ready", async ({ status }) => {
       try {
         const categories = await reader.categories();

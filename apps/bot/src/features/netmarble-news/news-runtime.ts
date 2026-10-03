@@ -1,4 +1,3 @@
-import { Cron } from "croner";
 import type { Client } from "discord.js";
 import { createNewsSource } from "./news-api.ts";
 import { createNewsPublisher } from "./news-publisher.ts";
@@ -33,39 +32,27 @@ export function createNewsRuntime(client: Client) {
   return runtime;
 }
 
-export function startNewsScheduler(client: Client) {
-  if (!process.env.DATABASE_URL) {
-    console.log("News synchronization is inactive: DATABASE_URL is not configured.");
-    return;
-  }
+export async function synchronizeNews(client: Client) {
+  if (!process.env.DATABASE_URL)
+    throw new Error("News synchronization is inactive: DATABASE_URL is not configured.");
   const { synchronizer, publications } = createNewsRuntime(client);
-  const run = async () => {
-    try {
-      const guildIds = await publications.enabledGuildIds();
-      await Promise.all(
-        guildIds.map(async (guildId) => {
-          try {
-            const result = await synchronizer.syncGuild(guildId);
-            if (result.failures.length)
-              console.error(`News synchronization failed in ${guildId}`, result.failures);
-            else
-              console.info("News guild synchronization succeeded", {
-                guildId,
-                published: result.published,
-                skipped: result.skipped,
-                at: new Date().toISOString(),
-              });
-          } catch (error) {
-            console.error(`News synchronization failed in ${guildId}`, error);
-          }
-        }),
-      );
-    } catch (error) {
-      console.error("Could not load news guilds", error);
-    }
-  };
-  new Cron("*/30 * * * *", { protect: true }, () => {
-    void run();
-  });
-  void run();
+  const guildIds = await publications.enabledGuildIds();
+  await Promise.all(
+    guildIds.map(async (guildId) => {
+      try {
+        const result = await synchronizer.syncGuild(guildId);
+        if (result.failures.length)
+          console.error(`News synchronization failed in ${guildId}`, result.failures);
+        else
+          console.info("News guild synchronization succeeded", {
+            guildId,
+            published: result.published,
+            skipped: result.skipped,
+            at: new Date().toISOString(),
+          });
+      } catch (error) {
+        console.error(`News synchronization failed in ${guildId}`, error);
+      }
+    }),
+  );
 }

@@ -6,15 +6,19 @@ import { commands, componentHandlers } from "@/core/command-registry.ts";
 import { ENV } from "@/core/config.ts";
 import { createBotHealthServer } from "@/core/health.ts";
 import { registerInteractionRouter } from "@/core/interaction-router.ts";
-import { startNewsScheduler } from "@/features/netmarble-news/news-runtime.ts";
+import { synchronizeNews } from "@/features/netmarble-news/news-runtime.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
 
 const client = createDiscordClient();
 const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
+const healthHost = process.env.BOT_HEALTH_HOST ?? "127.0.0.1";
 if (!Number.isInteger(healthPort) || healthPort < 1 || healthPort > 65535)
   throw new Error("BOT_HEALTH_PORT must be between 1 and 65535");
-createBotHealthServer(client, process.env.DATABASE_URL).listen(healthPort, "127.0.0.1", () => {
-  console.info(`Bot health listening on 127.0.0.1:${healthPort}`);
+createBotHealthServer(client, process.env.DATABASE_URL, {
+  token: process.env.JOBS_INTERNAL_TOKEN,
+  synchronizeNews: () => synchronizeNews(client),
+}).listen(healthPort, healthHost, () => {
+  console.info(`Bot health listening on ${healthHost}:${healthPort}`);
 });
 const commandLogger = await createCommandLogger(client);
 const commandsByName = new Collection<string, CommandDefinition>();
@@ -30,7 +34,6 @@ registerInteractionRouter(client, commandsByName, componentHandlers, {
 client.once(Events.ClientReady, async (readyClient) => {
   console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 
-  startNewsScheduler(readyClient);
   await fetchEmojis(readyClient);
   commands.forEach((command) => {
     console.log(`[Success] Command: ${command.data.name} loaded`);

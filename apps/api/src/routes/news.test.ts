@@ -43,6 +43,21 @@ describe("public news routes", () => {
     expect((await request("/v1/news/articles/999?menuSeq=32")).status).toBe(404);
   });
 
+  it("runs ingestion only through the authenticated jobs endpoint", async () => {
+    const synchronize = vi.fn(async () => {});
+    const jobs = createNewsApp(reader, { jobToken: "jobs-token", synchronize });
+    const call = (authorization?: string) =>
+      jobs.handle(
+        new Request("http://localhost/internal/jobs/news-ingestion", {
+          method: "POST",
+          headers: authorization ? { Authorization: authorization } : {},
+        }),
+      );
+    expect((await call()).status).toBe(401);
+    expect((await call("Bearer jobs-token")).status).toBe(204);
+    expect(synchronize).toHaveBeenCalledOnce();
+  });
+
   it("reports database readiness without exposing it to the public rate limit", async () => {
     const ready = await request("/health/ready");
     expect(ready.status).toBe(200);

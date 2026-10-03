@@ -27,6 +27,8 @@ export function composeEnvironment(values) {
     API_DATABASE_URL: dockerUrl.toString(),
     NEWS_CORS_ORIGINS: values.NEWS_CORS_ORIGINS ?? "",
     NEWS_INTERNAL_TOKEN: values.NEWS_INTERNAL_TOKEN ?? "",
+    JOBS_INTERNAL_TOKEN: values.JOBS_INTERNAL_TOKEN ?? "",
+    YOUTUBE_API_KEY: values.YOUTUBE_API_KEY ?? "",
   };
 }
 
@@ -38,6 +40,8 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const args = process.argv.slice(2);
     if (args.includes("--profile") && args.includes("bot") && !config.NEWS_INTERNAL_TOKEN)
       throw new Error("Set NEWS_INTERNAL_TOKEN in apps/api/.env before starting the bot profile.");
+    if (args.includes("--profile") && args.includes("bot") && !config.JOBS_INTERNAL_TOKEN)
+      throw new Error("Set JOBS_INTERNAL_TOKEN in apps/api/.env before starting the bot profile.");
     const result = spawnSync("docker", ["compose", ...args], {
       cwd: projectRoot,
       env: { ...process.env, ...config },

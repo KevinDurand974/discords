@@ -1,4 +1,3 @@
-import { Cron } from "croner";
 import { createDatabase } from "@discords/db";
 import { ENV } from "./config.ts";
 import { createIngestion } from "./news/ingestion.ts";
@@ -27,11 +26,11 @@ async function synchronize() {
 createNewsApp(publicReader, {
   internalToken,
   internalReader,
+  jobToken: process.env.JOBS_INTERNAL_TOKEN,
+  synchronize,
   allowedOrigins: (process.env.NEWS_CORS_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
 }).listen(port);
-new Cron("*/30 * * * *", { protect: true }, synchronize);
-void synchronize().catch((error: unknown) => console.error("Netmarble ingestion failed", error));
 console.info(`News API listening on ${port}`);

@@ -5,10 +5,12 @@ RUN npm install --global @nubjs/nub@0.9.2
 COPY package.json nub.lock ./
 COPY apps/bot/package.json apps/bot/package.json
 COPY apps/api/package.json apps/api/package.json
+COPY apps/jobs/package.json apps/jobs/package.json
 COPY packages/db/package.json packages/db/package.json
 RUN nub ci
 COPY apps/bot apps/bot
 COPY apps/api apps/api
+COPY apps/jobs apps/jobs
 COPY packages/db packages/db
 COPY tsconfig.json ./
 
@@ -17,3 +19,6 @@ CMD ["nub", "--cwd", "apps/api", "run", "start"]
 
 FROM base AS bot
 CMD ["nub", "--cwd", "apps/bot", "run", "start"]
+
+FROM base AS jobs
+CMD ["nub", "--cwd", "apps/jobs", "run", "start"]

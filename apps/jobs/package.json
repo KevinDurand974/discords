@@ -1,0 +1,27 @@
+{
+  "name": "@discords/jobs",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "nub src/index.ts",
+    "dev": "nub watch src/index.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bull-board/api": "^9.10.2",
+    "@bull-board/elysia": "^9.10.2",
+    "@bull-board/ui": "^9.10.2",
+    "@elysiajs/node": "^1.4.5",
+    "bullmq": "^6.3.11",
+    "elysia": "^1.4.30",
+    "ioredis": "^6.0.0"
+  },
+  "devDependencies": {
+    "@nubjs/types": ">=0.4.13 <=0.9.2",
+    "@types/node": "^26",
+    "typescript": "^7",
+    "varlock": "^1.19.0"
+  },
+  "packageManager": "nub@0.9.2"
+}

@@ -22,6 +22,8 @@
     "db:generate": "nub --cwd packages/db run db:generate",
     "db:migrate": "nub --cwd packages/db run db:migrate",
     "test:integration": "node scripts/test-integration.mjs",
+    "jobs:start": "nub --cwd apps/jobs run start",
+    "jobs:dev": "nub --cwd apps/jobs run dev",
     "docker:bot:up": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs --profile bot up -d --build --wait --wait-timeout 180"
   },
   "devDependencies": {

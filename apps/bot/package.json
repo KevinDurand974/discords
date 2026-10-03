@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@discords/db": "workspace:*",
-    "croner": "^10.0.1",
     "discord.js": "^14.27.0",
     "entities": "^8.1.0",
     "ofetch": "^1.5.1",

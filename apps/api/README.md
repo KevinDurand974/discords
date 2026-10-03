@@ -1,6 +1,6 @@
 # Public Netmarble news API
 
-Phase 2 exposes read-only news routes on the Node adapter. Source ingestion runs at startup and every 30 minutes via Croner. It reads the latest 50 ordinary articles per category and all returned pinned articles; existing articles are not refetched for detail. Each category is independent so one upstream failure does not prevent the others from syncing. `lastSyncedAt` is updated only after its transaction commits.
+Phase 2 exposes read-only news routes on the Node adapter. The separate BullMQ jobs worker triggers source ingestion at startup and every 30 minutes. It reads the latest 50 ordinary articles per category and all returned pinned articles; existing articles are not refetched for detail. Each category is independent so one upstream failure does not prevent the others from syncing. `lastSyncedAt` is updated only after its transaction commits.
 
 ## Run locally
 
