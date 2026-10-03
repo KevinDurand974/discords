@@ -1,6 +1,6 @@
 # YouTube Latest Videos — Global Integration Plan
 
-Status: implementation started with the database/API foundation (Phases 1–3). Discord commands/publication/cleanup and BullMQ scheduling are still pending. Product decisions incorporate the user's answers; remaining implementation proposals are identified explicitly.
+Status: design reference with implementation underway. Database/API foundation committed as `54c1000`; Discord/BullMQ integration added and automated checks passed; live staging validation remains pending. See the phased plan for delivery status. Product decisions incorporate the user's answers; remaining proposals are identified explicitly.
 
 Companion delivery plan: `docs/youtube-videos-phased-integration.md`.
 
@@ -12,7 +12,7 @@ Companion delivery plan: `docs/youtube-videos-phased-integration.md`.
 - Persist the resolved YouTube channel ID and all valid entries returned by its RSS feed.
 - Track multiple creators in one Forum, with one creator-name tag per tracked channel.
 - Initially publish the latest **10 videos per newly added creator** by default, each as its own tagged Forum post.
-- Render title, description, separators, a YouTube link button, and the visible video URL immediately beneath that button using Components V2.
+- Render title, separator, description, publication date and YouTube link button using Components V2; send the video URL beneath the V2 messages in a separate classic message for Discord's native video preview.
 - **Do not create a Content Creator role** or store/manage any such role.
 - Use the Discord **Manage Messages** permission (`ManageMessages`) for moderator management-command and post-creation access, with administrator/owner bypass. Cleanup is administrator-only.
 - Disable comments for ordinary members and moderators. Discord administrators bypass channel denies; the bot remains able to send publication messages.
@@ -233,7 +233,7 @@ Deny `SendMessages` and `SendMessagesInThreads` to `@everyone`. Allow `SendMessa
 
 Role position is not an authorization rule. Derive Forum moderator overwrites from current guild roles carrying Manage Messages; refresh when permissions change. Check effective member permissions on commands/modal submits and Administrator on cleanup buttons. Set the root command default to Manage Messages; keep destructive-subcommand runtime checks mandatory because the root default does not encode its stricter policy.
 
-A guild member's unrelated role allow or member-specific overwrite can override an `@everyone` deny. Create non-synced overwrites, audit all effective allows, and refuse/report conflicting access instead of claiming the Forum is locked down. Verify multi-role combinations and changes to roles/overwrites; revalidate on management/sync or add change-event checks.
+A guild member's unrelated role allow or member-specific overwrite can override an `@everyone` deny. Create non-synced overwrites. The implementation rebuilds overwrites for the feature-owned Forum on add/publication, removing manual grants there and deriving moderator post access from current guild roles. Refuse mutation of unowned Forums; do not treat permissions as permanently locked down against administrators. Verify multi-role combinations and changes to roles/overwrites; revalidate on management/sync or add change-event checks.
 
 The bot needs View Channel, Manage Channels, Manage Threads, Send Messages, Send Messages in Threads and Read Message History, plus any content-specific permission needed by the final renderer. Validate Discord's requirements for editing permission overwrites (including Manage Roles if required by that operation); no role-creation/deletion permission is requested for this feature. It must never grant itself Administrator or widen permissions of unrelated channels.
 
@@ -246,17 +246,19 @@ Proposed starter layout:
 ```text
 Container
   Text Display: ## <video title>
-  Text Display: <creator> · <Discord-formatted publication date>
   Separator
   Text Display: <description or empty-description fallback>
-  Separator
+  Text Display: <Discord-formatted publication date>
   Action Row: [Watch on YouTube] (Link button)
-  Text Display: https://www.youtube.com/watch?v=<videoId>
+  Text Display: <small source/reconciliation footer>
+
+Separate classic message after all V2 parts:
+  https://www.youtube.com/watch?v=<videoId>
 ```
 
-Use the installed Discord.js builders and `MessageFlags.IsComponentsV2`. Do not mix incompatible legacy `content`/embeds into V2 payloads. Preserve the visible URL directly after the button within the component ordering. Prevent mentions with restricted `allowedMentions`; descriptions and titles are untrusted text and must not ping users/roles/everyone.
+Use the installed Discord.js builders and `MessageFlags.IsComponentsV2`. Do not mix incompatible legacy `content`/embeds into V2 payloads: native previews are unavailable in V2 even outside the Container. Send the URL as a separate classic message after all V2 parts, with no V2 or embed-suppression flag. Grant the bot Embed Links in the Forum; Discord controls actual preview generation. Prevent mentions with restricted `allowedMentions`; descriptions and titles are untrusted text and must not ping users/roles/everyone.
 
-Store the entire description. Split long descriptions into valid V2 follow-up messages, preserving readable paragraph boundaries and respecting aggregate text/component limits. The final description segment ends with the link button and immediately following URL so the requested ordering is retained. Test empty descriptions, Unicode, long titles and descriptions, Markdown, URLs and suspicious mention content. Native previews/thumbnails and edits to already-published posts are not required in the initial scope.
+Store the entire description. Split long descriptions into valid V2 follow-up messages, preserving readable paragraph boundaries and respecting aggregate text/component limits. After the final description segment and link button, send one classic URL message. Reconcile it by bot author and exact URL on retries, including uncertain send acknowledgments. Test empty descriptions, Unicode, long titles and descriptions, Markdown, URLs and suspicious mention content. The classic URL message enables Discord's native video preview; custom thumbnails and edits to already-published posts remain outside scope.
 
 ## 10. Cleanup and resource ownership
 

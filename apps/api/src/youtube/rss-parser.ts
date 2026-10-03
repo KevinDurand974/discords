@@ -66,7 +66,9 @@ export function parseYoutubeFeed(xml: string, channelId: string): YoutubeFeed {
   try { data = object(parser.parse(xml)); } catch { throw invalid(); }
   const feed = object(data.feed);
   const displayName = text(feed.title)?.trim();
-  if (!displayName || text(feed["yt:channelId"]) !== channelId ||
+  // Real YouTube feeds may omit UC on the root ID, while video entries retain it.
+  const rootChannelId = text(feed["yt:channelId"]);
+  if (!displayName || (rootChannelId !== channelId && `UC${rootChannelId}` !== channelId) ||
       feed["@_xmlns"] !== "http://www.w3.org/2005/Atom" ||
       feed["@_xmlns:yt"] !== "http://www.youtube.com/xml/schemas/2015") throw invalid();
   const entries = array(feed.entry);

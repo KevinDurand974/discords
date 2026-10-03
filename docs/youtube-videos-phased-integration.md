@@ -1,14 +1,19 @@
 # YouTube Latest Videos — Phased Integration
 
-Status: implementation started — database/API foundation added; Discord and BullMQ integration are still pending.
+Status: database/API foundation committed as `54c1000`; Discord/BullMQ integration implemented and automated checks passed. Live Discord/Redis deployment validation remains pending.
 
 ## Delivery progress
 
 - Phase 0: product answers recorded; live Discord permission validation is pending with Phase 4.
 - Phase 1: schema/configuration implemented for source history and future guild subscriptions/publication intents; additive migration and checks are part of this delivery.
 - Phases 2–3: input normalization, handle lookup/direct-ID path, bounded secure RSS parsing, PostgreSQL persistence/exclusion, authenticated mutation/job endpoints and public source reads implemented.
-- Phases 4–8: not implemented. In particular, no `/videos` command, Forum publication, cleanup command or ten-minute scheduler is exposed yet.
-- Verification: API unit tests **74 passed** (5 PostgreSQL tests skipped in the unit-only run), DB tests **5 passed**, Docker script tests **2 passed**, API/DB typechecks passed. `nub run test:integration` passed **7 tests** (5 API + 2 existing bot) against disposable PostgreSQL, applying migrations twice. Final run produced no concurrent-transaction-query warning.
+- Phases 4–7: `/videos add|status|sync|clean`, expiring actor-bound modal/confirmation sessions, Forum/tag provisioning/repair, permission overwrites, V2 publication, durable initial selection/reconciliation, administrator cleanup and ordered ten-minute BullMQ refresh added. Bot/jobs/PostgreSQL automated checks passed; live Discord verification remains pending.
+- Phase 8: operations documentation and automated regression checks in progress; live Discord and Redis/Compose smoke tests remain pending.
+- Guild operations use PostgreSQL session advisory locks across setup/sync/cleanup, with checkpoints committed independently of Discord requests. Reconciliation scans bot-authored starter markers in active/archived threads and refuses ambiguous/bounded-out scans.
+- The managed Forum's permission overwrites are rebuilt on add/publication from current moderator permissions, replacing manual grants within that owned Forum only. Do not use it as a hand-managed channel. No unrelated channels/roles are modified.
+- `/videos sync` publishes pending stored sources; RSS refresh belongs to the worker. Optional per-creator unsubscribe/manual backfill commands are deferred.
+- Foundation verification (commit `54c1000`): API unit tests **74 passed** (5 PostgreSQL tests skipped in the unit-only run), DB tests **5 passed**, Docker script tests **2 passed**, API/DB typechecks passed. `nub run test:integration` passed **7 tests** (5 API + 2 existing bot) against disposable PostgreSQL, applying migrations twice. Final run produced no concurrent-transaction-query warning.
+- Discord persistence verification: `nub run test:integration` passed **11 tests** (5 API + 6 bot), including the four new YouTube persistence/recovery/locking/guild-isolation scenarios. Bot unit tests **143 passed**, jobs unit tests **6 passed**, bot/jobs typechecks and bot lint passed. Formatting and `git diff --check` passed.
 - Migration: `packages/db/drizzle/20261003224012_wealthy_manta/` (additive; reviewed). Applied only to the disposable test database, not the local/live database.
 - Fixture-based source tests do not assert live Google/Discord behavior. Live Discord permission checks remain pending.
 
@@ -29,8 +34,8 @@ Architecture, recorded product decisions and implementation proposals: `docs/you
 ### Remaining technical scope
 
 - Validate Forum starter creation separately from thread commenting in a staging guild.
-- Finalize optional controls: default 10 per creator, proposed 0–15 override and retained but not automatically published initial remainder.
-- Choose explicit single-executor deployment or distributed locking and a practical publication-reconciliation strategy.
+- Implemented controls: default 10 per creator, 0–15 override and retained but excluded initial remainder. Optional unsubscribe/manual backfill commands remain deferred.
+- Implemented locking/recovery: cross-process PostgreSQL advisory locks, thread-ID checkpoints and bounded active/archived-thread reconciliation; live process-crash exercises remain part of staging.
 - Keep untracked same-name Forums unrelated by default; tag reuse does not authorize automatic Forum adoption.
 
 ### Acceptance criteria
@@ -139,7 +144,7 @@ The API can validate a channel and store/read its videos; Discord setup is not y
 
 - Implement renderer, publisher, initial-selection persistence and guild synchronizer.
 - Select newest ten by `published_at DESC, video_id DESC`, then create selected threads oldest-first.
-- Render title, creator/date, separators, full description, link button and visible URL immediately beneath it.
+- Render title, separator, full description, publication date and link button in V2, then one classic URL message beneath all V2 parts to enable Discord's native video preview. Require Embed Links for the bot; never mix legacy content/embeds into V2 payloads.
 - Apply the creator tag and V2 flag; suppress all unsolicited mentions.
 - Handle long titles/descriptions and Discord aggregate component/text limits.
 - Track successful publications separately from pending/reconciliation intents.
@@ -153,7 +158,7 @@ The API can validate a channel and store/read its videos; Discord setup is not y
 - Repeated add/sync and interrupted initial imports do not repeat confirmed successful publications.
 - A newly observed entry with an older `published` date is not lost because of a timestamp-only watermark.
 - Failure after Discord thread creation exercises reconciliation rather than blind duplicate creation.
-- Render tests cover empty/long descriptions, title limits, mentions, URLs, Unicode and required button/URL order.
+- Render tests cover empty/long descriptions, title limits, mentions, Unicode and title/separator/description/date/button order. Publisher tests verify the separate classic URL message is last and not duplicated on retries, including uncertain send acknowledgments.
 - A live test guild validates V2 Forum starter messages and actual effective permissions.
 
 ### Working result

@@ -4,6 +4,7 @@ import { createDatabase } from "@discords/db";
 export type BotJobHandlers = {
   token?: string | undefined;
   synchronizeNews?: (() => Promise<void>) | undefined;
+  synchronizeVideos?: (() => Promise<void>) | undefined;
 };
 
 export function createBotHealthServer(
@@ -18,21 +19,30 @@ export function createBotHealthServer(
       response.end(JSON.stringify({ status: "ok" }));
       return;
     }
-    if (request.method === "POST" && request.url === "/internal/jobs/news-publication") {
+    if (
+      request.method === "POST" &&
+      ["/internal/jobs/news-publication", "/internal/jobs/youtube-publication"].includes(
+        request.url ?? "",
+      )
+    ) {
+      const synchronize =
+        request.url === "/internal/jobs/youtube-publication"
+          ? jobs.synchronizeVideos
+          : jobs.synchronizeNews;
       if (!jobs.token || request.headers.authorization !== `Bearer ${jobs.token}`) {
         response.writeHead(401).end(JSON.stringify({ error: "Unauthorized" }));
         return;
       }
-      if (!jobs.synchronizeNews) {
+      if (!synchronize) {
         response.writeHead(503).end(JSON.stringify({ error: "Job handler unavailable" }));
         return;
       }
       try {
-        await jobs.synchronizeNews();
+        await synchronize();
         response.writeHead(204).end();
       } catch (error) {
-        console.error("News publication job failed", error);
-        response.writeHead(500).end(JSON.stringify({ error: "News publication failed" }));
+        console.error("Publication job failed", error);
+        response.writeHead(500).end(JSON.stringify({ error: "Publication failed" }));
       }
       return;
     }

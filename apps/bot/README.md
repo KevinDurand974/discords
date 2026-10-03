@@ -2,6 +2,12 @@
 
 On Windows, `nub run start` / `nub run dev` may launch a nested `cmd.exe` batch script even from Warp Bash. If Ctrl+C shows `Terminate batch job (Y/N)?`, type `Y` and Enter, or bypass the script shell from `apps/bot` with `nub src/index.ts` (start) or `nub watch src/index.ts` (dev). You can also use `nub run --script-shell bash start` / `nub run --script-shell bash dev` to keep the package scripts while selecting Bash explicitly.
 
+## YouTube Latest Videos
+
+`/videos add [backfill-count:0..15]` opens a channel URL/`@handle`/`UC...` modal, creates the managed **Latest Videos** Forum when needed, reuses creator tags and imports ten videos by default. `/videos status` reports progress; `/videos sync` publishes pending stored sources; `/videos clean` is administrator-only and requires an expiring confirmation. There is no Content Creator role. Manage Messages authorizes management and post creation; human comments are denied, except Discord's Administrator bypass.
+
+Use the same `DATABASE_URL` and `NEWS_INTERNAL_TOKEN` as the API; `YOUTUBE_API_URL` optionally overrides `NEWS_API_URL`. `YOUTUBE_API_KEY` remains API-only. BullMQ refreshes RSS then publishes every ten minutes, including Shorts/livestreams. See [`docs/youtube-videos-operations.md`](../../docs/youtube-videos-operations.md) for staging validation, owned overwrite policy, tag capacity, cleanup and recovery. Live Discord permissions/V2 rendering must be verified before production deployment.
+
 ## Netmarble news Forum (Phases 4–8)
 
 Set `DATABASE_URL` in the untracked `apps/bot/.env` to the same PostgreSQL database used by the API, and set `NEWS_API_URL` to the public API base URL (`http://localhost:3000` by default). Run `nub --cwd apps/bot exec varlock run --inject vars -- nub --cwd ../.. run db:migrate` before starting the bot. Deploy the updated `/setup` command with `nub --cwd apps/bot run sync` (configure `DISCORD_GUILD_ID` for guild command deployment). Start the API before the bot (`nub --cwd apps/bot run start`); the source must have finished its first ingestion. The bot can also run in Compose with `nub run docker:bot:up` after setting a shared `NEWS_INTERNAL_TOKEN` in `apps/api/.env` and Discord credentials in `apps/bot/.env`; this profile is opt-in. The bot exposes container-local `/health/live` and `/health/ready` on port 3001; readiness checks Discord and PostgreSQL and returns durable per-guild last publication timestamps. See `docs/netmarble-news-operations.md` for restart and recovery.

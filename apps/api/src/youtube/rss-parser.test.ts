@@ -15,6 +15,15 @@ describe("YouTube RSS normalization", () => {
       sourceUpdatedAt: "2026-10-20T01:21:28.000Z",
     });
   });
+  it("accepts YouTube's prefixless root channel ID while entries keep the canonical UC ID", () => {
+    const xml = rssFixture(1).replace(`<yt:channelId>${CHANNEL_ID}</yt:channelId>`, `<yt:channelId>${CHANNEL_ID.slice(2)}</yt:channelId>`);
+    const feed = parseYoutubeFeed(xml, CHANNEL_ID);
+    expect(feed.channelId).toBe(CHANNEL_ID);
+    expect(feed.videos).toHaveLength(1);
+    expect(feed.rejectedEntries).toBe(0);
+    expect(feed.videos[0]!.channelId).toBe(CHANNEL_ID);
+    expect(() => parseYoutubeFeed(xml.replace(CHANNEL_ID.slice(2), OTHER_CHANNEL_ID.slice(2)), CHANNEL_ID)).toThrow("invalid RSS feed");
+  });
   it("accepts empty feeds and singleton entries, preserving text and empty descriptions", () => {
     expect(parseYoutubeFeed(rssFixture(0), CHANNEL_ID).videos).toEqual([]);
     const feed = parseYoutubeFeed(wrapFeed(rssEntry(1, { title: "001", description: "" })), CHANNEL_ID);

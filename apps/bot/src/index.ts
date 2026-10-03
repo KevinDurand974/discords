@@ -7,6 +7,7 @@ import { ENV } from "@/core/config.ts";
 import { createBotHealthServer } from "@/core/health.ts";
 import { registerInteractionRouter } from "@/core/interaction-router.ts";
 import { synchronizeNews } from "@/features/netmarble-news/news-runtime.ts";
+import { synchronizeVideos } from "@/features/youtube-videos/videos-runtime.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
 
 const client = createDiscordClient();
@@ -17,6 +18,7 @@ if (!Number.isInteger(healthPort) || healthPort < 1 || healthPort > 65535)
 createBotHealthServer(client, process.env.DATABASE_URL, {
   token: process.env.JOBS_INTERNAL_TOKEN,
   synchronizeNews: () => synchronizeNews(client),
+  synchronizeVideos: () => synchronizeVideos(client),
 }).listen(healthPort, healthHost, () => {
   console.info(`Bot health listening on ${healthHost}:${healthPort}`);
 });

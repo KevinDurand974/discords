@@ -4,10 +4,12 @@ import { ElysiaAdapter } from "@bull-board/elysia";
 import { node } from "@elysiajs/node";
 import { Queue, Worker } from "bullmq";
 import { Elysia } from "elysia";
+import { refreshYoutube, youtubeScheduler } from "./youtube-jobs.ts";
 
 const queueName = "discords-maintenance";
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
 const apiUrl = requiredUrl("NEWS_API_URL", process.env.NEWS_API_URL ?? "http://127.0.0.1:3000");
+const youtubeApiUrl = requiredUrl("YOUTUBE_API_URL", process.env.YOUTUBE_API_URL || apiUrl);
 const botUrl = requiredUrl("BOT_URL", process.env.BOT_URL ?? "http://127.0.0.1:3001");
 const jobsToken = required("JOBS_INTERNAL_TOKEN", process.env.JOBS_INTERNAL_TOKEN);
 const dashboardPort = port("JOBS_DASHBOARD_PORT", process.env.JOBS_DASHBOARD_PORT ?? "3002");
@@ -28,6 +30,7 @@ const queue = new Queue(queueName, { connection });
 const worker = new Worker(
   queueName,
   async (job) => {
+    if (job.name === "youtube-refresh") return refreshYoutube(youtubeApiUrl, botUrl, jobsToken);
     const target =
       job.name === "news-ingestion"
         ? `${apiUrl}/internal/jobs/news-ingestion`
@@ -46,19 +49,45 @@ const worker = new Worker(
 );
 
 worker.on("completed", (job) => console.info("Job completed", { id: job.id, name: job.name }));
-worker.on("failed", (job, error) => console.error("Job failed", { id: job?.id, name: job?.name, error }));
+worker.on("failed", (job, error) =>
+  console.error("Job failed", { id: job?.id, name: job?.name, error }),
+);
 
 await Promise.all([
-  queue.upsertJobScheduler("news-ingestion-every-30-minutes", { pattern: "*/30 * * * *" }, {
-    name: "news-ingestion",
-    opts: { attempts: 3, backoff: { type: "exponential", delay: 30_000 }, removeOnComplete: 100, removeOnFail: 100 },
-  }),
-  queue.upsertJobScheduler("news-publication-every-30-minutes", { pattern: "*/30 * * * *" }, {
-    name: "news-publication",
-    opts: { attempts: 3, backoff: { type: "exponential", delay: 30_000 }, removeOnComplete: 100, removeOnFail: 100 },
-  }),
+  queue.upsertJobScheduler(youtubeScheduler.id, youtubeScheduler.repeat, youtubeScheduler.template),
+  queue.upsertJobScheduler(
+    "news-ingestion-every-30-minutes",
+    { pattern: "*/30 * * * *" },
+    {
+      name: "news-ingestion",
+      opts: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30_000 },
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      },
+    },
+  ),
+  queue.upsertJobScheduler(
+    "news-publication-every-30-minutes",
+    { pattern: "*/30 * * * *" },
+    {
+      name: "news-publication",
+      opts: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 30_000 },
+        removeOnComplete: 100,
+        removeOnFail: 100,
+      },
+    },
+  ),
 ]);
 await Promise.all([
+  queue.add(
+    "youtube-refresh",
+    {},
+    { ...youtubeScheduler.template.opts, jobId: "startup-youtube-refresh", removeOnComplete: true },
+  ),
   queue.add("news-ingestion", {}, { jobId: "startup-news-ingestion", removeOnComplete: true }),
   queue.add("news-publication", {}, { jobId: "startup-news-publication", removeOnComplete: true }),
 ]);

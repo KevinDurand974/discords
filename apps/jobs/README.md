@@ -7,7 +7,11 @@ It schedules two jobs every 30 minutes and once at worker start:
 - `news-ingestion`: requests the API to ingest Netmarble articles.
 - `news-publication`: requests the connected bot to publish new articles in configured Discord guilds.
 
-The API and bot only execute their respective jobs; they contain no timers.
+It also schedules `youtube-refresh` every **10 minutes** and at startup. This single job ingests YouTube RSS sources first, then publishes stored pending videos through the bot, even when some ingestion fails. Incomplete work fails the job for retry; news schedules remain unchanged.
+
+The API and bot only execute their respective jobs; they contain no timers. `YOUTUBE_API_URL` optionally overrides `NEWS_API_URL` for the YouTube API. The worker never receives `YOUTUBE_API_KEY`.
+
+See [`docs/youtube-videos-operations.md`](../../docs/youtube-videos-operations.md) for rollout, commands, permissions and recovery. Unit tests: `nub --cwd apps/jobs run test`.
 
 ## Run locally
 
