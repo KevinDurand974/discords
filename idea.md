@@ -1,0 +1,3 @@
+- Faire en sorte d'avoir uniquement qu'un seul env via varlock (package?)
+- migrer les logs en db et pas dans un fichier en local
+- migrer les commandes pour qu'elles soit mieux
