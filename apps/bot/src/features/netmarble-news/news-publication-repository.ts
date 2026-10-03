@@ -5,7 +5,7 @@ import type { NewsArticle } from "./news-api.ts";
 
 export type KnownArticle = {
   id: number;
-  state: "published" | "skipped";
+  state: "published";
   threadId: string | null;
   discordPinned: boolean;
 };
@@ -14,7 +14,10 @@ export type NewsPublicationStore = {
   known(guildId: string): Promise<KnownArticle[]>;
   updateSourcePins(guildId: string, pinnedIds: number[]): Promise<void>;
   setDiscordPinned(guildId: string, articleId: number, pinned: boolean): Promise<void>;
-  skip(guildId: string, article: NewsArticle): Promise<void>;
+  initializeCutoff(
+    guildId: string,
+    article: NewsArticle,
+  ): Promise<{ id: number; createdAt: string }>;
   publish(guildId: string, article: NewsArticle, threadId: string): Promise<void>;
   completeInitial(guildId: string): Promise<void>;
 };
@@ -35,15 +38,14 @@ export function createNewsPublicationRepository(): NewsPublicationStore {
       const rows = await db
         .select({
           id: netmarbleArticles.sourceArticleId,
-          state: netmarbleArticles.syncState,
           threadId: netmarbleArticles.threadId,
           discordPinned: netmarbleArticles.isDiscordPinned,
         })
         .from(netmarbleArticles)
         .where(eq(netmarbleArticles.guildId, guildId));
-      return rows.map(({ id, state, threadId, discordPinned }) => ({
+      return rows.map(({ id, threadId, discordPinned }) => ({
         id,
-        state: state === "published" ? "published" : "skipped",
+        state: "published" as const,
         threadId,
         discordPinned,
       }));
@@ -86,18 +88,21 @@ export function createNewsPublicationRepository(): NewsPublicationStore {
       if (rows.length !== 1)
         throw new Error(`Published article ${articleId} is missing in ${guildId}.`);
     },
-    async skip(guildId, article) {
-      await db
-        .insert(netmarbleArticles)
-        .values({
-          guildId,
-          sourceArticleId: article.id,
-          menuSeq: article.menuSeq,
-          sourceCreatedAt: new Date(article.createdAt),
-          syncState: "skipped",
-          isSourcePinned: article.isSourcePinned,
+    async initializeCutoff(guildId, article) {
+      const [row] = await db
+        .update(netmarbleNewsSettings)
+        .set({
+          initialSourceCreatedAt: sql`coalesce(${netmarbleNewsSettings.initialSourceCreatedAt}, ${new Date(article.createdAt)})`,
+          initialSourceArticleId: sql`coalesce(${netmarbleNewsSettings.initialSourceArticleId}, ${article.id})`,
         })
-        .onConflictDoNothing();
+        .where(eq(netmarbleNewsSettings.guildId, guildId))
+        .returning({
+          createdAt: netmarbleNewsSettings.initialSourceCreatedAt,
+          id: netmarbleNewsSettings.initialSourceArticleId,
+        });
+      if (!row?.createdAt || row.id === null)
+        throw new Error(`News settings are missing in ${guildId}.`);
+      return { id: row.id, createdAt: row.createdAt.toISOString() };
     },
     async publish(guildId, article, threadId) {
       const rows = await db
@@ -112,16 +117,7 @@ export function createNewsPublicationRepository(): NewsPublicationStore {
           publishedAt: new Date(),
           isSourcePinned: article.isSourcePinned,
         })
-        .onConflictDoUpdate({
-          target: [netmarbleArticles.guildId, netmarbleArticles.sourceArticleId],
-          set: {
-            syncState: "published",
-            threadId,
-            publishedAt: new Date(),
-            isSourcePinned: article.isSourcePinned,
-          },
-          setWhere: sql`${netmarbleArticles.syncState} = 'skipped'`,
-        })
+        .onConflictDoNothing()
         .returning({ threadId: netmarbleArticles.threadId });
       if (rows.length !== 1)
         throw new Error(`Article ${article.id} was already published in guild ${guildId}.`);

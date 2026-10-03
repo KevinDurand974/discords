@@ -73,9 +73,45 @@ describe("news Forum setup", () => {
     ]);
   });
 
+  it("exposes only a 0–10 backfill-count option on create", () => {
+    const group = setupCommand.data.toJSON().options?.find(({ name }) => name === "news");
+    if (group?.type !== ApplicationCommandOptionType.SubcommandGroup)
+      throw new Error("News group missing");
+    const create = group.options?.find(({ name }) => name === "create");
+    expect(create?.options).toMatchObject([
+      {
+        name: "backfill-count",
+        type: ApplicationCommandOptionType.Integer,
+        min_value: 0,
+        max_value: 10,
+      },
+    ]);
+    expect(create?.options).toHaveLength(1);
+  });
+
+  it.each([0, 1, 10])(
+    "persists an initial count of %i and derives its import mode",
+    async (count) => {
+      const f = fixtures();
+      const setup = await createNewsSetup(f.guild, f.store, count);
+      expect(setup.initialBackfillCount).toBe(count);
+      expect(setup.initialImportMode).toBe(count === 0 ? "future_only" : "backfill");
+    },
+  );
+
+  it.each([-1, 11, 1.5])(
+    "rejects an invalid initial count of %s before creating resources",
+    async (count) => {
+      const f = fixtures();
+      await expect(createNewsSetup(f.guild, f.store, count)).rejects.toThrow("between 0 and 10");
+      expect(f.guild.preflight).not.toHaveBeenCalled();
+    },
+  );
+
   it("creates five manual roles, tags and a single persisted Forum", async () => {
     const f = fixtures();
     const setup = await createNewsSetup(f.guild, f.store);
+    expect(setup.initialBackfillCount).toBe(10);
     expect(setup.mappings.map(({ menuSeq }) => menuSeq)).toEqual(
       NEWS_TAGS.map(({ menuSeq }) => menuSeq),
     );

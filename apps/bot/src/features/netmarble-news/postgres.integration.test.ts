@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 import { createDatabase } from "@discords/db";
 import {
   newsCategories,
@@ -29,6 +30,60 @@ const article: NewsArticle = {
 };
 
 describe.skipIf(!database)("PostgreSQL guild publication recovery", () => {
+  it("migrates skipped history to one cutoff while preserving published rows", async () => {
+    const connection = await database!.pool.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query(`
+        CREATE TEMP TABLE netmarble_news_settings (
+          guild_id text PRIMARY KEY, initial_import_completed_at timestamptz
+        ) ON COMMIT DROP;
+        CREATE TEMP TABLE netmarble_articles (
+          guild_id text, source_article_id integer, source_created_at timestamptz,
+          first_seen_at timestamptz, sync_state text, thread_id text, published_at timestamptz,
+          CONSTRAINT netmarble_articles_sync_state_check CHECK (sync_state IN ('published', 'skipped')),
+          CONSTRAINT netmarble_articles_publication_check CHECK (
+            (sync_state = 'published' AND thread_id IS NOT NULL AND published_at IS NOT NULL)
+            OR (sync_state = 'skipped' AND thread_id IS NULL AND published_at IS NULL)
+          )
+        ) ON COMMIT DROP;
+        INSERT INTO netmarble_news_settings VALUES ('migration-guild', '2026-01-03');
+        INSERT INTO netmarble_articles VALUES
+          ('migration-guild', 1, '2026-01-01', '2026-01-02', 'published', 'thread-old', '2026-01-02'),
+          ('migration-guild', 2, '2026-01-02', '2026-01-02', 'skipped', NULL, NULL),
+          ('migration-guild', 3, '2026-01-02', '2026-01-02', 'skipped', NULL, NULL),
+          ('migration-guild', 4, '2026-02-01', '2026-02-01', 'published', 'thread-new', '2026-02-01');
+      `);
+      const migration = await readFile(
+        new URL(
+          "../../../../../packages/db/drizzle/20261003181343_sloppy_bloodstorm/migration.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      );
+      await connection.query(migration);
+      const history = await connection.query(
+        "SELECT source_article_id, thread_id FROM netmarble_articles ORDER BY source_article_id",
+      );
+      expect(history.rows).toEqual([
+        { source_article_id: 1, thread_id: "thread-old" },
+        { source_article_id: 4, thread_id: "thread-new" },
+      ]);
+      const baseline = await connection.query(
+        "SELECT initial_source_article_id FROM netmarble_news_settings",
+      );
+      expect(baseline.rows).toEqual([{ initial_source_article_id: 3 }]);
+      await expect(
+        connection.query(`
+        INSERT INTO netmarble_articles VALUES
+          ('migration-guild', 5, '2026-01-01', '2026-01-02', 'skipped', NULL, NULL)
+      `),
+      ).rejects.toThrow(/check constraint/);
+    } finally {
+      await connection.query("ROLLBACK");
+      connection.release();
+    }
+  });
   it("keeps publication state and enabled guilds after repository recreation", async () => {
     await database!.db
       .insert(newsCategories)
@@ -44,10 +99,19 @@ describe.skipIf(!database)("PostgreSQL guild publication recovery", () => {
     await database!.db.insert(netmarbleNewsSettings).values({
       guildId: "integration-guild",
       forumChannelId: "forum-1",
-      initialImportMode: "backfill",
+      initialImportMode: "future_only",
+      initialBackfillCount: 0,
+    });
+    expect(await createNewsSetupRepository().get("integration-guild")).toMatchObject({
+      initialImportMode: "future_only",
+      initialBackfillCount: 0,
     });
     const first = createNewsPublicationRepository();
-    await first.skip("integration-guild", article);
+    expect(await first.known("integration-guild")).toEqual([]);
+    expect(await first.initializeCutoff("integration-guild", article)).toEqual({
+      id: article.id,
+      createdAt: article.createdAt,
+    });
     await first.publish("integration-guild", article, "thread-1");
     const recovered = createNewsPublicationRepository();
     expect(await recovered.enabledGuildIds()).toContain("integration-guild");
@@ -92,6 +156,17 @@ describe.skipIf(!database)("PostgreSQL guild publication recovery", () => {
     });
     await recovered.publish("other-guild", article, "other-thread");
     const setups = createNewsSetupRepository();
+    expect((await setups.get("integration-guild"))?.initialSourceCutoff).toEqual({
+      id: article.id,
+      createdAt: article.createdAt,
+    });
+    expect(
+      await recovered.initializeCutoff("integration-guild", {
+        ...article,
+        id: article.id + 1,
+        createdAt: "2026-10-01T00:00:00.000Z",
+      }),
+    ).toEqual({ id: article.id, createdAt: article.createdAt });
     const gateway = {
       guildId: "integration-guild",
       preflight: async () => {},

@@ -10,7 +10,8 @@
   },
   "scripts": {
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "varlock run --inject vars -- drizzle-kit migrate",
+    "env:check": "varlock load",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -23,6 +24,7 @@
     "@types/pg": "^8.16.0",
     "drizzle-kit": "1.0.0-rc.4",
     "typescript": "^7",
+    "varlock": "^1.21.1",
     "vitest": "5.0.2"
   }
 }

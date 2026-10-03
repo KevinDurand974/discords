@@ -10,7 +10,7 @@
   - `Official News` (`menuSeq: 1`)
   - `Hunter: Origin` (`menuSeq: 46`)
 - Default setup backfills the 10 latest articles, ordered by `createdAt DESC`, plus every currently source-pinned article.
-- Setup must offer a choice between backfill and future-only operation. A later slash subcommand can run a backfill on demand.
+- Setup accepts `backfill-count` from 0 to 10 (default 10). Zero imports only the preferred source pin; positive counts import that many newest articles excluding the preferred pin, plus at most that one pin. A later slash subcommand can run a backfill on demand.
 - Poll the source every 30 minutes.
 - Use PostgreSQL in Docker with Drizzle's release-candidate packages for persistence and migrations.
 - Download and upload supported source media as Discord attachments so it is visible as native post media.
@@ -169,6 +169,8 @@ forum_channel_id
 enabled
 poll_interval_minutes                  -- default 30
 initial_import_mode                    -- backfill | future_only
+initial_source_created_at              -- initial listing cutoff
+initial_source_article_id              -- cutoff timestamp tie-breaker
 ```
 
 ### `netmarble_news_categories`
@@ -187,15 +189,15 @@ guild_id
 source_article_id
 menu_seq
 source_created_at
-sync_state                             -- published | skipped
-thread_id                              -- nullable until published
+sync_state                             -- published only
+thread_id                              -- required for publication
 is_source_pinned
 first_seen_at
-published_at                           -- nullable until published
+published_at                           -- required for publication
 PRIMARY KEY (guild_id, source_article_id)
 ```
 
-The table records every seen source ID. This prevents repeated list/detail work and lets future-only setup mark current normal articles as `skipped` without publishing them. A later forced backfill may still import skipped records.
+The table records only successfully published articles and prevents duplicate posts. Skipped attempts create no rows. One initial source cutoff per guild prevents future-only mode from importing historical normal articles; manual backfill bypasses that cutoff.
 
 The stored Discord `thread_id` lets the bot pin or unpin an existing Forum post without reposting it.
 
@@ -204,7 +206,7 @@ The stored Discord `thread_id` lets the bot pin or unpin an existing Forum post 
 Extend `/setup` with:
 
 ```text
-/setup news create [import-mode: backfill|future-only] [backfill-count: 1..50]
+/setup news create [backfill-count: 0..10]
 /setup news status
 /setup news disable
 /setup news sync
@@ -231,16 +233,16 @@ The default `backfill` mode:
 
 - fetches enough pages with `rows` and `start` to obtain the latest requested articles for each category;
 - selects the latest 10 by normalized `createdAt DESC` by default;
-- imports every currently pinned source article in addition to those 10;
+- imports at most one preferred source pin in addition to those 10, excluding it from the normal article count (newest Notices pin first, otherwise newest source pin);
 - never sends category-role notifications for historical posts.
 
 ### Future-only mode
 
-The `future-only` mode records IDs returned by the initial normal article pages as `skipped`, publishes no historical normal articles, and starts publishing only articles discovered later. Current pinned source articles are imported and pinned so the Discord Forum reflects the source's visible pinned content.
+Setting `backfill-count: 0` selects `future-only` internally and saves the newest initial source timestamp and article ID as a cutoff, publishes no historical normal articles, and starts publishing articles newer than that cutoff. Only the preferred source-pinned article is imported and pinned; other source pins do not add extra historical posts.
 
 ### Manual backfill
 
-`/setup news backfill` explicitly imports historical posts even when they were previously marked `skipped`. It accepts a count, defaults to 10, uses `createdAt DESC`, and never notifies category roles.
+`/setup news backfill` explicitly imports historical posts excluded by the initial cutoff. It accepts a count, defaults to 10, uses `createdAt DESC`, and never notifies category roles.
 
 ## Synchronization Module
 
@@ -407,7 +409,7 @@ Use Vitest for unit and integration tests. Add `vitest` and any narrowly scoped 
 - Verify public Elysia routes, schemas, CORS configuration, and pagination responses.
 - Determine pin state exclusively from `recommendList`.
 - Verify future-only setup does not publish current normal articles.
-- Verify default backfill imports 10 newest items plus pinned items.
+- Verify default backfill imports 10 newest items excluding the preferred pin, plus at most one preferred pin.
 - Verify a manual backfill imports previously skipped items without duplicate posts.
 - Verify no duplicate imports after restart.
 - Verify source pin and unpin reconciliation.

@@ -33,21 +33,12 @@ export function configureNewsGroup(group: SlashCommandSubcommandGroupBuilder) {
       subcommand
         .setName("create")
         .setDescription("Create or reactivate the news Forum")
-        .addStringOption((option) =>
-          option
-            .setName("import-mode")
-            .setDescription("Import historical news or start with future articles")
-            .addChoices(
-              { name: "backfill", value: "backfill" },
-              { name: "future-only", value: "future_only" },
-            ),
-        )
         .addIntegerOption((option) =>
           option
             .setName("backfill-count")
-            .setDescription("Newest articles to import (default: 10)")
-            .setMinValue(1)
-            .setMaxValue(50),
+            .setDescription("Articles to import, plus at most one pinned post (0–10; default: 10)")
+            .setMinValue(0)
+            .setMaxValue(10),
         ),
     )
     .addSubcommand((subcommand) =>
@@ -379,20 +370,38 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
   const botId = interaction.client.user?.id;
   if (!botId) throw new Error("The bot user is not available.");
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const mode =
-    interaction.options.getString("import-mode") === "future_only" ? "future_only" : "backfill";
   const count = interaction.options.getInteger("backfill-count") ?? 10;
   const synchronizer = createNewsRuntime(interaction.client).synchronizer;
   const { setup, result } = await synchronizer.withGuildSetup(interaction.guildId, async () => {
+    const updateProgress = async (content: string) => {
+      try {
+        await interaction.editReply({ content, allowedMentions: { parse: [] } });
+      } catch (error) {
+        console.error(`Could not update news setup progress in ${interaction.guildId}`, error);
+      }
+    };
+    await updateProgress("Creating or reactivating the news Forum and category roles…");
     const setup = await createNewsSetup(
       createNewsGuildGateway(interaction.guild!, botId, interaction.user.tag),
       store,
-      mode,
       count,
     );
+    let lastUpdate = Number.NEGATIVE_INFINITY;
+    if (!setup.initialImportCompleted) await updateProgress("Fetching the latest news…");
     const result = setup.initialImportCompleted
       ? null
-      : await synchronizer.syncGuild(interaction.guildId!);
+      : await synchronizer.syncGuild(interaction.guildId!, {
+          async onProgress({ completed, total, published, failed }) {
+            const now = Date.now();
+            if (completed !== total && now - lastUpdate < 2000) return;
+            lastUpdate = now;
+            await updateProgress(
+              total === 0
+                ? "No articles to import. Finalizing setup…"
+                : `Initial import: **${completed}/${total}** processed — ${published} published, ${failed} failed.${completed === total ? " Finalizing setup…" : ""}`,
+            );
+          },
+        });
     return { setup, result };
   });
   const summary = result

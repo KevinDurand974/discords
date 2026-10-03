@@ -34,6 +34,13 @@ export function createNewsSetupRepository(): NewsSetupStore {
           settings.initialImportMode === "future_only" ? "future_only" : "backfill",
         initialBackfillCount: settings.initialBackfillCount,
         initialImportCompleted: settings.initialImportCompletedAt !== null,
+        initialSourceCutoff:
+          settings.initialSourceCreatedAt !== null && settings.initialSourceArticleId !== null
+            ? {
+                id: settings.initialSourceArticleId,
+                createdAt: settings.initialSourceCreatedAt.toISOString(),
+              }
+            : null,
         mappings: mappings.map(({ menuSeq, tagId, notificationRoleId }) => ({
           menuSeq,
           tagId,

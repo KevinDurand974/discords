@@ -17,6 +17,7 @@ export type NewsSetup = {
   initialImportMode: NewsImportMode;
   initialBackfillCount: number;
   initialImportCompleted: boolean;
+  initialSourceCutoff?: { id: number; createdAt: string } | null;
   mappings: NewsMapping[];
 };
 
@@ -41,15 +42,14 @@ export type NewsGuildGateway = {
 export async function createNewsSetup(
   guild: NewsGuildGateway,
   store: NewsSetupStore,
-  initialImportMode: NewsImportMode = "backfill",
   initialBackfillCount = 10,
 ): Promise<NewsSetup> {
   if (
     !Number.isInteger(initialBackfillCount) ||
-    initialBackfillCount < 1 ||
-    initialBackfillCount > 50
+    initialBackfillCount < 0 ||
+    initialBackfillCount > 10
   )
-    throw new RangeError("Backfill count must be between 1 and 50.");
+    throw new RangeError("Backfill count must be between 0 and 10.");
   const current = await store.get(guild.guildId);
   if (current?.enabled) throw new Error("News is already configured for this server.");
   await guild.preflight();
@@ -89,7 +89,7 @@ export async function createNewsSetup(
       guildId: guild.guildId,
       forumChannelId: forum.id,
       enabled: true,
-      initialImportMode,
+      initialImportMode: initialBackfillCount === 0 ? "future_only" : "backfill",
       initialBackfillCount,
       initialImportCompleted: false,
       mappings,

@@ -90,10 +90,10 @@ Extend `/setup` with `/setup news create`.
 
 Publish text-only Netmarble articles from the public API.
 
-- Add `/setup news create` import mode: `backfill` or `future-only`.
-- Default backfill: 10 newest articles by `createdAt DESC`, plus currently source-pinned articles.
+- Add `/setup news create [backfill-count: 0..10]` (default 10). Zero imports only the preferred source pin, or nothing if none exists; positive values control the normal initial history size.
+- Default backfill: 10 newest articles by `createdAt DESC` excluding the preferred pin, plus at most one preferred source pin (newest Notices pin first, otherwise newest source pin).
 - Add `/setup news backfill [count]`.
-- In future-only mode, record current normal article IDs as skipped without publishing them.
+- In future-only mode, save one source cutoff per guild instead of recording skipped article IDs; only published articles enter publication history.
 - Convert simple HTML paragraph, line-break, heading, list, bold, italic, and link content to Discord Markdown.
 - Create a tagged Forum post with a plain-text preview message (no embed) and full Markdown detail messages.
 - Add one **Read on Netmarble** link button using:

@@ -40,10 +40,12 @@ export const netmarbleNewsSettings = pgTable("netmarble_news_settings", {
   initialImportMode: text("initial_import_mode").notNull().default("backfill"),
   initialBackfillCount: integer("initial_backfill_count").notNull().default(10),
   initialImportCompletedAt: timestamp("initial_import_completed_at", { withTimezone: true }),
+  initialSourceCreatedAt: timestamp("initial_source_created_at", { withTimezone: true }),
+  initialSourceArticleId: integer("initial_source_article_id"),
 }, (table) => [
   check("netmarble_news_settings_poll_interval_check", sql`${table.pollIntervalMinutes} > 0`),
   check("netmarble_news_settings_import_mode_check", sql`${table.initialImportMode} IN ('backfill', 'future_only')`),
-  check("netmarble_news_settings_backfill_count_check", sql`${table.initialBackfillCount} BETWEEN 1 AND 50`),
+  check("netmarble_news_settings_backfill_count_check", sql`${table.initialBackfillCount} BETWEEN 0 AND 50`),
 ]);
 
 export const netmarbleNewsCategories = pgTable("netmarble_news_categories", {
@@ -67,6 +69,6 @@ export const netmarbleArticles = pgTable("netmarble_articles", {
 }, (table) => [
   primaryKey({ columns: [table.guildId, table.sourceArticleId] }),
   unique("netmarble_articles_thread_id_unique").on(table.threadId),
-  check("netmarble_articles_sync_state_check", sql`${table.syncState} IN ('published', 'skipped')`),
-  check("netmarble_articles_publication_check", sql`(${table.syncState} = 'published' AND ${table.threadId} IS NOT NULL AND ${table.publishedAt} IS NOT NULL) OR (${table.syncState} = 'skipped' AND ${table.threadId} IS NULL AND ${table.publishedAt} IS NULL)`),
+  check("netmarble_articles_sync_state_check", sql`${table.syncState} = 'published'`),
+  check("netmarble_articles_publication_check", sql`${table.threadId} IS NOT NULL AND ${table.publishedAt} IS NOT NULL`),
 ]);

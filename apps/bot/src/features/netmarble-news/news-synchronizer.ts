@@ -3,7 +3,12 @@ import type { NewsPublisher } from "./news-publisher.ts";
 import type { NewsPublicationStore } from "./news-publication-repository.ts";
 import { NOTICES_MENU_SEQ, type NewsSetupStore } from "./news-setup.ts";
 
-export type SyncOptions = { mode?: "automatic" | "backfill"; count?: number };
+export type SyncProgress = { completed: number; total: number; published: number; failed: number };
+export type SyncOptions = {
+  mode?: "automatic" | "backfill";
+  count?: number;
+  onProgress?: (progress: SyncProgress) => void | Promise<void>;
+};
 export type SyncResult = {
   published: number;
   skipped: number;
@@ -78,50 +83,54 @@ export function createNewsSynchronizer(
           ) ?? articles.find((article) => article.isSourcePinned)
         )?.id;
         const initial = !setup.initialImportCompleted && options.mode !== "backfill";
+        if (initial && !setup.initialSourceCutoff && listing.failures.length === 0 && articles[0])
+          setup.initialSourceCutoff = await store.initializeCutoff(guildId, articles[0]);
+        const isNew = (article: NewsArticle) =>
+          !setup.initialSourceCutoff ||
+          Date.parse(article.createdAt) > Date.parse(setup.initialSourceCutoff.createdAt) ||
+          (Date.parse(article.createdAt) === Date.parse(setup.initialSourceCutoff.createdAt) &&
+            article.id > setup.initialSourceCutoff.id);
         const manual = options.mode === "backfill";
         const count = initial ? setup.initialBackfillCount : manual ? (options.count ?? 10) : 10;
-        if (!Number.isInteger(count) || count < 1 || count > 50)
-          throw new RangeError("Backfill count must be between 1 and 50.");
+        const minimum = initial ? 0 : 1;
+        if (!Number.isInteger(count) || count < minimum || count > 50)
+          throw new RangeError(`Backfill count must be between ${minimum} and 50.`);
         const latest = new Set(articles.slice(0, count).map(({ id }) => id));
+        const initialLatest = new Set(
+          articles
+            .filter(({ id }) => id !== pinnedWinnerId)
+            .slice(0, count)
+            .map(({ id }) => id),
+        );
         const selected = articles.filter((article) =>
           manual
             ? latest.has(article.id)
             : initial
-              ? article.isSourcePinned ||
-                (setup.initialImportMode === "backfill" && latest.has(article.id))
+              ? article.id === pinnedWinnerId ||
+                (setup.initialImportMode === "backfill" && initialLatest.has(article.id))
               : latest.has(article.id) &&
-                (!known.has(article.id) ||
-                  (article.isSourcePinned && known.get(article.id)?.state === "skipped")),
+                !known.has(article.id) &&
+                (isNew(article) || article.id === pinnedWinnerId),
         );
-        let skipped = 0;
-        if (initial) {
-          const selectedIds = new Set(selected.map(({ id }) => id));
-          await articles
-            .filter(({ id }) => !selectedIds.has(id) && !known.has(id))
-            .reduce<Promise<void>>(async (previous, article) => {
-              await previous;
-              await store.skip(guildId, article);
-              known.set(article.id, {
-                id: article.id,
-                state: "skipped",
-                threadId: null,
-                discordPinned: false,
-              });
-              skipped += 1;
-            }, Promise.resolve());
-        }
+        const selectedIds = new Set(selected.map(({ id }) => id));
+        const skipped = initial
+          ? articles.filter(({ id }) => !selectedIds.has(id) && !known.has(id)).length
+          : 0;
         const failures: string[] = [...listing.failures];
         let published = 0;
-        await selected.reduce<Promise<void>>(async (previous, article: NewsArticle) => {
+        let completed = 0;
+        let failed = 0;
+        const pending = selected.filter(({ id }) => !known.has(id));
+        const reportProgress = async () => {
+          try {
+            await options.onProgress?.({ completed, total: pending.length, published, failed });
+          } catch (error) {
+            console.error(`Could not report news import progress in ${guildId}`, error);
+          }
+        };
+        await reportProgress();
+        await pending.reduce<Promise<void>>(async (previous, article: NewsArticle) => {
           await previous;
-          if (known.get(article.id)?.state === "published") return;
-          if (
-            known.get(article.id)?.state === "skipped" &&
-            !initial &&
-            !manual &&
-            !article.isSourcePinned
-          )
-            return;
           try {
             const detail = await source.detail(article.id, article.menuSeq);
             if (detail.id !== article.id || detail.menuSeq !== article.menuSeq)
@@ -129,7 +138,7 @@ export function createNewsSynchronizer(
             const threadId = await publisher.publish(
               setup,
               { ...detail, isSourcePinned: article.isSourcePinned },
-              !initial && !manual && known.get(article.id)?.state !== "skipped",
+              !initial && !manual && isNew(article),
             );
             await store.publish(guildId, article, threadId);
             known.set(article.id, {
@@ -140,11 +149,14 @@ export function createNewsSynchronizer(
             });
             published += 1;
           } catch (error) {
+            failed += 1;
             failures.push(
               `${article.id} (${article.menuSeq}): ${error instanceof Error ? error.message : String(error)}`,
             );
             console.error(`News article ${article.id} failed in ${guildId}`, error);
           }
+          completed += 1;
+          await reportProgress();
         }, Promise.resolve());
         if (listing.failures.length === 0) {
           await store.updateSourcePins(

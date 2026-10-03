@@ -1,3 +1,4 @@
+import { decodeHTML } from "entities";
 import {
   ActionRowBuilder,
   ButtonBuilder,
@@ -5,7 +6,6 @@ import {
   ChannelFlags,
   ChannelType,
   ContainerBuilder,
-  MediaGalleryBuilder,
   MessageFlags,
   SectionBuilder,
   SeparatorBuilder,
@@ -29,6 +29,10 @@ function tableHeading(value: string): string {
     .trim();
 }
 
+function hasTableText(value: string): boolean {
+  return /[^\s\u200b]/u.test(value);
+}
+
 function tableContainers(
   part: Extract<ArticlePart, { type: "tableRow" }>,
   headers: string[],
@@ -36,18 +40,21 @@ function tableContainers(
   fallback?: string,
 ): ContainerBuilder[] {
   const text = (content: string) => new TextDisplayBuilder().setContent(content);
-  const values = part.columns.map((column, index) => {
+  const values = part.columns.flatMap((column, index) => {
     const body =
       index === 1 && part.rightRows
-        ? part.rightRows.map((row) => `- ${row || "\u200b"}`).join("\n")
-        : column || "\u200b";
-    return `-# ${headers[index] || (index === 0 ? "Category" : "Changed")}\n${body}`;
+        ? part.rightRows
+            .filter(hasTableText)
+            .map((row) => `- ${row}`)
+            .join("\n")
+        : column.trim();
+    if (!hasTableText(body)) return [];
+    return [headers[index] ? `-# ${headers[index]}\n${body}` : body];
   });
-  if (values.length === 1) values.push(`-# ${headers[1] || "Changed"}\n\u200b`);
-  if (fallback) values[0] = `${values[0] || ""}\n${fallback}`;
+  if (fallback) values[0] = [values[0], fallback].filter(Boolean).join("\n");
   const chunks = values.flatMap((value) => splitDiscordText(value, 1500));
-  const containers: ContainerBuilder[] = [];
-  for (let index = 0; index < chunks.length; index += 3) {
+  return Array.from({ length: Math.ceil(chunks.length / 3) }, (_, containerIndex) => {
+    const index = containerIndex * 3;
     const container = new ContainerBuilder();
     const first = chunks[index]!;
     if (index === 0 && thumbnail) {
@@ -57,13 +64,12 @@ function tableContainers(
           .setThumbnailAccessory(new ThumbnailBuilder().setURL(`attachment://${thumbnail.name}`)),
       );
     } else container.addTextDisplayComponents(text(first));
-    for (const chunk of chunks.slice(index + 1, index + 3)) {
+    chunks.slice(index + 1, index + 3).forEach((chunk) => {
       container.addSeparatorComponents(new SeparatorBuilder());
       container.addTextDisplayComponents(text(chunk));
-    }
-    containers.push(container);
-  }
-  return containers;
+    });
+    return container;
+  });
 }
 
 function isUnknownChannel(error: unknown): boolean {
@@ -99,22 +105,20 @@ export function createNewsPublisher(client: Client): NewsPublisher {
         new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel("Read on Netmarble").setURL(url),
       );
       const parts = renderArticleParts(article.bodyHtml, article.excerpt);
-      const mention = notify ? `<@&${mapping.notificationRoleId}>\n` : "";
       const text = (content: string) => new TextDisplayBuilder().setContent(content);
-      const gallery = (file: AttachmentBuilder) =>
-        new MediaGalleryBuilder().addItems({ media: { url: `attachment://${file.name}` } });
       const create = (
-        components: (TextDisplayBuilder | MediaGalleryBuilder | ActionRowBuilder<ButtonBuilder>)[],
+        components: (TextDisplayBuilder | ActionRowBuilder<ButtonBuilder>)[],
         files?: AttachmentBuilder[],
+        componentsV2 = true,
       ) =>
         forum.threads.create({
-          name: article.title.slice(0, 100) || `Article ${article.id}`,
+          name: decodeHTML(article.title).slice(0, 100) || `Article ${article.id}`,
           appliedTags: [mapping.tagId],
           message: {
-            flags: MessageFlags.IsComponentsV2,
+            ...(componentsV2 ? { flags: MessageFlags.IsComponentsV2 } : {}),
             components: [...components, button],
             ...(files ? { files } : {}),
-            allowedMentions: { parse: [], roles: notify ? [mapping.notificationRoleId] : [] },
+            allowedMentions: { parse: [] },
           },
           reason: `Netmarble article ${article.id}`,
         });
@@ -130,22 +134,21 @@ export function createNewsPublisher(client: Client): NewsPublisher {
       const first = parts[0]!;
       let thread;
       if (first.type === "text") {
-        thread = await create([text(`${mention}${first.content}`)]);
+        thread = await create([text(first.content)]);
       } else if (first.type === "tableRow") {
-        // Forum starters need a message; the table's own V2 container follows it.
-        thread = await create(mention ? [text(mention.trim())] : []);
+        // Keep the source link in the starter; table rows follow in reading order.
+        thread = await create([]);
       } else {
         const imported = await importMedia(first.url, `media-${article.id}-1`, 10_000_000);
-        const prefix = mention ? [text(mention.trim())] : [];
         if (imported.attachment) {
           try {
-            thread = await create([...prefix, gallery(imported.attachment)], [imported.attachment]);
+            thread = await create([], [imported.attachment], false);
           } catch (error) {
             if (!isUploadRejection(error)) throw error;
             console.error(`Could not attach first image for news article ${article.id}`, error);
-            thread = await create([text(`${mention}${imported.fallback}`)]);
+            thread = await create([text(imported.fallback)]);
           }
-        } else thread = await create([text(`${mention}${imported.fallback}`)]);
+        } else thread = await create([text(imported.fallback)]);
       }
       await parts
         .slice(first.type === "tableRow" ? 0 : 1)
@@ -161,24 +164,33 @@ export function createNewsPublisher(client: Client): NewsPublisher {
             return;
           }
           if (part.type === "tableRow") {
+            if (part.tableStart) headers = [];
             if (part.header) {
               headers = part.columns.map(tableHeading);
               return;
             }
             const imported = await prepareRow(part);
+            const imageOnly = !part.columns.some(hasTableText);
             const sendRow = async (thumbnail?: AttachmentBuilder, fallback?: string) => {
-              for (const [index, container] of tableContainers(
-                part,
-                headers,
-                thumbnail,
-                fallback,
-              ).entries())
-                await thread.send({
-                  flags: MessageFlags.IsComponentsV2,
-                  components: [container],
-                  ...(index === 0 && thumbnail ? { files: [thumbnail] } : {}),
-                  allowedMentions: { parse: [] },
-                });
+              if (imageOnly) {
+                if (thumbnail)
+                  await thread.send({ files: [thumbnail], allowedMentions: { parse: [] } });
+                else if (fallback)
+                  await thread.send({ content: fallback, allowedMentions: { parse: [] } });
+                return;
+              }
+              await tableContainers(part, headers, thumbnail, fallback).reduce<Promise<void>>(
+                async (previous, container, index) => {
+                  await previous;
+                  await thread.send({
+                    flags: MessageFlags.IsComponentsV2,
+                    components: [container],
+                    ...(index === 0 && thumbnail ? { files: [thumbnail] } : {}),
+                    allowedMentions: { parse: [] },
+                  });
+                },
+                Promise.resolve(),
+              );
             };
             if (imported?.attachment) {
               try {
@@ -188,31 +200,32 @@ export function createNewsPublisher(client: Client): NewsPublisher {
                 await sendRow(undefined, imported.fallback);
               }
             } else await sendRow(undefined, imported?.fallback);
-            for (const [imageIndex, imageUrl] of part.images.slice(1).entries()) {
-              const extra = await importMedia(
-                imageUrl,
-                `media-${article.id}-row-${rowNumber}-${imageIndex + 2}`,
-                10_000_000,
-              );
-              if (extra.attachment) {
-                try {
-                  await thread.send({
-                    flags: MessageFlags.IsComponentsV2,
-                    components: [gallery(extra.attachment)],
-                    files: [extra.attachment],
-                    allowedMentions: { parse: [] },
-                  });
-                  continue;
-                } catch (error) {
-                  if (!isUploadRejection(error)) throw error;
+            await part.images
+              .slice(1)
+              .reduce<Promise<void>>(async (previousImage, imageUrl, imageIndex) => {
+                await previousImage;
+                const extra = await importMedia(
+                  imageUrl,
+                  `media-${article.id}-row-${rowNumber}-${imageIndex + 2}`,
+                  10_000_000,
+                );
+                if (extra.attachment) {
+                  try {
+                    await thread.send({
+                      files: [extra.attachment],
+                      allowedMentions: { parse: [] },
+                    });
+                    return;
+                  } catch (error) {
+                    if (!isUploadRejection(error)) throw error;
+                  }
                 }
-              }
-              await thread.send({
-                flags: MessageFlags.IsComponentsV2,
-                components: [text(extra.fallback)],
-                allowedMentions: { parse: [] },
-              });
-            }
+                await thread.send({
+                  flags: MessageFlags.IsComponentsV2,
+                  components: [text(extra.fallback)],
+                  allowedMentions: { parse: [] },
+                });
+              }, Promise.resolve());
             return;
           }
           headers = [];
@@ -224,8 +237,6 @@ export function createNewsPublisher(client: Client): NewsPublisher {
           if (imported.attachment) {
             try {
               await thread.send({
-                flags: MessageFlags.IsComponentsV2,
-                components: [gallery(imported.attachment)],
                 files: [imported.attachment],
                 allowedMentions: { parse: [] },
               });
@@ -241,6 +252,10 @@ export function createNewsPublisher(client: Client): NewsPublisher {
             allowedMentions: { parse: [] },
           });
         }, Promise.resolve());
+      await thread.send({
+        content: `<@&${mapping.notificationRoleId}>`,
+        allowedMentions: { parse: [], roles: notify ? [mapping.notificationRoleId] : [] },
+      });
       return thread.id;
     },
     async setPin(setup, threadId, pinned) {

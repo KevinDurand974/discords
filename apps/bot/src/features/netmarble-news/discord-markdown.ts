@@ -1,16 +1,41 @@
 import TurndownService from "turndown";
+import { decodeHTML } from "entities";
 
 function createTurndown(
   onImage?: (url: string) => string,
-  onTableRow?: (columns: string[], header: boolean, rightRows: string[]) => string,
+  onTableRow?: (
+    columns: string[],
+    header: boolean,
+    rightRows: string[],
+    tableStart: boolean,
+  ) => string,
 ) {
   const turndown = new TurndownService({ headingStyle: "atx", bulletListMarker: "-" });
   const escape = turndown.escape.bind(turndown);
   turndown.escape = (text) => escape(text).replace(/@/g, "@\u200b").replace(/[|`]/g, "\\$&");
+  type FormattingNode = {
+    nodeName: string;
+    textContent: string | null;
+    parentNode: FormattingNode | null;
+  };
+  const hasBoldAncestor = (node: FormattingNode | null): boolean =>
+    node !== null &&
+    (["STRONG", "B", "MARK"].includes(node.nodeName) ||
+      (/^H[1-6]$/.test(node.nodeName) && !(node.textContent ?? "").trimStart().startsWith("📌")) ||
+      hasBoldAncestor(node.parentNode));
+  turndown.addRule("discordBold", {
+    filter: ["strong", "b", "mark"],
+    replacement: (content, node) =>
+      !content.trim() || hasBoldAncestor((node as FormattingNode).parentNode)
+        ? content
+        : `**${content}**`,
+  });
   turndown.addRule("discordHeadings", {
     filter: ["h1", "h2", "h3", "h4", "h5", "h6"],
-    replacement: (content) =>
-      /^📌/.test(content.trim()) ? `\n\n${content.trim()}\n\n` : `\n\n**${content.trim()}**\n\n`,
+    replacement: (content, node) =>
+      (node.textContent ?? "").trimStart().startsWith("📌")
+        ? `\n\n${content.trim()}\n\n`
+        : `\n\n**${content.trim()}**\n\n`,
   });
   turndown.addRule("discordCodeBlock", {
     filter: "pre",
@@ -41,7 +66,9 @@ function createTurndown(
       const flush = () => {
         const columns = groupedColumns.map((values) => values.join("\n"));
         groups.push(
-          onTableRow ? onTableRow(columns, header, groupedColumns[1] ?? []) : columns.join("  •  "),
+          onTableRow
+            ? onTableRow(columns, header, groupedColumns[1] ?? [], groups.length === 0)
+            : columns.filter((column) => column.trim()).join("  •  "),
         );
         groupedColumns = [];
       };
@@ -84,10 +111,6 @@ function createTurndown(
     filter: "hr",
     replacement: () => "\uE004",
   });
-  turndown.addRule("discordHighlight", {
-    filter: "mark",
-    replacement: (content) => `**${content.trim()}**`,
-  });
   turndown.addRule("discordStrikethrough", {
     filter: ["s", "strike", "del"],
     replacement: (content) => `~~${content.trim()}~~`,
@@ -100,11 +123,7 @@ function createTurndown(
       try {
         const url = new URL(href, "https://forum.netmarble.com");
         return ["http:", "https:"].includes(url.protocol)
-          ? `[${content
-              .replace(/[\\`|]/g, "\\$&")
-              .replaceAll("[", "\\[")
-              .replaceAll("]", "\\]")
-              .replace(/@/g, "@\u200b")}](${url.toString().replaceAll(")", "%29")})`
+          ? `[${content}](${url.toString().replaceAll("(", "%28").replaceAll(")", "%29")})`
           : content;
       } catch {
         return content;
@@ -133,7 +152,7 @@ function formatArticleText(text: string): string {
     .replace(/^\*\*(📌[^\n]*?)\*\*$/gm, "$1")
     .replace(/(?:\n[ \t]*)+📌/g, "\n\n\n📌")
     .replace(/^📌/gm, "## 📌")
-    .replace(/^※\s*/gm, "> ※ ")
+    .replace(/^(?:\\?>[ \t]*)?※[ \t]*/gm, "> ※ ")
     .replace(/^\\?\*(?!\*)\s*/gm, "-# ");
 }
 
@@ -145,7 +164,9 @@ export function toDiscordMarkdown(html: string | null, fallback: string | null):
         .trim()
     : "";
   return formatArticleText(
-    text || fallback?.trim() || "No article text available. Read the full article on Netmarble.",
+    text ||
+      decodeHTML(fallback ?? "").trim() ||
+      "No article text available. Read the full article on Netmarble.",
   );
 }
 
@@ -155,6 +176,7 @@ export type ArticlePart =
   | {
       type: "tableRow";
       header: boolean;
+      tableStart?: true;
       columns: string[];
       images: string[];
       rightRows?: string[];
@@ -162,7 +184,8 @@ export type ArticlePart =
 
 export function renderArticleParts(html: string | null, fallback: string | null): ArticlePart[] {
   const images: string[] = [];
-  const rows: { columns: string[]; header: boolean; rightRows: string[] }[] = [];
+  const rows: { columns: string[]; header: boolean; rightRows: string[]; tableStart: boolean }[] =
+    [];
   const markdown = html
     ? createTurndown(
         (url) => {
@@ -173,8 +196,8 @@ export function renderArticleParts(html: string | null, fallback: string | null)
           }
           return `\uE000${images.length - 1}\uE001`;
         },
-        (columns, header, rightRows) => {
-          rows.push({ columns, header, rightRows });
+        (columns, header, rightRows, tableStart) => {
+          rows.push({ columns, header, rightRows, tableStart });
           return `\uE002${rows.length - 1}\uE003`;
         },
       ).turndown(html)
@@ -205,6 +228,7 @@ export function renderArticleParts(html: string | null, fallback: string | null)
         {
           type: "tableRow",
           header: rowData.header,
+          ...(rowData.tableStart ? { tableStart: true as const } : {}),
           columns,
           images: rowImages,
           ...(rightRows.length > 1 ? { rightRows } : {}),
@@ -218,26 +242,77 @@ export function renderArticleParts(html: string | null, fallback: string | null)
   });
 }
 
-// For long articles, use escaped plain text so no Markdown link/emphasis/code span
-// can be split across Discord messages. Keep link destinations visible as text.
+function packTextUnits(units: string[], limit: number, trim = true): string[] {
+  const messages: string[] = [];
+  let current = "";
+  units.forEach((unit) => {
+    if (current.length + unit.length > limit) {
+      if (current) messages.push(trim ? current.trim() : current);
+      current = "";
+    }
+    current += current || !trim ? unit : unit.trimStart();
+  });
+  if (current) messages.push(trim ? current.trim() : current);
+  return messages;
+}
+
+function splitOversizedMarkdown(token: string, limit: number): string[] {
+  const raw = (value: string, size: number, preserveWhitespace = false) =>
+    packTextUnits(
+      value
+        .match(/\\[\s\S]|[^\s\\]+|\s+|[\s\S]/gu)
+        ?.flatMap((word) => (word.length <= size ? [word] : Array.from(word))) ?? [],
+      size,
+      !preserveWhitespace,
+    );
+  const fence = /^(`{3,})([^\n]*)\n([\s\S]*)\n\1$/.exec(token);
+  if (fence) {
+    const opening = `${fence[1]}${fence[2]}\n`;
+    const closing = `\n${fence[1]}`;
+    const size = limit - opening.length - closing.length;
+    return size >= 3
+      ? raw(fence[3]!, size, true).map((chunk) => `${opening}${chunk}${closing}`)
+      : raw(fence[3]!, limit);
+  }
+  const prefix = /^(>+[ \t]*|#{1,6}[ \t]+|-#[ \t]+)([\s\S]*)$/.exec(token);
+  if (prefix && limit - prefix[1]!.length >= 3)
+    return splitDiscordText(prefix[2]!, limit - prefix[1]!.length).map(
+      (chunk) => `${prefix[1]}${chunk}`,
+    );
+  const span = /^(\*\*|__|~~|`+|\*|_)([\s\S]*)\1$/.exec(token);
+  if (span) {
+    const marker = span[1]!;
+    const size = limit - marker.length * 2;
+    if (size >= 3) {
+      const chunks = marker.startsWith("`")
+        ? raw(span[2]!, size, true)
+        : splitDiscordText(span[2]!, size);
+      return chunks.map((chunk) => `${marker}${chunk}${marker}`);
+    }
+    return raw(span[2]!, limit);
+  }
+  // A single masked link larger than a message cannot stay intact; degrade only that link.
+  const link = /^\[((?:\\.|[^\]\\])*)\]\((https?:\/\/[^\s)]+)\)$/.exec(token);
+  return raw(link ? `${link[1]} (${link[2]})` : token, limit);
+}
+
 export function splitDiscordText(text: string, limit = 1900): string[] {
   if (limit < 3) throw new RangeError("The message limit must be at least 3.");
   const remaining = text.trim();
   if (remaining.length <= limit) return remaining ? [remaining] : [];
-  const plain = remaining
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1 ($2)")
-    .replace(/\\([\\`*_{}()#+.!>|~-]|\[|\])/g, "$1")
-    .replace(/(?:\*\*|__|~~|`)/g, "")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/@/g, "@\u200b")
-    .replace(/[\\`*_{}()#+.!>|~-]|\[|\]/g, "\\$&");
-  const units = plain.match(/\\[\s\S]|[\s\S]/gu) ?? [];
-  const { messages, current } = units.reduce<{ messages: string[]; current: string }>(
-    (state, unit) =>
-      state.current.length + unit.length > limit
-        ? { messages: [...state.messages, state.current], current: unit }
-        : { ...state, current: state.current + unit },
-    { messages: [], current: "" },
-  );
-  return current ? [...messages, current] : messages;
+  // Keep links, inline formatting, code fences and quote/heading lines atomic.
+  const tokens =
+    remaining.match(
+      /(?<fence>`{3,})[^\n]*\n[\s\S]*?\n\k<fence>|^(?:>+[ \t]*|#{1,6}[ \t]+|-#[ \t]+)[^\n]+$|\[((?:\\.|[^\]\\])*)\]\(https?:\/\/[^\s)]+\)|(?<code>`+)[^\n]*?\k<code>|\*\*(?:\\.|[^\\])*?\*\*|__(?:\\.|[^\\])*?__|~~(?:\\.|[^\\])*?~~|\*(?!\*)(?:\\.|[^*\\\n])+\*|_(?!_)(?:\\.|[^_\\\n])+_|\\[\s\S]|[^\\\s[\]*_~`]+|\s+|[\s\S]/gmu,
+    ) ?? [];
+  const messages: string[] = [];
+  let pending: string[] = [];
+  tokens.forEach((token) => {
+    if (token.length <= limit) pending.push(token);
+    else {
+      messages.push(...packTextUnits(pending, limit), ...splitOversizedMarkdown(token, limit));
+      pending = [];
+    }
+  });
+  return [...messages, ...packTextUnits(pending, limit)].filter(Boolean);
 }

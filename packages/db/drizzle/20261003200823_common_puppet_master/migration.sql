@@ -1,0 +1,1 @@
+ALTER TABLE "netmarble_news_settings" DROP CONSTRAINT "netmarble_news_settings_backfill_count_check", ADD CONSTRAINT "netmarble_news_settings_backfill_count_check" CHECK ("initial_backfill_count" BETWEEN 0 AND 50);

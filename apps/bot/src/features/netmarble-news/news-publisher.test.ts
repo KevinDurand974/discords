@@ -96,7 +96,82 @@ const mockImageFetch = () =>
     );
 
 describe("Forum publishing", () => {
-  it("starts with article text, its canonical button and only the live role (no preview)", async () => {
+  it.each(["text", "image", "table"])(
+    "mentions the matching tag role last for a %s starter",
+    async (kind) => {
+      const f = fixture();
+      const fetcher = mockImageFetch();
+      const mappedSetup = {
+        ...setup,
+        mappings: [
+          { menuSeq: 33, tagId: "other-tag", notificationRoleId: "other-role" },
+          ...setup.mappings,
+        ],
+      };
+      const html = {
+        text: "<p>Before</p>",
+        image: '<img src="https://forum.netmarble.com/first.png">',
+        table: "<table><tr><td>A</td><td>B</td></tr></table>",
+      };
+      try {
+        await f.publisher.publish(
+          mappedSetup,
+          { ...article, bodyHtml: `${html[kind as keyof typeof html]}<p>After</p>` },
+          true,
+        );
+        expect(f.create.mock.calls[0]![0].appliedTags).toEqual(["tag"]);
+        const lastContent = f.send.mock.calls.at(-2)?.[0] ?? f.create.mock.calls[0]![0].message;
+        expect(lastContent.components?.[0]?.data?.content).toContain("After");
+        expect(f.send).toHaveBeenLastCalledWith({
+          content: "<@&role>",
+          allowedMentions: { parse: [], roles: ["role"] },
+        });
+        expect(JSON.stringify(f.create.mock.calls[0]![0].message)).not.toContain("<@&role>");
+      } finally {
+        fetcher.mockRestore();
+      }
+    },
+  );
+  it("does not send the role mention if article delivery fails", async () => {
+    const f = fixture();
+    f.send.mockRejectedValueOnce(new Error("connection lost"));
+    await expect(
+      f.publisher.publish(
+        setup,
+        {
+          ...article,
+          bodyHtml: `<p>${"Article text. ".repeat(200)}</p>`,
+        },
+        true,
+      ),
+    ).rejects.toThrow("connection lost");
+    expect(f.send.mock.calls.some(([options]) => options.content === "<@&role>")).toBe(false);
+  });
+
+  it("decodes HTML entities in thread titles before applying the length limit", async () => {
+    const f = fixture();
+    await f.publisher.publish(
+      setup,
+      { ...article, title: `${"A".repeat(95)} &amp; &#x1F389; &quot;Update&quot;` },
+      false,
+    );
+    expect(f.create.mock.calls[0]![0]).toMatchObject({
+      name: `${"A".repeat(95)} & 🎉`,
+    });
+  });
+
+  it("preserves literal angle brackets while decoding title entities", async () => {
+    const f = fixture();
+    await f.publisher.publish(
+      setup,
+      { ...article, title: "<Update> &amp; &quot;Rewards&quot; &#39;Today&#39; &copy;" },
+      false,
+    );
+    expect(f.create.mock.calls[0]![0]).toMatchObject({
+      name: "<Update> & \"Rewards\" 'Today' ©",
+    });
+  });
+  it("starts with article text and sends the live role mention as the final message", async () => {
     const f = fixture();
     expect(await f.publisher.publish(setup, article, true)).toBe("thread");
     const options = f.create.mock.calls[0]![0];
@@ -104,15 +179,18 @@ describe("Forum publishing", () => {
     expect(options.message.flags).toBe(MessageFlags.IsComponentsV2);
     expect(options.message.content).toBeUndefined();
     expect(options.message.components[0]).toMatchObject({
-      data: { content: "<@&role>\nFull **details**." },
+      data: { content: "Full **details**." },
     });
     expect(options.message).not.toHaveProperty("embeds");
-    expect(options.message.allowedMentions).toEqual({ parse: [], roles: ["role"] });
+    expect(options.message.allowedMentions).toEqual({ parse: [] });
     expect(options.message.components[1]?.components?.[0]?.data).toMatchObject({
       style: ButtonStyle.Link,
       url: "https://forum.netmarble.com/slv_en/view/32/109472",
     });
-    expect(f.send).not.toHaveBeenCalled();
+    expect(f.send).toHaveBeenLastCalledWith({
+      content: "<@&role>",
+      allowedMentions: { parse: [], roles: ["role"] },
+    });
   });
 
   it("preserves HTML text/image order with V2 galleries and ignores unpositioned thumbnails", async () => {
@@ -141,10 +219,9 @@ describe("Forum publishing", () => {
         data: { content: "Before" },
       });
       expect(
-        f.send.mock.calls.map(([options]) => [
-          options.components?.[0]?.data?.content,
-          options.files?.[0],
-        ]),
+        f.send.mock.calls
+          .slice(0, -1)
+          .map(([options]) => [options.components?.[0]?.data?.content, options.files?.[0]]),
       ).toMatchObject([
         [undefined, { name: "media-109472-2.png" }],
         ["Between", undefined],
@@ -157,7 +234,132 @@ describe("Forum publishing", () => {
     }
   });
 
-  it("uses V2 text, galleries and table containers", async () => {
+  it("omits invented labels and empty sections from single-value table rows", async () => {
+    const f = fixture();
+    await f.publisher.publish(
+      setup,
+      {
+        ...article,
+        bodyHtml: "<table><tr><td><strong>Diana Lopez</strong></td><td></td></tr></table>",
+      },
+      false,
+    );
+    const container = f.send.mock.calls[0]![0].components?.[0]?.toJSON?.();
+    expect(container).toMatchObject({ components: [{ content: "**Diana Lopez**" }] });
+    expect((container as { components: unknown[] }).components).toHaveLength(1);
+    expect(JSON.stringify(container)).not.toMatch(/Category|Changed/);
+  });
+
+  it("does not reuse source headers for a separate headerless table", async () => {
+    const f = fixture();
+    await f.publisher.publish(
+      setup,
+      {
+        ...article,
+        bodyHtml:
+          "<table><tr><th>Category</th><th>Changed</th></tr><tr><td>First</td><td>Value</td></tr></table><table><tr><td>Element</td><td>Wind</td></tr></table>",
+      },
+      false,
+    );
+    const container = f.send.mock.calls[1]![0].components?.[0]?.toJSON?.();
+    expect(container).toMatchObject({
+      components: [{ content: "Element" }, { type: 14 }, { content: "Wind" }],
+    });
+  });
+
+  it("sends image-only table rows directly without a V2 container", async () => {
+    const f = fixture();
+    const fetcher = mockImageFetch();
+    try {
+      await f.publisher.publish(
+        setup,
+        {
+          ...article,
+          bodyHtml:
+            '<table><tr><td><img src="https://forum.netmarble.com/prize.png"></td><td></td></tr></table>',
+        },
+        false,
+      );
+      const image = f.send.mock.calls[0]![0];
+      expect(image.files).toMatchObject([{ name: "media-109472-row-1.png" }]);
+      expect(image.flags).toBeUndefined();
+      expect(image.components).toBeUndefined();
+    } finally {
+      fetcher.mockRestore();
+    }
+  });
+
+  it("starts an image-only article with a plain attachment and its canonical link button", async () => {
+    const f = fixture();
+    const fetcher = mockImageFetch();
+    try {
+      await f.publisher.publish(
+        setup,
+        { ...article, bodyHtml: '<img src="https://forum.netmarble.com/prize.png">' },
+        false,
+      );
+      const opening = f.create.mock.calls[0]![0].message;
+      expect(opening.flags).toBeUndefined();
+      expect(opening.files).toMatchObject([{ name: "media-109472-1.png" }]);
+      expect(opening.components).toHaveLength(1);
+      expect(opening.components[0]?.components?.[0]?.data).toMatchObject({
+        style: ButtonStyle.Link,
+      });
+      expect(f.send).toHaveBeenCalledExactlyOnceWith({
+        content: "<@&role>",
+        allowedMentions: { parse: [], roles: [] },
+      });
+    } finally {
+      fetcher.mockRestore();
+    }
+  });
+
+  it("omits blank rows and preserves the correct source header when a middle column is empty", async () => {
+    const f = fixture();
+    await f.publisher.publish(
+      setup,
+      {
+        ...article,
+        bodyHtml:
+          "<table><tr><th>Name</th><th>Unused</th><th>Element</th></tr><tr><td>&nbsp;</td><td>\u200b</td><td></td></tr><tr><td>Diana Lopez</td><td></td><td>Wind</td></tr></table>",
+      },
+      false,
+    );
+    expect(f.send).toHaveBeenCalledTimes(2);
+    expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
+      components: [
+        { content: "-# Name\nDiana Lopez" },
+        { type: 14 },
+        { content: "-# Element\nWind" },
+      ],
+    });
+  });
+
+  it("uploads all images from an image-only row without an empty container", async () => {
+    const f = fixture();
+    const fetcher = mockImageFetch();
+    try {
+      await f.publisher.publish(
+        setup,
+        {
+          ...article,
+          bodyHtml:
+            '<table><tr><td><img src="https://forum.netmarble.com/first.png"><img src="https://forum.netmarble.com/second.png"></td></tr></table>',
+        },
+        false,
+      );
+      expect(f.send).toHaveBeenCalledTimes(3);
+      f.send.mock.calls.slice(0, 2).forEach(([options]) => {
+        expect(options.files).toHaveLength(1);
+        expect(options.flags).toBeUndefined();
+        expect(options.components).toBeUndefined();
+      });
+    } finally {
+      fetcher.mockRestore();
+    }
+  });
+
+  it("uses V2 text and table containers but sends standalone images as plain attachments", async () => {
     const f = fixture();
     const fetcher = mockImageFetch();
     try {
@@ -173,14 +375,13 @@ describe("Forum publishing", () => {
       const opening = f.create.mock.calls[0]![0].message;
       expect(opening.flags).toBe(MessageFlags.IsComponentsV2);
       expect(opening).not.toHaveProperty("embeds");
-      expect(f.send.mock.calls[0]![0]).toMatchObject({ flags: MessageFlags.IsComponentsV2 });
-      expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
-        items: [{ media: { url: "attachment://media-109472-2.png" } }],
-      });
+      expect(f.send.mock.calls[0]![0].flags).toBeUndefined();
+      expect(f.send.mock.calls[0]![0].components).toBeUndefined();
+      expect(f.send.mock.calls[0]![0].files).toMatchObject([{ name: "media-109472-2.png" }]);
       expect(f.send.mock.calls[1]![0].embeds).toBeUndefined();
       expect(f.send.mock.calls[1]![0].flags).toBe(MessageFlags.IsComponentsV2);
       expect(f.send.mock.calls[1]![0].components?.[0]?.toJSON?.()).toMatchObject({
-        components: [{ content: "-# Category\nA" }, { type: 14 }, { content: "-# Changed\nB" }],
+        components: [{ content: "A" }, { type: 14 }, { content: "B" }],
       });
       expect(f.send.mock.calls[2]![0]).toMatchObject({ flags: MessageFlags.IsComponentsV2 });
     } finally {
@@ -200,7 +401,7 @@ describe("Forum publishing", () => {
       false,
     );
     expect(f.create.mock.calls[0]![0].message.flags).toBe(MessageFlags.IsComponentsV2);
-    expect(f.send).toHaveBeenCalledTimes(2);
+    expect(f.send).toHaveBeenCalledTimes(3);
     expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
       components: [{ content: "-# Stat\nATK" }, { type: 14 }, { content: "-# Value\n~~100~~ 120" }],
     });
@@ -218,13 +419,9 @@ describe("Forum publishing", () => {
       },
       false,
     );
-    expect(f.send).toHaveBeenCalledOnce();
+    expect(f.send).toHaveBeenCalledTimes(2);
     expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
-      components: [
-        { content: "-# Category\nShared" },
-        { type: 14 },
-        { content: "-# Changed\n- One\n- Two\n- Three" },
-      ],
+      components: [{ content: "Shared" }, { type: 14 }, { content: "- One\n- Two\n- Three" }],
     });
   });
 
@@ -239,7 +436,7 @@ describe("Forum publishing", () => {
       },
       false,
     );
-    expect(f.send).toHaveBeenCalledOnce();
+    expect(f.send).toHaveBeenCalledTimes(2);
     expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
       components: [
         { content: "-# Reward Claim Period (UTC+0)\nAfter maintenance" },
@@ -267,7 +464,7 @@ describe("Forum publishing", () => {
         components: [
           { accessory: { media: { url: "attachment://media-109472-row-1.png" } } },
           { type: 14 },
-          { content: "-# Changed\nRare" },
+          { content: "Rare" },
         ],
       });
       expect(row.files).toMatchObject([{ name: "media-109472-row-1.png" }]);
@@ -296,11 +493,7 @@ describe("Forum publishing", () => {
       expect(opening.flags).toBe(MessageFlags.IsComponentsV2);
       expect(opening.embeds).toBeUndefined();
       expect(f.send.mock.calls[0]![0].components?.[0]?.toJSON?.()).toMatchObject({
-        components: [
-          { accessory: { media: { url: "attachment://media-109472-row-1.png" } } },
-          { type: 14 },
-          { content: "-# Changed\n\u200b" },
-        ],
+        components: [{ accessory: { media: { url: "attachment://media-109472-row-1.png" } } }],
       });
       expect(f.send.mock.calls[0]![0].files).toMatchObject([{ name: "media-109472-row-1.png" }]);
     } finally {
@@ -308,7 +501,7 @@ describe("Forum publishing", () => {
     }
   });
 
-  it("falls back to the image URL inside the container on rejected upload", async () => {
+  it("falls back to a plain image URL without a container on rejected image-only upload", async () => {
     const f = fixture();
     const fetcher = mockImageFetch();
     try {
@@ -322,10 +515,9 @@ describe("Forum publishing", () => {
         },
         false,
       );
-      expect(f.send).toHaveBeenCalledTimes(2);
-      expect(JSON.stringify(f.send.mock.calls[1]![0].components?.[0]?.toJSON?.())).toContain(
-        "https://forum.netmarble.com/prize.png",
-      );
+      expect(f.send).toHaveBeenCalledTimes(3);
+      expect(f.send.mock.calls[1]![0].content).toContain("https://forum.netmarble.com/prize.png");
+      expect(f.send.mock.calls[1]![0].components).toBeUndefined();
       expect(f.send.mock.calls[1]![0].files).toBeUndefined();
     } finally {
       fetcher.mockRestore();
@@ -344,12 +536,14 @@ describe("Forum publishing", () => {
     );
     expect(f.send.mock.calls.length).toBeGreaterThan(1);
     expect(
-      f.send.mock.calls.every(([options]) => options.flags === MessageFlags.IsComponentsV2),
+      f.send.mock.calls
+        .slice(0, -1)
+        .every(([options]) => options.flags === MessageFlags.IsComponentsV2),
     ).toBe(true);
     expect(
-      f.send.mock.calls.every(
-        ([options]) => JSON.stringify(options.components?.[0]?.toJSON?.()).length < 5000,
-      ),
+      f.send.mock.calls
+        .slice(0, -1)
+        .every(([options]) => JSON.stringify(options.components?.[0]?.toJSON?.()).length < 5000),
     ).toBe(true);
   });
 
@@ -366,8 +560,9 @@ describe("Forum publishing", () => {
       expect(f.create.mock.calls[0]![0].message.files).toMatchObject([
         { name: "media-109472-1.png" },
       ]);
+      expect(f.create.mock.calls[0]![0].message.flags).toBeUndefined();
       expect(f.create.mock.calls[0]![0].message.components[0]?.toJSON?.()).toMatchObject({
-        items: [{ media: { url: "attachment://media-109472-1.png" } }],
+        components: [{ style: ButtonStyle.Link, label: "Read on Netmarble" }],
       });
       expect(f.send.mock.calls[0]![0].components?.[0]?.data?.content).toBe("After");
     } finally {
@@ -391,10 +586,9 @@ describe("Forum publishing", () => {
         },
         false,
       );
-      expect(f.send.mock.calls.map(([options]) => options.components?.[0]?.data?.content)).toEqual([
-        "media-109472-2: https://forum.netmarble.com/bad.png",
-        "After",
-      ]);
+      expect(
+        f.send.mock.calls.slice(0, -1).map(([options]) => options.components?.[0]?.data?.content),
+      ).toEqual(["media-109472-2: https://forum.netmarble.com/bad.png", "After"]);
     } finally {
       fetcher.mockRestore();
     }
@@ -436,7 +630,11 @@ describe("Forum publishing", () => {
     expect(f.create.mock.calls[0]![0].message.components[0]?.data?.content).toBe(
       "Full **details**.",
     );
-    expect(f.create.mock.calls[0]![0].message.allowedMentions).toEqual({ parse: [], roles: [] });
+    expect(f.create.mock.calls[0]![0].message.allowedMentions).toEqual({ parse: [] });
+    expect(f.send).toHaveBeenLastCalledWith({
+      content: "<@&role>",
+      allowedMentions: { parse: [], roles: [] },
+    });
     expect(f.pin).not.toHaveBeenCalled();
     await f.publisher.setPin(setup, "thread", true);
     expect(f.pin).toHaveBeenCalledOnce();
