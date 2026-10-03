@@ -24,7 +24,7 @@ try {
   const env = { ...process.env, DATABASE_URL: url, TEST_DATABASE_URL: url };
   run("nub", ["run", "db:migrate"], env);
   run("nub", ["run", "db:migrate"], env);
-  run("nub", ["--cwd", "apps/api", "exec", "vitest", "run", "src/news/postgres.integration.test.ts"], env);
+  run("nub", ["--cwd", "apps/api", "exec", "vitest", "run", "src/news/postgres.integration.test.ts", "src/youtube/postgres.integration.test.ts"], env);
   run("nub", ["--cwd", "apps/bot", "exec", "vitest", "run", "src/features/netmarble-news/postgres.integration.test.ts"], env);
 } catch (error) {
   console.error(error);
