@@ -28,13 +28,11 @@ const makeVideo = (
 
 describe.skipIf(!url)("YouTube Discord persistence", () => {
   it("snapshots all stored sources, imports ten, excludes the initial remainder and survives restart", async () => {
-    await database!.db
-      .insert(youtubeChannels)
-      .values({
-        channelId,
-        displayName: "Guide Creator",
-        canonicalUrl: `https://www.youtube.com/channel/${channelId}`,
-      });
+    await database!.db.insert(youtubeChannels).values({
+      channelId,
+      displayName: "Guide Creator",
+      canonicalUrl: `https://www.youtube.com/channel/${channelId}`,
+    });
     await database!.db
       .insert(youtubeVideos)
       .values(Array.from({ length: 15 }, (_, index) => makeVideo(index + 1)));
@@ -102,6 +100,54 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
       }),
     ).rejects.toThrow("simulated failure");
     await expect(second!.withGuild("yt-main", async () => "released")).resolves.toBe("released");
+  });
+  it("excludes scoped deleted videos without reposting them and keeps future sources eligible", async () => {
+    const a = `UC${"x".repeat(22)}`;
+    const b = `UC${"w".repeat(22)}`;
+    await database!.db.insert(youtubeChannels).values([
+      { channelId: a, displayName: "A", canonicalUrl: `https://www.youtube.com/channel/${a}` },
+      { channelId: b, displayName: "B", canonicalUrl: `https://www.youtube.com/channel/${b}` },
+    ]);
+    const source = (channelId: string, videoId: string) => ({
+      ...makeVideo(1),
+      channelId,
+      videoId,
+      sourceEntryId: `yt:video:${videoId}`,
+      url: `https://www.youtube.com/watch?v=${videoId}`,
+    });
+    await database!.db
+      .insert(youtubeVideos)
+      .values([source(a, "X0000000001"), source(b, "W0000000001")]);
+    await store!.createSettings("yt-clean");
+    await store!.setForum("yt-clean", "yt-clean-forum", 1, false);
+    expect((await store!.get("yt-clean"))!.ownsForum).toBe(false);
+    await store!.subscribe("yt-clean", a, "tag-a", true, 1, ["X0000000001"], 1);
+    await store!.subscribe("yt-clean", b, "tag-b", true, 1, ["W0000000001"], 1);
+    const first = (await store!.pending("yt-clean")).find((row) => row.video.channelId === a)!;
+    await store!.published(first.intent, "yt-clean-thread");
+    expect(await store!.publicationThreads("yt-clean", a)).toEqual(["yt-clean-thread"]);
+    // This source was ingested but never enqueued before cleanup.
+    await database!.db.insert(youtubeVideos).values(source(a, "X0000000002"));
+    await store!.excludeVideos("yt-clean", a);
+    await store!.enqueue("yt-clean", 1);
+    expect((await store!.pending("yt-clean")).map((row) => row.video.videoId)).toEqual([
+      "W0000000001",
+    ]);
+    expect(await store!.publicationThreads("yt-clean", a)).toEqual([]);
+    expect(await store!.subscriptions("yt-clean")).toHaveLength(2);
+    await database!.db.insert(youtubeVideos).values(source(a, "X0000000003"));
+    await store!.enqueue("yt-clean", 1);
+    expect((await store!.pending("yt-clean")).map((row) => row.video.videoId)).toContain(
+      "X0000000003",
+    );
+    await store!.removeCreator("yt-clean", a);
+    expect((await store!.subscriptions("yt-clean")).map((row) => row.creator.channelId)).toEqual([
+      b,
+    ]);
+    expect((await store!.pending("yt-clean")).map((row) => row.video.videoId)).toEqual([
+      "W0000000001",
+    ]);
+    await store!.remove("yt-clean");
   });
   it("recreates missing Forums with fresh mappings and cleans only the target guild", async () => {
     await store!.createSettings("yt-other");

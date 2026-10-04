@@ -9,6 +9,17 @@ export const registerInteractionRouter = (
   context: CommandExecutionContext,
 ) => {
   client.on(Events.InteractionCreate, async (interaction) => {
+    if (interaction.isAutocomplete()) {
+      try {
+        const command = commands.get(interaction.commandName);
+        if (command?.autocomplete) await command.autocomplete(interaction);
+        else await interaction.respond([]);
+      } catch (error) {
+        console.error("Command autocomplete failed", error);
+        if (!interaction.responded) await interaction.respond([]);
+      }
+      return;
+    }
     if (interaction.isChatInputCommand()) {
       const command = commands.get(interaction.commandName);
       if (!command) {

@@ -1,6 +1,6 @@
 # YouTube Latest Videos — Operations
 
-Automated verification passed: 143 bot unit tests, 6 jobs tests, 11 PostgreSQL integration tests, bot/jobs typechecks and bot lint. Validate actual Discord Forum permissions and Components V2 in a staging guild before production use. No live commands, migrations or Discord resources were deployed by this coding session.
+Run bot unit tests, typecheck and lint, plus the isolated PostgreSQL integration suite after command or persistence changes. Validate actual Discord Forum permissions and Components V2 in a staging guild before production use. No live commands, migrations or Discord resources were deployed by this coding session.
 
 ## Configuration and rollout
 
@@ -21,18 +21,19 @@ Automated verification passed: 143 bot unit tests, 6 jobs tests, 11 PostgreSQL i
 
 ## Commands
 
-- `/videos add [backfill-count:0..15]`: opens an actor-bound, five-minute modal for a channel URL, bare `@handle` or `UC...` ID. Default import is ten posts per creator. The API validates/ingests before any Forum is provisioned.
-- `/videos status`: displays configuration, creator source timestamps/errors and publication-state counts.
-- `/videos sync`: publishes pending **stored** sources. It does not trigger an immediate RSS request; routine source refresh belongs to the worker.
-- `/videos clean`: administrator-only, with an actor-bound five-minute destructive confirmation. Deletes the managed Forum and its posts/tags/messages plus that guild's tracking. It never deletes roles, global creator/video history or other guilds.
+- `/setup youtube`: explicitly creates or repairs the default Forum; it does not subscribe a creator or publish videos. Requires Manage Channels (or the owner).
+- `/youtube add [backfill-count:0..15]`: opens an actor-bound, five-minute modal for a channel URL, bare `@handle` or `UC...` ID and a required Forum selector. The configured Forum is selected by default; an existing Forum can be explicitly chosen without creating any channel. Default import is ten posts per creator.
+- `/youtube status`: displays configuration, creator source timestamps/errors and publication-state counts.
+- `/youtube sync`: publishes pending **stored** sources. It does not trigger an immediate RSS request; routine source refresh belongs to the worker.
+- `/setup clean [tag]`: administrator-only, with creator-tag autocomplete and an actor-bound five-minute choice/confirmation. Omit the tag to target all creators. **Videos only** deletes managed posts while retaining subscriptions/tags/Forum for future videos; existing stored sources are excluded so they do not immediately reappear. **Everything in scope** removes that creator's posts/owned tag/subscription, or, without a tag, the feature-owned Forum and all guild tracking. An explicitly selected, unowned Forum and its unrelated posts/tags are preserved. Cancellation has no side effects. Global creator/video history and other guilds are never removed.
 
-Ordinary management requires Manage Messages; Administrator/owner bypass is supported. Ordinary members cannot create posts or comment. Moderators can create posts but have no Send Messages in Threads grant. The bot may send multi-part descriptions. Discord administrators bypass channel denies and therefore cannot be prevented from commenting.
+Ordinary management requires Manage Messages; Administrator/owner bypass is supported. In feature-created Forums, ordinary members cannot create posts or comment. Moderators can create posts but have no Send Messages in Threads grant. The bot may send multi-part descriptions. Discord administrators bypass channel denies and therefore cannot be prevented from commenting.
 
 No Content Creator role is created. Shorts and livestreams are accepted as returned by RSS. Optional unsubscribe and historical-backfill commands are not included in this delivery.
 
 ## Owned resources and limits
 
-- Only saved, feature-owned Forums are modified/deleted. A same-name unrelated Forum is never adopted or removed automatically.
+- One Forum per guild is persisted as the publication destination. Changing the selection while subscriptions exist is rejected: clean all tracking first. Changing an empty setup leaves the old channel intact. A same-name unrelated Forum is never adopted automatically; only an explicit user selection can adopt an existing Forum. Unowned Forum overwrites are not rewritten and the channel is never deleted by cleanup.
 - The feature rebuilds the **owned Forum's permission overwrites** on add/publication from current moderator roles, removing manual grants there. Do not customize its overwrites as if it were a hand-managed channel.
 - Tag identity follows the YouTube channel ID. Repeated adds reuse the subscription/tag even when all 20 tag slots are occupied. Display-name collisions get deterministic unique labels; source renames update the existing tag.
 - The Forum needs a Community guild and the bot permissions reported by setup, including Manage Roles for overwrite edits, not for role creation.
@@ -53,11 +54,11 @@ PostgreSQL session advisory locks serialize guild setup/publication/cleanup acro
 
 ### Incomplete publication
 
-Check `/videos status`, worker history and saved `youtube_publication_intents`. `needs_reconciliation` means some Discord side effect may already exist. Do not delete/reset an intent merely to force reposting without inspecting its thread/source marker.
+Check `/youtube status`, worker history and saved `youtube_publication_intents`. `needs_reconciliation` means some Discord side effect may already exist. Do not delete/reset an intent merely to force reposting without inspecting its thread/source marker.
 
-- For a known surviving thread, rerun `/videos sync` to resume unsent parts and commit publication history.
+- For a known surviving thread, rerun `/youtube sync` to resume unsent parts and commit publication history.
 - For an ambiguous/deleted known thread or scan-limit failure, inspect the Forum and persisted intent before manual repair. No blind automatic repost is attempted for missing known IDs. There is no dedicated repair command yet.
-- If the configured Forum was deleted, rerun `/videos add` for a tracked creator: it creates a fresh Forum generation, rebuilds subscriptions/tags and applies fresh initial-import selections. This intentionally republishes the selected history into the replacement Forum.
+- If the configured Forum was deleted, rerun `/setup youtube`: it creates a fresh Forum generation, rebuilds subscriptions/tags and applies fresh initial-import selections. This intentionally republishes the selected history into the replacement Forum.
 - If a DB checkpoint failed after Forum creation, compensation is attempted; an orphan Forum ID is logged when compensation fails. Inspect that ID before manual removal; never remove a channel by name alone.
 - If cleanup is incomplete, saved resource IDs and `cleaning` lifecycle remain for administrator retry. This blocks add/publication and stops that guild's source polling contribution until cleanup succeeds.
 
@@ -69,5 +70,6 @@ Check `/videos status`, worker history and saved `youtube_publication_intents`. 
 - V2 starter and long-description follow-ups: title/separator/description/date/button ordering, classic URL message beneath V2 with native preview, no mentions, no duplicate URL message after retries.
 - Ordinary member denied management/post/comment; Manage Messages moderator allowed management/post but denied comment; administrator bypass documented. Test multi-role combinations.
 - Missing bot permissions, removed creator tag, creator rename, interrupted posting/restart and API partial failure.
-- Administrator confirmation ownership/expiry, partial cleanup/retry, no roles removed, other guild/source records retained and recreation after cleanup.
+- Administrator confirmation ownership/expiry/cancellation, creator-tag and all-creator scopes, videos-only versus full cleanup, archived posts, no automatic repost after videos-only cleanup, partial cleanup/retry, no roles removed, other guild/source records retained and recreation after cleanup.
+- Explicit `/setup youtube` creation, add modal's default Forum selection, user-selected Forum with preserved overwrites/unrelated posts, and rejection of a second Forum while tracking exists.
 - Redis/worker restart recreates one recurring schedule, news remains operational, dashboard exposure remains restricted.

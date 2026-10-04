@@ -1,4 +1,5 @@
 import type {
+  AutocompleteInteraction,
   ButtonInteraction,
   ChatInputCommandInteraction,
   ModalSubmitInteraction,
@@ -28,6 +29,7 @@ export type CommandExecutionContext = {
 
 export type CommandDefinition = {
   data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
+  autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
   execute(
     interaction: ChatInputCommandInteraction,
     context: CommandExecutionContext,

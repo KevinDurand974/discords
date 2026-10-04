@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
 import { setupCommand } from "../setup/setup.command.ts";
+import { slaCommand } from "../sla/sla.command.ts";
 import { newsForumPermissions } from "./news-setup-command.ts";
 import {
   cleanNewsSetup,
@@ -57,10 +58,13 @@ function fixtures() {
 }
 
 describe("news Forum setup", () => {
-  it("registers publishing subcommands alongside existing log setup", () => {
-    const options = setupCommand.data.toJSON().options ?? [];
-    expect(options.map(({ name }) => name)).toEqual(["news", "logs"]);
-    const news = options[0];
+  it("registers publishing subcommands under /sla, not /setup", () => {
+    expect(setupCommand.data.toJSON().options?.map(({ name }) => name)).toEqual([
+      "youtube",
+      "clean",
+      "logs",
+    ]);
+    const news = slaCommand.data.toJSON().options?.find(({ name }) => name === "news");
     expect(news?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
     if (news?.type !== ApplicationCommandOptionType.SubcommandGroup)
       throw new Error("News group missing");
@@ -74,7 +78,7 @@ describe("news Forum setup", () => {
   });
 
   it("exposes only a 0–10 backfill-count option on create", () => {
-    const group = setupCommand.data.toJSON().options?.find(({ name }) => name === "news");
+    const group = slaCommand.data.toJSON().options?.find(({ name }) => name === "news");
     if (group?.type !== ApplicationCommandOptionType.SubcommandGroup)
       throw new Error("News group missing");
     const create = group.options?.find(({ name }) => name === "create");

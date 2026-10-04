@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { ChannelType, Collection, type Client } from "discord.js";
-import { publishVideo, renderVideo } from "./videos-discord.ts";
+import { ChannelType, Collection, type Client, type ForumChannel } from "discord.js";
+import { deleteVideoPosts, publishVideo, renderVideo } from "./videos-discord.ts";
 import type { ForumSettings, Intent, Video } from "./videos-repository.ts";
 const video: Video = {
   videoId: "abcdefghijk",
@@ -55,9 +55,11 @@ function fixture() {
     name: video.title.slice(0, 100),
     archived: false,
     archiveTimestamp: null,
+    appliedTags: ["tag"],
+    delete: vi.fn(async () => {}),
     client: { user: { id: "bot" } },
     isThread: () => true,
-    fetchStarterMessage: vi.fn(async () => starter),
+    fetchStarterMessage: vi.fn(async () => starter as typeof starter | null),
     messages: { fetch: vi.fn(async () => messages) },
     send: vi.fn(async (message: PublicationMessage) => {
       messages.set(`part-${messages.size}`, {
@@ -90,6 +92,54 @@ function fixture() {
   const client = { guilds: { fetch: async () => guild } } as unknown as Client;
   return { client, thread, forum, messages };
 }
+describe("scoped video post deletion", () => {
+  it("deletes bot-owned managed posts for the selected tag including archived posts", async () => {
+    const { forum, thread } = fixture();
+    const archived = { ...thread, id: "archived", delete: vi.fn() };
+    forum.threads.fetchArchived.mockResolvedValueOnce({
+      threads: new Collection([["archived", archived]]),
+      hasMore: false,
+    });
+    expect(await deleteVideoPosts(forum as unknown as ForumChannel, "tag")).toBe(2);
+    expect(thread.delete).toHaveBeenCalledOnce();
+    expect(archived.delete).toHaveBeenCalledOnce();
+  });
+  it("preserves other creators and human-authored posts even when they copy a marker", async () => {
+    const { forum, thread, messages } = fixture();
+    thread.appliedTags = ["other-tag"];
+    expect(await deleteVideoPosts(forum as unknown as ForumChannel, "tag")).toBe(0);
+    thread.appliedTags = ["tag"];
+    messages.get("thread")!.author.id = "human";
+    expect(await deleteVideoPosts(forum as unknown as ForumChannel, "tag")).toBe(0);
+    expect(thread.delete).not.toHaveBeenCalled();
+  });
+  it("preserves unrelated bot posts without the exact video source footer", async () => {
+    const { forum, thread } = fixture();
+    thread.fetchStarterMessage.mockResolvedValueOnce({
+      id: "thread",
+      content: "Unrelated",
+      author: { id: "bot" },
+      components: [],
+    });
+    expect(await deleteVideoPosts(forum as unknown as ForumChannel)).toBe(0);
+    expect(thread.delete).not.toHaveBeenCalled();
+  });
+  it("uses saved thread IDs when a managed post's creator tag was removed", async () => {
+    const { forum, thread } = fixture();
+    thread.appliedTags = [];
+    expect(
+      await deleteVideoPosts(forum as unknown as ForumChannel, "tag", new Set(["thread"])),
+    ).toBe(1);
+    expect(thread.delete).toHaveBeenCalledOnce();
+  });
+  it("can delete a known managed thread whose starter was removed", async () => {
+    const { forum, thread } = fixture();
+    thread.fetchStarterMessage.mockResolvedValueOnce(null);
+    expect(
+      await deleteVideoPosts(forum as unknown as ForumChannel, "tag", new Set(["thread"])),
+    ).toBe(1);
+  });
+});
 describe("resumable video publication", () => {
   it("checkpoints immediately and resumes a crash between Discord creation and persistence without another post", async () => {
     const { client, forum, thread } = fixture();

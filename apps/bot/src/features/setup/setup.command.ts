@@ -10,9 +10,11 @@ import {
   type ModalSubmitInteraction,
 } from "discord.js";
 import {
-  configureNewsGroup,
-  handleNewsSetup,
-} from "@/features/netmarble-news/news-setup-command.ts";
+  autocompleteYoutubeTag,
+  configureYoutubeClean,
+  configureYoutubeSetup,
+  handleYoutubeSetup,
+} from "@/features/youtube-videos/videos.command.ts";
 import type {
   CommandDefinition,
   CommandExecutionContext,
@@ -113,7 +115,8 @@ export const setupCommand = {
     .setName("setup")
     .setDescription("Configure the bot")
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
-    .addSubcommandGroup(configureNewsGroup)
+    .addSubcommand(configureYoutubeSetup)
+    .addSubcommand(configureYoutubeClean)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("logs")
@@ -126,9 +129,10 @@ export const setupCommand = {
         ),
     ),
 
+  autocomplete: autocompleteYoutubeTag,
   async execute(interaction, context) {
-    if (interaction.options.getSubcommandGroup(false) === "news") {
-      await handleNewsSetup(interaction);
+    if (["youtube", "clean"].includes(interaction.options.getSubcommand())) {
+      await handleYoutubeSetup(interaction);
       return;
     }
     assertCanConfigureLogs(interaction);

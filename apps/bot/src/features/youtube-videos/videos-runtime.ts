@@ -3,11 +3,19 @@ import { createVideosApi } from "./videos-api.ts";
 import {
   auditVideoPermissions,
   creatorTag,
+  checkVideoPermissions,
+  deleteVideoPosts,
   getVideoForum,
   provisionVideoForum,
   publishVideo,
 } from "./videos-discord.ts";
-import { createVideosRepository, type ForumSettings } from "./videos-repository.ts";
+import {
+  createVideosRepository,
+  type ForumSettings,
+  type VideosRepository,
+} from "./videos-repository.ts";
+
+export type CleanupMode = "videos" | "resources";
 
 const runtimes = new WeakMap<Client, ReturnType<typeof buildRuntime>>();
 function buildRuntime(client: Client) {
@@ -17,6 +25,17 @@ function buildRuntime(client: Client) {
     process.env.YOUTUBE_API_URL || process.env.NEWS_API_URL || "http://localhost:3000",
     process.env.NEWS_INTERNAL_TOKEN,
   );
+  return buildVideosRuntime(client, store, api);
+}
+export function buildVideosRuntime(
+  client: Client,
+  store: VideosRepository,
+  api: ReturnType<typeof createVideosApi>,
+) {
+  async function permissions(setup: ForumSettings, forum: ForumChannel) {
+    if (setup.ownsForum) await auditVideoPermissions(forum);
+    else await checkVideoPermissions(forum);
+  }
   async function repairTags(setup: ForumSettings, forum: ForumChannel) {
     const tracked = await store.subscriptions(setup.guildId);
     await tracked.reduce(async (previous, { subscription, creator }) => {
@@ -45,8 +64,7 @@ function buildRuntime(client: Client) {
     await store.createSettings(guildId);
     let setup = (await store.get(guildId))!;
     if (setup.lifecycle === "cleaning")
-      throw new Error("Cleanup is incomplete; an administrator must finish /videos clean first.");
-    if (!setup.ownsForum) throw new Error("Unowned Forums cannot be modified by this feature.");
+      throw new Error("Cleanup is incomplete; an administrator must finish /setup clean first.");
     let forum = await getVideoForum(guild, setup.forumChannelId);
     if (!forum) {
       if (setup.forumChannelId) {
@@ -66,16 +84,15 @@ function buildRuntime(client: Client) {
       }
       setup = (await store.get(guildId))!;
     }
-    await auditVideoPermissions(forum);
+    await permissions(setup, forum);
     await repairTags(setup, forum);
     return { setup, forum };
   }
   async function publish(setup: ForumSettings) {
     const guild = await client.guilds.fetch(setup.guildId);
     const forum = await getVideoForum(guild, setup.forumChannelId);
-    if (!forum) throw new Error("Latest Videos is missing; run /videos add to recreate it.");
-    if (!setup.ownsForum) throw new Error("Unowned video Forum cannot be modified.");
-    await auditVideoPermissions(forum);
+    if (!forum) throw new Error("Latest Videos is missing; run /setup youtube to recreate it.");
+    await permissions(setup, forum);
     await repairTags(setup, forum);
     await store.enqueue(setup.guildId, setup.forumGeneration);
     const pending = await store.pending(setup.guildId);
@@ -107,13 +124,56 @@ function buildRuntime(client: Client) {
   }
   return {
     store,
-    async add(guildId: string, input: string, count: number) {
+    async setup(guildId: string) {
+      return store.withGuild(guildId, () => provision(guildId));
+    },
+    async creatorTags(guildId: string) {
+      const setup = await store.get(guildId);
+      if (!setup) return [];
+      const guild = await client.guilds.fetch(guildId);
+      const forum = await getVideoForum(guild, setup.forumChannelId);
+      const tracked = await store.subscriptions(guildId);
+      // Retain saved IDs in suggestions during an interrupted tag cleanup.
+      return tracked.flatMap(({ subscription, creator }) =>
+        subscription.tagId
+          ? [
+              {
+                id: subscription.tagId,
+                name:
+                  forum?.availableTags.find((tag) => tag.id === subscription.tagId)?.name ??
+                  creator.displayName,
+              },
+            ]
+          : [],
+      );
+    },
+    async add(guildId: string, input: string, count: number, forumId: string) {
       if (!Number.isInteger(count) || count < 0 || count > 15)
         throw new Error("Backfill count must be between 0 and 15.");
       const resolved = await api.resolve(input);
       return store.withGuild(guildId, async () => {
-        const { setup, forum } = await provision(guildId);
+        const guild = await client.guilds.fetch(guildId);
+        const forum = await getVideoForum(guild, forumId);
+        if (!forum || forum.guildId !== guildId)
+          throw new Error("Choose a Forum channel in this server.");
+        let setup = await store.get(guildId);
+        if (setup?.lifecycle === "cleaning")
+          throw new Error("Finish /setup clean before adding a creator.");
         const tracked = await store.subscriptions(guildId);
+        if (setup?.forumChannelId !== forum.id) {
+          if (tracked.length)
+            throw new Error(
+              "Only one YouTube Forum is supported; clean the existing tracking before changing channels.",
+            );
+          await checkVideoPermissions(forum);
+          await store.createSettings(guildId);
+          if (setup?.forumChannelId) await store.resetForum(guildId);
+          setup = (await store.get(guildId))!;
+          await store.setForum(guildId, forum.id, setup.forumGeneration, false);
+          setup = (await store.get(guildId))!;
+        }
+        if (!setup || setup.lifecycle !== "active") throw new Error("Run /setup youtube first.");
+        await permissions(setup, forum);
         const existing = tracked.find(
           (row) => row.subscription.channelId === resolved.channel.channelId,
         );
@@ -151,18 +211,58 @@ function buildRuntime(client: Client) {
         return publish(setup);
       });
     },
-    async clean(guildId: string, expectedForumId: string | null, generation: number) {
+    async clean(
+      guildId: string,
+      expectedForumId: string | null,
+      generation: number,
+      mode: CleanupMode,
+      tagId?: string,
+    ) {
       return store.withGuild(guildId, async () => {
         const setup = await store.get(guildId);
         if (!setup) return;
         if (setup.forumChannelId !== expectedForumId || setup.forumGeneration !== generation)
           throw new Error("Video resources changed; request cleanup confirmation again.");
-        if (!setup.ownsForum) throw new Error("Refusing to delete an unowned Forum.");
-        await store.cleaning(guildId);
+        const tracked = await store.subscriptions(guildId);
+        const selected = tagId
+          ? tracked.find((row) => row.subscription.tagId === tagId)
+          : undefined;
+        if (tagId && !selected)
+          throw new Error("Creator tag changed; request cleanup confirmation again.");
         const guild = await client.guilds.fetch(guildId);
         const forum = await getVideoForum(guild, setup.forumChannelId);
-        if (forum) await forum.delete("Administrator-confirmed YouTube cleanup");
-        await store.remove(guildId);
+        await store.cleaning(guildId);
+        if (mode === "resources" && !tagId && setup.ownsForum) {
+          if (forum) await forum.delete("Administrator-confirmed YouTube cleanup");
+          await store.remove(guildId);
+          return;
+        }
+        if (forum)
+          await deleteVideoPosts(
+            forum,
+            tagId,
+            new Set(await store.publicationThreads(guildId, selected?.subscription.channelId)),
+          );
+        if (mode === "resources") {
+          const removed = selected ? [selected] : tracked;
+          const ownedTags = new Set(
+            removed.filter((row) => row.subscription.ownsTag).map((row) => row.subscription.tagId),
+          );
+          if (forum && forum.availableTags.some((tag) => ownedTags.has(tag.id))) {
+            await forum.setAvailableTags(
+              forum.availableTags.filter((tag) => !ownedTags.has(tag.id)),
+            );
+          }
+          if (selected) await store.removeCreator(guildId, selected.subscription.channelId);
+          else {
+            await store.remove(guildId);
+            return;
+          }
+        } else {
+          await store.excludeVideos(guildId, selected?.subscription.channelId);
+        }
+        if (forum) await store.setForum(guildId, forum.id, setup.forumGeneration, setup.ownsForum);
+        else await store.resetForum(guildId);
       });
     },
   };

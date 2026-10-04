@@ -1,11 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  Collection,
   ComponentType,
+  PermissionsBitField,
   MessageFlags,
   PermissionFlagsBits as P,
   type ForumChannel,
 } from "discord.js";
-import { creatorTag, renderVideo, videoForumPermissions } from "./videos-discord.ts";
+import {
+  auditVideoPermissions,
+  checkVideoPermissions,
+  creatorTag,
+  renderVideo,
+  videoForumPermissions,
+} from "./videos-discord.ts";
 import type { Video } from "./videos-repository.ts";
 const video: Video = {
   videoId: "abcdefghijk",
@@ -32,6 +40,38 @@ function forumWithTags(tags: { id: string; name: string }[]) {
   return { state, forum: state as unknown as ForumChannel };
 }
 describe("video presentation and resources", () => {
+  it("checks unowned Forum permissions without rewriting them, and audits owned Forums with the fetched bot ID", async () => {
+    const bot = { id: "bot" };
+    const set = vi.fn();
+    const forum = {
+      guildId: "guild",
+      guild: {
+        members: { fetchMe: vi.fn(async () => bot) },
+        roles: {
+          fetch: vi.fn(),
+          cache: new Collection([
+            [
+              "moderator",
+              { id: "moderator", permissions: new PermissionsBitField([P.ManageMessages]) },
+            ],
+          ]),
+        },
+      },
+      permissionsFor: vi.fn(() => ({ has: () => true })),
+      permissionOverwrites: { set },
+    } as unknown as ForumChannel;
+    expect(await checkVideoPermissions(forum)).toBe(bot);
+    expect(set).not.toHaveBeenCalled();
+    await auditVideoPermissions(forum);
+    expect(set).toHaveBeenCalledWith(videoForumPermissions("guild", "bot", ["moderator"]));
+  });
+  it("rejects a Forum with missing bot permissions", async () => {
+    const forum = {
+      guild: { members: { fetchMe: vi.fn(async () => ({ id: "bot" })) } },
+      permissionsFor: () => ({ has: () => false }),
+    } as unknown as ForumChannel;
+    await expect(checkVideoPermissions(forum)).rejects.toThrow("missing required permissions");
+  });
   it("renders title, separator, description, publication date and link button without mentions", () => {
     const [message] = renderVideo(video);
     expect(message!.flags).toBe(MessageFlags.IsComponentsV2);

@@ -59,10 +59,10 @@ export function createVideosRepository(url: string) {
     async createSettings(guildId: string) {
       await db.insert(settings).values({ guildId }).onConflictDoNothing();
     },
-    async setForum(guildId: string, forumChannelId: string, generation: number) {
+    async setForum(guildId: string, forumChannelId: string, generation: number, ownsForum = true) {
       await db
         .update(settings)
-        .set({ forumChannelId, forumGeneration: generation, lifecycle: "active" })
+        .set({ forumChannelId, forumGeneration: generation, ownsForum, lifecycle: "active" })
         .where(scope(guildId));
     },
     async resetForum(guildId: string) {
@@ -232,8 +232,61 @@ export function createVideosRepository(url: string) {
         .groupBy(intents.state);
       return result.map((row) => `${row.state}: ${row.count}`).join(", ") || "no videos";
     },
+    async publicationThreads(guildId: string, channelId?: string) {
+      const rows = await db
+        .select({ threadId: intents.threadId })
+        .from(intents)
+        .where(
+          channelId
+            ? and(eq(intents.guildId, guildId), eq(intents.channelId, channelId))
+            : eq(intents.guildId, guildId),
+        );
+      return rows.flatMap((row) => (row.threadId ? [row.threadId] : []));
+    },
     async cleaning(guildId: string) {
       await db.update(settings).set({ lifecycle: "cleaning" }).where(scope(guildId));
+    },
+    async excludeVideos(guildId: string, channelId?: string) {
+      const intentScope = channelId
+        ? and(eq(intents.guildId, guildId), eq(intents.channelId, channelId))
+        : eq(intents.guildId, guildId);
+      const publicationScope = channelId
+        ? and(eq(publications.guildId, guildId), eq(publications.channelId, channelId))
+        : eq(publications.guildId, guildId);
+      await db.transaction(async (tx) => {
+        // Snapshot even unqueued sources so the next scheduled sync cannot repost them.
+        await tx.execute(sql`INSERT INTO youtube_publication_intents (guild_id, channel_id, video_id, forum_generation, state, mode)
+          SELECT s.guild_id, v.channel_id, v.video_id, f.forum_generation, 'excluded', 'live'
+          FROM youtube_subscriptions s JOIN youtube_videos v ON v.channel_id = s.channel_id
+          JOIN youtube_forum_settings f ON f.guild_id = s.guild_id
+          WHERE s.guild_id = ${guildId} AND (${channelId ?? null}::text IS NULL OR s.channel_id = ${channelId ?? null})
+          ON CONFLICT DO NOTHING`);
+        await tx.delete(publications).where(publicationScope);
+        await tx
+          .update(intents)
+          .set({
+            state: "excluded",
+            mode: "live",
+            threadId: null,
+            starterMessageId: null,
+            lastError: null,
+            updatedAt: new Date(),
+          })
+          .where(intentScope);
+        await tx
+          .update(subscriptions)
+          .set({ initialImportCompletedAt: new Date() })
+          .where(
+            channelId
+              ? and(eq(subscriptions.guildId, guildId), eq(subscriptions.channelId, channelId))
+              : eq(subscriptions.guildId, guildId),
+          );
+      });
+    },
+    async removeCreator(guildId: string, channelId: string) {
+      await db
+        .delete(subscriptions)
+        .where(and(eq(subscriptions.guildId, guildId), eq(subscriptions.channelId, channelId)));
     },
     async remove(guildId: string) {
       await db.delete(settings).where(scope(guildId));

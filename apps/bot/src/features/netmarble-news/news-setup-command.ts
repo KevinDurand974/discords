@@ -240,7 +240,7 @@ export async function handleNewsCleanConfirmation(interaction: ButtonInteraction
     pending.userId !== interaction.user.id
   )
     throw new Error(
-      "This confirmation expired or belongs to another administrator. Run /setup news clean again.",
+      "This confirmation expired or belongs to another administrator. Run /sla news clean again.",
     );
   pendingCleanups.delete(token);
   await interaction.deferUpdate();
@@ -258,7 +258,7 @@ export async function handleNewsCleanConfirmation(interaction: ButtonInteraction
   } catch (error) {
     console.error(`News cleanup failed in ${interaction.guildId}`, error);
     await interaction.editReply({
-      content: `Cleanup incomplete: ${error instanceof Error ? error.message : String(error)} Check /setup news status; if still configured, run /setup news clean again to retry.`,
+      content: `Cleanup incomplete: ${error instanceof Error ? error.message : String(error)} Check /sla news status; if still configured, run /sla news clean again to retry.`,
       components: [],
     });
     return;

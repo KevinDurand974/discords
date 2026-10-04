@@ -147,10 +147,14 @@ export async function provisionVideoForum(guild: Guild) {
     reason: "YouTube Latest Videos setup",
   });
 }
-export async function auditVideoPermissions(forum: ForumChannel) {
+export async function checkVideoPermissions(forum: ForumChannel) {
   const bot = await forum.guild.members.fetchMe();
   if (!forum.permissionsFor(bot)?.has(required))
     throw new Error("The bot is missing required permissions in Latest Videos.");
+  return bot;
+}
+export async function auditVideoPermissions(forum: ForumChannel) {
+  const bot = await checkVideoPermissions(forum);
   await forum.guild.roles.fetch();
   // Rebuild only the feature-owned Forum policy; unrelated channels/roles remain untouched.
   const moderators = forum.guild.roles.cache
@@ -217,7 +221,7 @@ async function messages(thread: ThreadChannel) {
   };
   return collect();
 }
-async function findThread(forum: ForumChannel, video: Video) {
+async function forumThreads(forum: ForumChannel) {
   const active = await forum.threads.fetchActive();
   const archived = async (before?: Date, pages = 0): Promise<ThreadChannel[]> => {
     if (pages >= 20)
@@ -231,9 +235,43 @@ async function findThread(forum: ForumChannel, video: Video) {
     if (!last) throw new Error("Cannot paginate archived threads safely.");
     return [...rows, ...(await archived(new Date(last), pages + 1))];
   };
+  return [
+    ...new Map(
+      [...active.threads.values(), ...(await archived())].map((thread) => [thread.id, thread]),
+    ).values(),
+  ];
+}
+export async function deleteVideoPosts(
+  forum: ForumChannel,
+  tagId?: string,
+  knownThreadIds = new Set<string>(),
+) {
+  // Enumerate first: hitting a pagination limit must not leave a partially deleted page.
+  const candidates = await forumThreads(forum);
+  let deleted = 0;
+  for (const thread of candidates) {
+    const known = knownThreadIds.has(thread.id);
+    if (tagId && !known && !thread.appliedTags.includes(tagId)) continue;
+    const starter = await thread.fetchStarterMessage();
+    if (known && starter && starter.author.id !== forum.client.user?.id)
+      throw new Error("Saved video thread ownership changed; refusing to delete it.");
+    if (
+      !known &&
+      (starter?.author.id !== forum.client.user?.id ||
+        !/"content":"-# YouTube source: yt:video:[A-Za-z0-9_-]{11} · part 1"/.test(
+          JSON.stringify(starter.components),
+        ))
+    )
+      continue;
+    await thread.delete("Administrator-confirmed YouTube video cleanup");
+    deleted += 1;
+  }
+  return deleted;
+}
+async function findThread(forum: ForumChannel, video: Video) {
   // The bot-authored starter marker is authoritative, not the visible title.
   // Scan all posts so title changes and legacy ID-suffixed names still reconcile.
-  const candidates = [...active.threads.values(), ...(await archived())];
+  const candidates = await forumThreads(forum);
   const verified = (
     await Promise.all(
       candidates.map(async (thread) => {
@@ -262,7 +300,7 @@ export async function publishVideo(
   const guild = await client.guilds.fetch(setup.guildId);
   const forum = await getVideoForum(guild, setup.forumChannelId);
   if (!forum || !forum.availableTags.some((tag) => tag.id === tagId))
-    throw new Error("Video Forum/tag is missing; run /videos add to repair it.");
+    throw new Error("Video Forum/tag is missing; run /setup youtube or /youtube add to repair it.");
   const parts = renderVideo(video);
   let thread: ThreadChannel | undefined;
   if (intent.threadId) {

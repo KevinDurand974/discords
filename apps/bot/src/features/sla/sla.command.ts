@@ -2,11 +2,16 @@ import { SlashCommandBuilder } from "discord.js";
 import type { CommandDefinition } from "@/core/command.ts";
 import { handleCreateClaim, itemChoices } from "./create-claim.ts";
 import { handleRedeem } from "./redeem.ts";
+import {
+  configureNewsGroup,
+  handleNewsSetup,
+} from "@/features/netmarble-news/news-setup-command.ts";
 
 export const slaCommand = {
   data: new SlashCommandBuilder()
     .setName("sla")
     .setDescription("Solo Leveling: ARISE tools")
+    .addSubcommandGroup(configureNewsGroup)
     .addSubcommand((subcommand) =>
       subcommand
         .setName("redeem")
@@ -46,6 +51,10 @@ export const slaCommand = {
     }),
 
   async execute(interaction) {
+    if (interaction.options.getSubcommandGroup(false) === "news") {
+      await handleNewsSetup(interaction);
+      return;
+    }
     switch (interaction.options.getSubcommand()) {
       case "redeem":
         return handleRedeem(interaction);
