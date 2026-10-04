@@ -4,6 +4,7 @@ import {
   youtubeComponentHandler,
 } from "@/features/youtube-videos/videos.command.ts";
 import { claimComponentHandler } from "@/features/sla/claim-components.ts";
+import { createCouponComponentHandler } from "@/features/sla/create-coupon.ts";
 import { newsCleanComponentHandler } from "@/features/netmarble-news/news-setup-command.ts";
 import { redeemComponentHandler } from "@/features/sla/redeem.ts";
 import { setupCommand, setupComponentHandler } from "@/features/setup/setup.command.ts";
@@ -23,6 +24,7 @@ export const commands: readonly CommandDefinition[] = [
 
 export const componentHandlers: readonly ComponentHandler[] = [
   claimComponentHandler,
+  createCouponComponentHandler,
   redeemComponentHandler,
   setupComponentHandler,
   newsCleanComponentHandler,

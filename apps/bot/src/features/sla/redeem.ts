@@ -15,9 +15,7 @@ const REDEEM_MODAL_ID = "sla:redeem";
 const COUPON_INPUT_ID = "coupon";
 const PID_INPUT_ID = "pid";
 
-type RedeemInteraction = ChatInputCommandInteraction | ModalSubmitInteraction;
-
-const createRedeemModal = (couponCode: string | null, pid: string | null) => {
+const createRedeemModal = () => {
   const couponInput = new TextInputBuilder()
     .setCustomId(COUPON_INPUT_ID)
     .setPlaceholder("Enter your coupon code")
@@ -31,9 +29,6 @@ const createRedeemModal = (couponCode: string | null, pid: string | null) => {
     .setRequired(true)
     .setMaxLength(80);
 
-  if (couponCode) couponInput.setValue(couponCode);
-  if (pid) pidInput.setValue(pid);
-
   return new ModalBuilder()
     .setCustomId(REDEEM_MODAL_ID)
     .setTitle("Redeem a coupon")
@@ -46,7 +41,7 @@ const createRedeemModal = (couponCode: string | null, pid: string | null) => {
     );
 };
 
-const redeem = async (interaction: RedeemInteraction, couponCode: string, pid: string) => {
+const redeem = async (interaction: ModalSubmitInteraction, couponCode: string, pid: string) => {
   const data = await redeemCoupon(couponCode, pid);
 
   if (data.errorCode === 24004) {
@@ -75,15 +70,7 @@ const redeem = async (interaction: RedeemInteraction, couponCode: string, pid: s
 };
 
 export const handleRedeem = async (interaction: ChatInputCommandInteraction) => {
-  const couponCode = interaction.options.getString("coupon");
-  const pid = interaction.options.getString("pid");
-
-  if (!couponCode || !pid) {
-    await interaction.showModal(createRedeemModal(couponCode, pid));
-    return;
-  }
-
-  await redeem(interaction, couponCode, pid);
+  await interaction.showModal(createRedeemModal());
 };
 
 export const redeemComponentHandler: ComponentHandler = {

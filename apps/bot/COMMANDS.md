@@ -13,8 +13,8 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 
 | Commande | Description |
 | --- | --- |
-| `/sla redeem [coupon] [pid]` | Utilise un code coupon. `pid` correspond au code membre (Personal ID). |
-| `/sla create code [item_1] [quantity_1] … [item_4] [quantity_4]` | Crée une publication de coupon avec jusqu’à quatre récompenses. Les quantités doivent être supérieures ou égales à 1. |
+| `/sla redeem` | Opens a modal with required coupon code and Personal ID (Member code) fields. No command options. |
+| `/sla create-coupon [item_1] … [item_8]` | Choose up to eight optional rewards using autocomplete across the complete `couponItems` catalog. Suggestions use object keys as labels and emoji names as values, return at most 25 matches, and exclude items selected in other options. Duplicate or unrecognized item values are rejected. Enter the coupon code and select a destination channel in the first modal (the current channel is selected by default). The private draft shows four selected items per page; each **Set quantity** button opens a separate modal requiring a positive whole-number quantity. Saved quantities can be edited. All selected items must have a quantity before publication; with no selected items, publish directly without rewards. The five category selects have been removed. The Components V2 card displays the title and code beside the thumbnail, followed by optional rewards and a Primary Claim button using the existing Claim/PID flow. Drafts expire after 5 minutes and are deleted immediately after publication or cancellation. Both you and the bot need permission to post in the destination channel. The legacy `/sla create` command has been removed; use `/sla create-coupon` instead. |
 | `/sla news create [backfill-count]` | Crée ou réactive le forum de news. Importe de **0 à 10 articles** (10 par défaut), plus au maximum une publication épinglée. |
 | `/sla news backfill [count]` | Importe de **1 à 50 articles** historiques sans notifier les rôles (10 par défaut). |
 | `/sla news status` | Affiche la configuration des news. |

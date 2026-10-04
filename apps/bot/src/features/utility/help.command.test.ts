@@ -45,7 +45,7 @@ describe("/help", () => {
       "/youtube status",
       "/youtube sync",
       "/sla redeem",
-      "/sla create <code>",
+      "/sla create-coupon",
       "/sla news create",
       "/sla news backfill",
       "/sla news status",
@@ -55,6 +55,9 @@ describe("/help", () => {
       expect(text).toContain(path);
     expect(text).not.toContain("/videos");
     expect(text).not.toContain("/setup news");
+    expect(text).not.toContain("`/sla create ");
+    expect(text).toContain("`/sla redeem`");
+    expect(text).not.toContain("/sla redeem [");
     expect(text).toContain("[tag]");
     expect(text).toContain("[backfill-count]");
   });
