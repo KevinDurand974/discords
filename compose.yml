@@ -6,13 +6,13 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL to the postgres service URL}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in apps/api/.env}
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in apps/api/.env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in apps/api/.env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the root .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the root .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env}
       PORT: ${PORT:-3000}
       NEWS_CORS_ORIGINS: ${NEWS_CORS_ORIGINS:-}
       NEWS_INTERNAL_TOKEN: ${NEWS_INTERNAL_TOKEN:-}
-      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in apps/api/.env}
+      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in the root .env}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
     command: ["sh", "-c", "nub run db:migrate && nub --cwd apps/api run start"]
     ports:
@@ -33,13 +33,16 @@ services:
       context: .
       target: bot
     restart: unless-stopped
-    env_file:
-      - apps/bot/.env
     environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_OWNER_CLIENT_ID: ${DISCORD_OWNER_CLIENT_ID:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       DATABASE_URL: ${API_DATABASE_URL:?Set API_DATABASE_URL to the postgres service URL}
       NEWS_API_URL: http://api:${PORT:-3000}
+      YOUTUBE_API_URL: ${YOUTUBE_API_URL:-}
       NEWS_INTERNAL_TOKEN: ${NEWS_INTERNAL_TOKEN:-}
-      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in apps/api/.env}
+      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in the root .env}
       BOT_HEALTH_PORT: "3001"
       BOT_HEALTH_HOST: "0.0.0.0"
     volumes:
@@ -63,8 +66,9 @@ services:
     environment:
       REDIS_URL: redis://redis:6379
       NEWS_API_URL: http://api:${PORT:-3000}
+      YOUTUBE_API_URL: ${YOUTUBE_API_URL:-}
       BOT_URL: http://bot:3001
-      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in apps/api/.env}
+      JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in the root .env}
       JOBS_DASHBOARD_PORT: "3002"
       JOBS_DASHBOARD_HOST: "0.0.0.0"
     ports:
@@ -100,9 +104,9 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in apps/api/.env}
-      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in apps/api/.env}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in apps/api/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in the root .env}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in the root .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the root .env}
     ports:
       - "127.0.0.1:5432:5432"
     volumes:

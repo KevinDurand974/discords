@@ -12,7 +12,7 @@ COPY apps/bot apps/bot
 COPY apps/api apps/api
 COPY apps/jobs apps/jobs
 COPY packages/db packages/db
-COPY tsconfig.json ./
+COPY tsconfig.json .env.schema ./
 
 FROM base AS api
 CMD ["nub", "--cwd", "apps/api", "run", "start"]

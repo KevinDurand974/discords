@@ -19,6 +19,16 @@ test("builds container credentials and URL without reusing the host localhost UR
   assert.equal(env.PORT, "3000");
 });
 
+test("forwards Discord credentials from the shared environment without requiring them for API-only commands", () => {
+  const values = { POSTGRES_USER: "discords", POSTGRES_DB: "discords", POSTGRES_PASSWORD: "secret", PORT: 3000 };
+  assert.equal(composeEnvironment(values).DISCORD_TOKEN, "");
+  const env = composeEnvironment({ ...values, DISCORD_TOKEN: "bot-token", DISCORD_CLIENT_ID: "123", DISCORD_OWNER_CLIENT_ID: "456", DISCORD_GUILD_ID: "789" });
+  assert.equal(env.DISCORD_TOKEN, "bot-token");
+  assert.equal(env.DISCORD_CLIENT_ID, "123");
+  assert.equal(env.DISCORD_OWNER_CLIENT_ID, "456");
+  assert.equal(env.DISCORD_GUILD_ID, "789");
+});
+
 test("requires a configured password and valid port", () => {
   assert.throws(() => composeEnvironment({ POSTGRES_USER: "discords", POSTGRES_DB: "discords", PORT: 3000 }), /POSTGRES_PASSWORD/);
   assert.throws(() => composeEnvironment({ POSTGRES_USER: "discords", POSTGRES_DB: "discords", POSTGRES_PASSWORD: "secret", PORT: 0 }), /PORT/);

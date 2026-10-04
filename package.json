@@ -13,24 +13,24 @@
   "scripts": {
     "start": "nub run docker:up",
     "stop": "nub run docker:down",
-    "docker:up": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs up -d --build --wait --wait-timeout 120",
-    "docker:down": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs down",
-    "docker:build": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs build",
-    "docker:ps": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs ps",
-    "docker:logs": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs logs --tail=100",
-    "test": "nub --cwd packages/db run test && node --test scripts/docker.test.mjs",
+    "docker:up": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs up -d --build --wait --wait-timeout 120",
+    "docker:down": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs down",
+    "docker:build": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs build",
+    "docker:ps": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs ps",
+    "docker:logs": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs logs --tail=100",
+    "test": "nub --cwd packages/db run test && nub --node --test scripts/docker.test.mjs scripts/env.test.mjs",
     "db:generate": "nub --cwd packages/db run db:generate",
     "db:migrate": "nub --cwd packages/db run db:migrate",
     "test:integration": "node scripts/test-integration.mjs",
     "jobs:start": "nub --cwd apps/jobs run start",
     "jobs:dev": "nub --cwd apps/jobs run dev",
-    "docker:bot:up": "nub --cwd apps/api exec varlock run --inject vars -- node ../../scripts/docker.mjs --profile bot up -d --build --wait --wait-timeout 180"
+    "docker:bot:up": "nub exec varlock run --filter=#docker,#bot,#jobs --inject vars -- node scripts/docker.mjs --profile bot up -d --build --wait --wait-timeout 180"
   },
   "devDependencies": {
     "@nubjs/types": ">=0.4.13 <=0.9.2",
     "@types/node": "^26",
     "typescript": "^7",
-    "varlock": "^1.19.0"
+    "varlock": "^1.21.1"
   },
   "workspaces": [
     "apps/*",

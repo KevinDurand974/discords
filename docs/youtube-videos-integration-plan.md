@@ -96,7 +96,7 @@ Use `URLSearchParams`; define and test whether the extracted handle retains its 
 
 For `/channel/ID` or bare `UC...`, use the validated ID directly and **do not call the Google channels endpoint**. Fetch RSS to establish that the source exists and corresponds to the requested channel before provisioning Discord resources. This path works without `YOUTUBE_API_KEY`; a missing key blocks only unresolved handle lookup. Reuse a previously resolved ID during polling; do not spend Google quota every ten minutes. Source display names come from `feed.title`.
 
-Use `YOUTUBE_API_KEY` only in `apps/api/.env.schema`, its example/config, and API container environment. Never send it to the bot, worker, public responses, or logs. Redact upstream URLs/errors because Google requests contain the key. Distinguish invalid-channel, missing-key, quota, authorization, timeout, and upstream-unavailable errors.
+Define `YOUTUBE_API_KEY` in the root `.env.schema` with the API tag and configure its value in the root `.env`; only the API imports it and only the API container receives it. Never send it to the bot, worker, public responses, or logs. Redact upstream URLs/errors because Google requests contain the key. Distinguish invalid-channel, missing-key, quota, authorization, timeout, and upstream-unavailable errors.
 
 ### RSS operation
 

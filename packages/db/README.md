@@ -10,13 +10,13 @@ The publication-only migration derives the cutoff from existing initial history,
 
 ## Local workflow
 
-1. Copy `apps/api/.env.example` to `apps/api/.env` and set matching `POSTGRES_PASSWORD` and host `DATABASE_URL` credentials.
-2. Run `node scripts/docker.mjs up -d postgres` and wait for the health check.
+1. Copy the repository root `.env.example` to the untracked root `.env` and set matching `POSTGRES_PASSWORD` and host `DATABASE_URL` credentials.
+2. Run `nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs up -d postgres` from the repository root and wait for the health check.
 3. Run `nub --cwd packages/db run env:check` to validate the database configuration.
 4. Run `nub run db:migrate`. Varlock loads and validates `DATABASE_URL` before migration; re-running applies only pending migrations.
 5. Run `nub run test` and `nub --cwd packages/db run typecheck`.
 
-`packages/db/.env.schema` imports only `DATABASE_URL` from `apps/api/`, including its required, sensitive URL validation and local env files. No shell export or duplicated secrets are needed. To use a different database, copy `packages/db/.env.example` to `packages/db/.env` and set the URL there; a shell/CI `DATABASE_URL` takes precedence over local files. URL-encode special characters in passwords. Varlock generates ignored `packages/db/env.d.ts` types during validation. Schema generation remains environment-independent and does not require database credentials.
+`packages/db/.env.schema` imports only `DATABASE_URL` (the `db` tag) from the root, including its required, sensitive URL validation and root `.env` values. No shell export or duplicated secrets are needed. To use a different database, change the root `DATABASE_URL` or supply a shell/CI override, which takes precedence over file values. URL-encode special characters in passwords. Varlock generates ignored `packages/db/env.d.ts` types during validation. Schema generation remains environment-independent and does not require database credentials.
 
 After changing `src/schema.ts`, run `nub run db:generate`, review and commit the generated SQL and journal, then run `nub run db:migrate`. Never use a schema push against production. `docker compose down` preserves the named `postgres_data` volume; `docker compose down -v` deletes it.
 

@@ -5,8 +5,8 @@ Automated verification passed: 143 bot unit tests, 6 jobs tests, 11 PostgreSQL i
 ## Configuration and rollout
 
 1. Back up PostgreSQL and apply additive migrations with `nub run db:migrate` using the normal environment.
-2. Set `YOUTUBE_API_KEY` **only in `apps/api/.env`** (or the API container). Restrict it to YouTube Data API v3. Direct `UC...` channel IDs and recurring RSS fetches do not require this key.
-3. Match `NEWS_INTERNAL_TOKEN` between API and bot, and `JOBS_INTERNAL_TOKEN` between API, bot and worker. Source reads are public like news, but resolution/ingestion/publication routes require service tokens.
+2. Set `YOUTUBE_API_KEY` in the **root `.env`** (or the API container); only the API schema imports it and only the API container receives it. Restrict it to YouTube Data API v3. Direct `UC...` channel IDs and recurring RSS fetches do not require this key.
+3. Set `NEWS_INTERNAL_TOKEN` and `JOBS_INTERNAL_TOKEN` once in the root `.env`; the API, bot and worker import their shared tokens. Source reads are public like news, but resolution/ingestion/publication routes require service tokens.
 4. API/bot share PostgreSQL. Configure `NEWS_API_URL`; optionally override the YouTube service with `YOUTUBE_API_URL` in bot/jobs. An unset/empty override falls back to NEWS_API_URL.
 5. Start the API, bot and Redis/jobs worker. Compose already supplies internal API/service URLs through NEWS_API_URL; no Google key is sent to bot/jobs.
 6. Deploy the registered guild commands with the existing bot sync script (`nub --cwd apps/bot run sync`). Command deployment contacts Discord; run it deliberately in staging first.

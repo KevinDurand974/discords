@@ -16,8 +16,8 @@ See [`docs/youtube-videos-operations.md`](../../docs/youtube-videos-operations.m
 ## Run locally
 
 1. Start Redis locally on `127.0.0.1:6379` (or set `REDIS_URL`).
-2. Copy `.env.example` to `.env` and choose a long `JOBS_INTERNAL_TOKEN`.
-3. Put the same token in `apps/api/.env` and `apps/bot/.env`.
+2. Copy the repository root `.env.example` to the untracked root `.env` and choose a long `JOBS_INTERNAL_TOKEN`.
+3. All apps import that shared token automatically. The jobs `.env.schema` imports only jobs-tagged definitions and values from the root; no app-local `.env` is needed.
 4. Start PostgreSQL and apply migrations as usual, then run the API and bot in separate terminals.
 5. Run `nub run jobs:dev` from the repository root.
 

@@ -14,7 +14,7 @@
     "@elysiajs/node": "1.4.5",
     "elysia": "1.4.30",
     "fast-xml-parser": "^5.11.2",
-    "varlock": "^1.19.0"
+    "varlock": "^1.21.1"
   },
   "devDependencies": {
     "@types/node": "^26",
