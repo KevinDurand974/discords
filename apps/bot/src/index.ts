@@ -1,4 +1,6 @@
 import { Collection, Events } from "discord.js";
+import { createDatabase } from "@discords/db";
+import { createCommandLogRepository } from "@/core/command-log-repository.ts";
 import { createDiscordClient } from "@/core/client.ts";
 import { createCommandLogger } from "@/core/command-logger.ts";
 import type { CommandDefinition } from "@/core/command.ts";
@@ -22,7 +24,8 @@ createBotHealthServer(client, process.env.DATABASE_URL, {
 }).listen(healthPort, healthHost, () => {
   console.info(`Bot health listening on ${healthHost}:${healthPort}`);
 });
-const commandLogger = await createCommandLogger(client);
+const logDatabase = createDatabase(ENV.DATABASE_URL);
+const commandLogger = createCommandLogger(client, createCommandLogRepository(logDatabase));
 const commandsByName = new Collection<string, CommandDefinition>();
 
 commands.forEach((command) => {

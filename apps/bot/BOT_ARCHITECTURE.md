@@ -162,7 +162,9 @@ The command requires the **Manage Channels** permission. It offers two configura
 - select an existing text channel with the optional `channel` option;
 - leave `channel` empty to open a modal, choose a name (default: `bot-command-logs`), and create a new text channel.
 
-A newly created channel denies `View Channel` to `@everyone`, explicitly allows the bot to send embeds, and allows roles with **Manage Channels** to view it. The selected channel ID is persisted locally in `data/log-channels.json`; this runtime configuration file is ignored by Git. If a server has no configured channel, command logs are silently skipped.
+A newly created channel denies `View Channel` to `@everyone`, explicitly allows the bot to send embeds, and allows roles with **Manage Channels** to view it. The selected channel ID is persisted in PostgreSQL in `command_log_settings`, keyed by guild ID. The bot requires `DATABASE_URL`; run `nub run db:migrate` before starting it. Settings are read from the database for each log so changes are visible across bot instances. If a server has no configured channel, command logs are silently skipped. Database or Discord errors during log delivery are reported without failing the command; setup only confirms success once the database write succeeds.
+
+To migrate existing local settings, run `nub --cwd apps/bot run logs:import` after applying the schema migration, using the same `DATABASE_URL` as the bot. The script reads `apps/bot/data/log-channels.json` by default, validates all entries before writing, and imports missing guild settings without overwriting existing database settings. It is safe to rerun and leaves the JSON file untouched as a backup. The runtime no longer reads or writes that file. Command execution history still goes to Discord, not the database.
 
 ## Current packages
 

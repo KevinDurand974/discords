@@ -4,8 +4,9 @@
   "type": "module",
   "scripts": {
     "start": "nub src/index.ts",
-    "dev": "nub watch src/index.ts",
+    "dev": "nub --watch-path=src --watch-path=../../packages/db/src src/index.ts",
     "sync": "nub src/scripts/deploy-commands.ts",
+    "logs:import": "nub src/scripts/import-log-channels.ts",
     "generate:emojis": "nub src/scripts/generate-emojis.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",

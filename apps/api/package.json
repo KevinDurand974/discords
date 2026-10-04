@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "nub src/index.ts",
-    "dev": "nub watch src/index.ts",
+    "dev": "nub --watch-path=src --watch-path=../../packages/db/src src/index.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

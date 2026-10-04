@@ -1,6 +1,11 @@
 import { sql } from "drizzle-orm";
 import { boolean, check, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
 
+export const commandLogSettings = pgTable("command_log_settings", {
+  guildId: varchar("guild_id", { length: 20 }).primaryKey(),
+  channelId: varchar("channel_id", { length: 20 }).notNull(),
+});
+
 // Global YouTube history is independent of Discord guild subscriptions.
 export const youtubeChannels = pgTable("youtube_channels", {
   channelId: varchar("channel_id", { length: 24 }).primaryKey(),
