@@ -41,6 +41,8 @@ No Content Creator role is created. Shorts and livestreams are accepted as retur
 - New Forum post titles use only the video title (up to 100 characters), without an appended video ID. Crash recovery identifies bot-authored starter source markers independently of titles, including legacy ID-suffixed posts or renamed titles. Existing published posts are not renamed automatically.
 - Descriptions are stored in full and posted in bounded Components V2 parts, without mention permissions: title → separator → description → publication date → Watch on YouTube button (plus a small reconciliation footer). One separate classic message containing the video URL follows all V2 parts, enabling Discord's native video preview. The bot needs Embed Links; previews are controlled by Discord. Retries reconcile this URL message by author and exact URL, avoiding duplicate previews. Existing published posts are not edited automatically.
 
+Description timestamps such as `03:42` link to the video's `t=222s` query parameter; hashtags such as `#guide` link to `https://www.youtube.com/hashtag/guide`. Existing URLs and Markdown links are preserved. Generated links stay intact across multi-part messages. This formatting applies to new publications, not already published posts.
+
 ## Scheduling and recovery
 
 `youtube-refresh-every-10-minutes` uses `*/10 * * * *`; the same refresh runs at worker startup. One execution ingests first, then publishes, including already pending sources when ingestion fails. Failures make the job fail/retry (three attempts, exponential backoff) while successful work remains durable. News schedules are unchanged.

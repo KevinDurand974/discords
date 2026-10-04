@@ -75,6 +75,51 @@ describe("video presentation and resources", () => {
       /\\ud[89ab][0-9a-f]{2}/i,
     );
   });
+  it("links timestamps to the video with a seconds query parameter", () => {
+    const [message] = renderVideo({
+      ...video,
+      url: `${video.url}&t=10s#chapter`,
+      description: "00:00 Intro\n03:42 Guide\n120:05 End",
+    });
+    expect(message!.components[0]!.toJSON().components[2]).toMatchObject({
+      content:
+        `[00:00](${video.url}&t=0s#chapter) Intro\n` +
+        `[03:42](${video.url}&t=222s#chapter) Guide\n` +
+        `[120:05](${video.url}&t=7205s#chapter) End`,
+    });
+  });
+  it("links hashtags without including the hash in the URL and encodes Unicode tags", () => {
+    const [message] = renderVideo({ ...video, description: "#Game_2026, #été! #ゲーム" });
+    expect(message!.components[0]!.toJSON().components[2]).toMatchObject({
+      content:
+        "[#Game_2026](https://www.youtube.com/hashtag/Game_2026), " +
+        `[#été](https://www.youtube.com/hashtag/${encodeURIComponent("été")})! ` +
+        `[#ゲーム](https://www.youtube.com/hashtag/${encodeURIComponent("ゲーム")})`,
+    });
+  });
+  it("leaves URLs, existing Markdown links, invalid times and embedded tokens untouched", () => {
+    const description =
+      "https://example.com/03:42#tag [03:42 #tag](https://example.com) " +
+      "03:60 01:02:03 word03:42 word#tag ##heading";
+    const [message] = renderVideo({ ...video, description });
+    expect(message!.components[0]!.toJSON().components[2]).toMatchObject({ content: description });
+  });
+  it("keeps generated links intact at message boundaries and respects text limits", () => {
+    const description = `${"x".repeat(2795)} 03:42 #guide `.repeat(3);
+    const messages = renderVideo({ ...video, description });
+    const chunks = messages.map((message) => {
+      const texts = message.components[0]!.toJSON().components.filter(
+        (component) => component.type === ComponentType.TextDisplay,
+      );
+      expect(texts.reduce((sum, text) => sum + text.content.length, 0)).toBeLessThanOrEqual(4000);
+      return texts[1]!.content;
+    });
+    const timestamp = `[03:42](${video.url}&t=222s)`;
+    const hashtag = "[#guide](https://www.youtube.com/hashtag/guide)";
+    expect(chunks.join("")).toBe(`${"x".repeat(2795)} ${timestamp} ${hashtag} `.repeat(3));
+    expect(chunks.filter((chunk) => chunk.includes(timestamp))).toHaveLength(3);
+    expect(chunks.filter((chunk) => chunk.includes(hashtag))).toHaveLength(3);
+  });
   it("has a readable fallback for empty descriptions", () => {
     expect(
       JSON.stringify(renderVideo({ ...video, description: "" })[0]!.components[0]!.toJSON()),

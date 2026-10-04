@@ -47,16 +47,38 @@ export function videoForumPermissions(guildId: string, botId: string, moderatorI
     { id: botId, allow: required },
   ];
 }
-export function renderVideo(video: Video) {
-  const chunks = Array.from(video.description || "No description available.").reduce<string[]>(
-    (parts, character) => {
-      const last = parts.length - 1;
-      if (parts[last]!.length + character.length > 2800) parts.push(character);
-      else parts[last] += character;
-      return parts;
-    },
-    [""],
+function descriptionChunks(description: string, videoUrl: string) {
+  // Match existing links/URLs first so their timestamps and fragments stay untouched.
+  const tokens = description.matchAll(
+    /\[[^\]\n]*\]\([^)\n]*\)|https?:\/\/[^\s<>]+|(?<![\p{L}\p{N}_:/])\d+:[0-5]\d(?![\p{L}\p{N}_:])|(?<![\p{L}\p{N}_/#])#[\p{L}\p{M}\p{N}_]+|[\s\S]/gu,
   );
+  const chunks = [""];
+  const append = (text: string) => {
+    const last = chunks.length - 1;
+    if (chunks[last]!.length + text.length > 2800) chunks.push(text);
+    else chunks[last] += text;
+  };
+  for (const [token] of tokens) {
+    let text = token;
+    if (/^\d+:[0-5]\d$/.test(token)) {
+      const [minutes, seconds] = token.split(":").map(Number);
+      const total = minutes! * 60 + seconds!;
+      if (Number.isSafeInteger(total)) {
+        const url = new URL(videoUrl);
+        url.searchParams.set("t", `${total}s`);
+        text = `[${token}](${url.href})`;
+      }
+    } else if (/^#[\p{L}\p{M}\p{N}_]+$/u.test(token)) {
+      text = `[${token}](https://www.youtube.com/hashtag/${encodeURIComponent(token.slice(1))})`;
+    }
+    // Keep generated Markdown links atomic; preserve oversized original text as Unicode chunks.
+    if (text.length > 2800) Array.from(token).forEach(append);
+    else append(text);
+  }
+  return chunks;
+}
+export function renderVideo(video: Video) {
+  const chunks = descriptionChunks(video.description || "No description available.", video.url);
   return chunks.map((description, index) => ({
     flags: MessageFlags.IsComponentsV2 as const,
     allowedMentions: { parse: [] as [] },
