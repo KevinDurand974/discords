@@ -211,13 +211,11 @@ Do not downgrade application code for older JavaScript runtimes or add polyfills
 
 ## Configuration
 
-Guild commands require `DISCORD_GUILD_ID` in the bot environment:
+Commands are registered globally using `Routes.applicationCommands`, making them available across servers and eligible for Discord's bot-profile Commands section.
 
-```env
-DISCORD_GUILD_ID=...
-```
+`DISCORD_GUILD_ID` is optional. When configured, deployment and deletion scripts also clear legacy guild-specific registrations for that server to prevent duplicates. Deployment registers global commands before clearing legacy guild commands.
 
-Declare this value in `.env.schema` and access it via `getGuildId()` in deployment and deletion scripts.
+Run `nub --cwd apps/bot run sync` to deploy commands, or `nub --cwd apps/bot run rm` to delete them.
 
 ## Naming conventions
 
