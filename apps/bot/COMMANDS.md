@@ -9,6 +9,22 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping` | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre. |
 | `/help` | Envoie toutes les commandes et leurs paramètres en MP, en Components V2 avec séparateurs entre les catégories. La liste est générée depuis le registre du bot. Aucun paramètre ni permission particulière ; les MP doivent être ouverts. |
 
+## Polls
+
+`/poll` takes **no slash-command options**. It opens one modal with five labeled fields:
+
+- **Question**: required, up to **300 characters**.
+- **Answers**: required multiline text, **one answer per line**, with **2–10 distinct answers** of up to **55 characters** each. Whitespace is trimmed and empty lines are ignored.
+- **Duration in hours**: a whole number from **1 to 768** (32 days), prefilled with **24**; leaving it empty also defaults to 24.
+- **Voting mode**: a dropdown for **Single choice** (default) or **Multiple choice**.
+- **Post in channel**: a required channel selector, with the current channel preselected when supported.
+
+Submitting the modal creates a **native Discord poll**, not a reaction-based poll, publicly in the selected destination. Text channels, announcement channels, and active threads are supported. The private processing response is deleted after successful publication, leaving only the poll. Creation errors remain visible privately. The command has no default member-permission restriction in Discord's command picker; permissions are checked in the destination when it runs. Both the user and bot need **View Channel**, **Send Polls**, and **Send Messages** (or **Send Messages in Threads**) in the destination. Archived or locked threads are rejected. In private threads, both the user and bot must be thread members or have **Manage Threads**. Discord handles voting, results, and automatic expiry; no reactions, extra gateway intents, or database migration are needed.
+
+Closing the modal without submitting does not publish anything. Only the user who opened the form can submit it; permissions are checked again at submission.
+
+Deploy/restart the updated bot, then run `nub --cwd apps/bot run sync` to remove the old slash options and register the modal-based `/poll`. Reload the Discord client with **Ctrl+R** if it still shows the old definition.
+
 ## Solo Leveling: ARISE
 
 | Commande | Description |
@@ -58,6 +74,8 @@ Un seul forum YouTube est utilisé par serveur. Le choix effectué est conservé
 ## Mise à jour des commandes Discord
 
 Après déploiement du code, synchroniser les commandes du serveur avec `nub --cwd apps/bot run sync`. Cette opération contacte Discord et remplace les définitions enregistrées, notamment `/videos` par `/youtube` et `/setup news …` par `/sla news …`.
+
+To inspect the definitions actually stored by Discord without changing them, run `nub --cwd apps/bot src/scripts/check-commands.ts`. It lists global and configured-server commands, their default permissions, contexts and installation types, and reports any missing local commands. Command registration does not confirm that a particular user's Discord client shows the command: server integration overrides and channel permissions can still restrict access.
 
 ## Références
 

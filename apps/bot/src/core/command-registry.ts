@@ -10,6 +10,8 @@ import { redeemComponentHandler } from "@/features/sla/redeem.ts";
 import { setupCommand, setupComponentHandler } from "@/features/setup/setup.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
+import { pollCommand } from "@/features/polls/poll.command.ts";
+import { pollComponentHandler } from "@/features/polls/poll-modal.ts";
 import { createHelpCommand } from "@/features/utility/help.command.ts";
 
 export const helpCommand = createHelpCommand(() => commands);
@@ -20,6 +22,7 @@ export const commands: readonly CommandDefinition[] = [
   pingCommand,
   helpCommand,
   youtubeCommand,
+  pollCommand,
 ];
 
 export const componentHandlers: readonly ComponentHandler[] = [
@@ -29,4 +32,5 @@ export const componentHandlers: readonly ComponentHandler[] = [
   setupComponentHandler,
   newsCleanComponentHandler,
   youtubeComponentHandler,
+  pollComponentHandler,
 ];
