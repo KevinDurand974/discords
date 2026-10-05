@@ -9,6 +9,8 @@ It schedules two jobs every 30 minutes and once at worker start:
 
 It also schedules `youtube-refresh` every **10 minutes** and at startup. This single job ingests YouTube RSS sources first, then publishes stored pending videos through the bot, even when some ingestion fails. Incomplete work fails the job for retry; news schedules remain unchanged.
 
+It also schedules `ticket-closures` **every minute** and at startup. This uses a dedicated `discords-ticket-closures` queue and worker so long news/YouTube jobs do not block ticket checks. `/close-ticket` persists a deadline five minutes ahead in PostgreSQL; the authenticated `POST /internal/jobs/ticket-closures` bot endpoint deletes only due, still-valid tickets. Duplicate closure requests do not postpone deletion. Pending records survive restarts and failed Discord requests, and retries/next cron runs recover them. Deletion may be later during downtime, rate limiting, or a backlog, but never before the deadline. Bull Board displays both queues.
+
 The API and bot only execute their respective jobs; they contain no timers. `YOUTUBE_API_URL` optionally overrides `NEWS_API_URL` for the YouTube API. The worker never receives `YOUTUBE_API_KEY`.
 
 See [`docs/youtube-videos-operations.md`](../../docs/youtube-videos-operations.md) for rollout, commands, permissions and recovery. Unit tests: `nub --cwd apps/jobs run test`.

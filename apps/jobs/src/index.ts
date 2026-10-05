@@ -5,6 +5,7 @@ import { node } from "@elysiajs/node";
 import { Queue, Worker } from "bullmq";
 import { Elysia } from "elysia";
 import { refreshYoutube, youtubeScheduler } from "./youtube-jobs.ts";
+import { closeDueTickets, ticketClosureScheduler } from "./ticket-jobs.ts";
 
 const queueName = "discords-maintenance";
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
@@ -26,6 +27,15 @@ const connection = {
   ...(redis.protocol === "rediss:" ? { tls: {} } : {}),
 };
 const queue = new Queue(queueName, { connection });
+const ticketQueue = new Queue("discords-ticket-closures", { connection });
+const ticketWorker = new Worker(
+  "discords-ticket-closures",
+  async (job) => {
+    if (job.name !== "ticket-closures") throw new Error(`Unknown ticket job: ${job.name}`);
+    await closeDueTickets(botUrl, jobsToken);
+  },
+  { connection, concurrency: 1 },
+);
 
 const worker = new Worker(
   queueName,
@@ -48,12 +58,21 @@ const worker = new Worker(
   { connection, concurrency: 1 },
 );
 
-worker.on("completed", (job) => console.info("Job completed", { id: job.id, name: job.name }));
-worker.on("failed", (job, error) =>
-  console.error("Job failed", { id: job?.id, name: job?.name, error }),
-);
+[worker, ticketWorker].forEach((activeWorker) => {
+  activeWorker.on("completed", (job) =>
+    console.info("Job completed", { id: job.id, name: job.name }),
+  );
+  activeWorker.on("failed", (job, error) =>
+    console.error("Job failed", { id: job?.id, name: job?.name, error }),
+  );
+});
 
 await Promise.all([
+  ticketQueue.upsertJobScheduler(
+    ticketClosureScheduler.id,
+    ticketClosureScheduler.repeat,
+    ticketClosureScheduler.template,
+  ),
   queue.upsertJobScheduler(youtubeScheduler.id, youtubeScheduler.repeat, youtubeScheduler.template),
   queue.upsertJobScheduler(
     "news-ingestion-every-30-minutes",
@@ -90,11 +109,20 @@ await Promise.all([
   ),
   queue.add("news-ingestion", {}, { jobId: "startup-news-ingestion", removeOnComplete: true }),
   queue.add("news-publication", {}, { jobId: "startup-news-publication", removeOnComplete: true }),
+  ticketQueue.add(
+    "ticket-closures",
+    {},
+    {
+      ...ticketClosureScheduler.template.opts,
+      jobId: "startup-ticket-closures",
+      removeOnComplete: true,
+    },
+  ),
 ]);
 
 const serverAdapter = new ElysiaAdapter({ prefix: "/admin/queues", basePath: "/admin/queues" });
 createBullBoard({
-  queues: [new BullMQAdapter(queue)],
+  queues: [new BullMQAdapter(queue), new BullMQAdapter(ticketQueue)],
   serverAdapter,
   options: { uiBasePath: "node_modules/@bull-board/ui" },
 });
@@ -106,7 +134,8 @@ console.info(`Jobs dashboard listening on http://${dashboardHost}:${dashboardPor
 
 async function shutdown() {
   dashboard.stop();
-  await Promise.all([worker.close(), queue.close()]);
+  await Promise.all([worker.close(), ticketWorker.close()]);
+  await Promise.all([queue.close(), ticketQueue.close()]);
 }
 
 process.once("SIGINT", () => void shutdown().finally(() => process.exit(0)));

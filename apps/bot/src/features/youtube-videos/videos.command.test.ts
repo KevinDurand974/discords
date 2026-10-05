@@ -100,6 +100,8 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "help",
       "youtube",
       "poll",
+      "ticket",
+      "close-ticket",
     ]);
     expect(youtubeCommand.data.toJSON().options?.map((option) => option.name)).toEqual([
       "add",

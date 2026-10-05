@@ -11,6 +11,7 @@ import { registerInteractionRouter } from "@/core/interaction-router.ts";
 import { synchronizeNews } from "@/features/netmarble-news/news-runtime.ts";
 import { synchronizeVideos } from "@/features/youtube-videos/videos-runtime.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
+import { deleteDueTickets } from "@/features/tickets/ticket-runtime.ts";
 
 const client = createDiscordClient();
 const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
@@ -21,6 +22,7 @@ createBotHealthServer(client, process.env.DATABASE_URL, {
   token: process.env.JOBS_INTERNAL_TOKEN,
   synchronizeNews: () => synchronizeNews(client),
   synchronizeVideos: () => synchronizeVideos(client),
+  deleteDueTickets: () => deleteDueTickets(client),
 }).listen(healthPort, healthHost, () => {
   console.info(`Bot health listening on ${healthHost}:${healthPort}`);
 });

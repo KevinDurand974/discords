@@ -1,10 +1,20 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, unique, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const commandLogSettings = pgTable("command_log_settings", {
   guildId: varchar("guild_id", { length: 20 }).primaryKey(),
   channelId: varchar("channel_id", { length: 20 }).notNull(),
 });
+
+export const ticketClosures = pgTable("ticket_closures", {
+  closureId: uuid("closure_id").notNull().defaultRandom(),
+  channelId: varchar("channel_id", { length: 20 }).primaryKey(),
+  guildId: varchar("guild_id", { length: 20 }).notNull(),
+  ownerId: varchar("owner_id", { length: 20 }).notNull(),
+  requestedBy: varchar("requested_by", { length: 20 }).notNull(),
+  deleteAt: timestamp("delete_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("ticket_closures_due_idx").on(table.deleteAt)]);
 
 // Global YouTube history is independent of Discord guild subscriptions.
 export const youtubeChannels = pgTable("youtube_channels", {

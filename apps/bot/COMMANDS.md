@@ -25,6 +25,31 @@ Closing the modal without submitting does not publish anything. Only the user wh
 
 Deploy/restart the updated bot, then run `nub --cwd apps/bot run sync` to remove the old slash options and register the modal-based `/poll`. Reload the Discord client with **Ctrl+R** if it still shows the old definition.
 
+## Moderation tickets
+
+`/ticket` takes **no command options** and opens a modal with two **required** fields:
+
+- **Title**: 1–100 characters.
+- **Description**: 1–4000 characters, with multiline input.
+
+Submitting the form creates a new private text channel named `ticket-xxxxx`, using five random hexadecimal characters (for example, `ticket-a3f9c`), not the title. The first message is a **Components V2** card explaining how to close the ticket with `/close-ticket`; the bot **pins it** before posting the requester's message in a separate **Components V2** card: **title**, **description**, **separator**, then `-# Opened by <@requester>` in small text. Long descriptions continue in additional cards to respect the 4000-character combined text limit per message, preserving their order and content. These cards are not pinned and do not ping any users or roles. The requester receives a private link to the channel; this successful creation confirmation is automatically deleted after **5 seconds**, without deleting the ticket or its messages. Error responses remain visible. Whitespace-only inputs are rejected; cancelling the form creates nothing.
+
+The channel denies **View Channel** to `@everyone` and explicitly grants **View Channel**, **Send Messages**, and **Read Message History** to the **requester**, the bot, and non-managed roles with **Manage Messages** permission. Other ordinary members receive no access. `@everyone` and managed integration/bot roles are never added as moderator roles, even when they have Manage Messages. Discord server owners and administrators always retain access through Discord's permission bypass. This is a private server channel, not a group DM; moderator roles are detected at creation rather than configured separately.
+
+The bot needs **Manage Channels**, **View Channel**, **Send Messages**, **Pin Messages**, and **Read Message History**. It grants itself the permissions needed to post and pin the instructions in the new channel. If posting or pinning fails after creating the channel, it attempts to delete the incomplete channel and reports an error rather than confirming success. Ticket contents are not stored in command logs or a database.
+
+### Closing a ticket
+
+Run **`/close-ticket` inside the ticket channel** to schedule permanent deletion **5 minutes later**: **no confirmation dialog, archive, or transcript**. Only the ticket requester, moderator roles defined above, administrators, and the server owner can close it. The bot needs **Manage Channels** in the ticket channel. Closing and reopening do not modify channel permissions; members can continue writing during the countdown. A **public Components V2 message** in the ticket channel confirms the persisted deadline and includes an **ActionRow** with **Close now** (immediate permanent deletion) and **Reopen** (cancel the pending deletion, keep the channel open). Only the requester, moderators, administrators, and server owner can use these buttons. Reopening cancels the pending deletion and deletes the closure notice, without posting a replacement message. Repeated closure calls preserve the original deadline and requester instead of postponing deletion.
+
+Pending deletion metadata (guild, channel, owner, closing user, and deadline—not the title or description) is stored in PostgreSQL in `ticket_closures`, so it survives bot and worker restarts. The jobs worker runs `ticket-closures` every minute and at startup on its own `discords-ticket-closures` queue, separate from news/YouTube work. The bot contains no timer. Deletion happens **no earlier than 5 minutes**, usually within the following minute while services are healthy. Downtime, Discord rate limits, or large backlogs can delay it. Overdue requests are processed on recovery; already-deleted channels are safely cleared. Failed deletions remain pending for subsequent runs, and advisory locks serialize cron deletions, scheduling, and button actions for the same ticket. Each pending closure has a unique ID, so old buttons cannot cancel or delete a ticket after it has been reopened and closed again. Reopening does not require **Manage Roles** or **Manage Channels**; immediate deletion requires **Manage Channels**.
+
+Discord may suggest `/close-ticket` elsewhere, but the bot refuses to delete anything outside a ticket text channel. It checks both the `ticket-` name prefix and the exact requester marker in the channel topic, so a name alone is not enough. The marker persists across bot restarts and also recognizes tickets created with the previous title-based naming scheme. Do not remove or change the ticket name prefix or topic marker while deletion is pending: the worker rechecks the ticket type, server, owner marker, and bot permissions before deleting it, and refuses unsafe deletion if they changed. Treat the marker as reserved bot metadata; staff who can edit channel topics can also repurpose it. Moderators can always delete a channel using Discord's normal controls.
+
+There is no `!close` message listener; slash commands do not require the privileged **Message Content** intent.
+
+Apply the migration with `nub run db:migrate`, then restart/deploy **both bot and jobs worker** with PostgreSQL, Redis, and the same `JOBS_INTERNAL_TOKEN`. Run `nub --cwd apps/bot run sync` to register `/ticket` and `/close-ticket` (or update the closure command description). Reload Discord with **Ctrl+R** if it does not appear immediately.
+
 ## Solo Leveling: ARISE
 
 | Commande | Description |

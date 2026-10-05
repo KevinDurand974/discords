@@ -1,0 +1,2104 @@
+{
+  "version": "8",
+  "dialect": "postgres",
+  "id": "0eb93fa9-be48-4815-a91a-58b215828a9e",
+  "prevIds": [
+    "2c77b7ff-8970-4ac6-85ad-ecd41b09c585"
+  ],
+  "ddl": [
+    {
+      "isRlsEnabled": false,
+      "name": "command_log_settings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_articles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_news_categories",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "netmarble_news_settings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "news_categories",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "source_article_media",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "source_articles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "ticket_closures",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_channels",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_forum_settings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_publication_intents",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_subscriptions",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_video_publications",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "youtube_videos",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "command_log_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "command_log_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_article_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sync_state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_source_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_discord_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "first_seen_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tag_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "notification_role_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "forum_channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "enabled",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "30",
+      "generated": null,
+      "identity": null,
+      "name": "poll_interval_minutes",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'backfill'",
+      "generated": null,
+      "identity": null,
+      "name": "initial_import_mode",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "10",
+      "generated": null,
+      "identity": null,
+      "name": "initial_backfill_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "initial_import_completed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "initial_source_created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "initial_source_article_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_synced_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "article_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "position",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "original_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "media_type",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "filename",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "menu_seq",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "excerpt",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "body_html",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thumbnail_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "canonical_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "false",
+      "generated": null,
+      "identity": null,
+      "name": "is_source_pinned",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "ingested_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "owner_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "requested_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "delete_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "type": "varchar(24)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "canonical_url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "handle",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "display_name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_attempted_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_synced_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "forum_channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "1",
+      "generated": null,
+      "identity": null,
+      "name": "forum_generation",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "'disabled'",
+      "generated": null,
+      "identity": null,
+      "name": "lifecycle",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "owns_forum",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "varchar(24)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "varchar(11)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "video_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "forum_generation",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "mode",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "starter_message_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "0",
+      "generated": null,
+      "identity": null,
+      "name": "attempts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "last_error",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "varchar(24)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "tag_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "owns_tag",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "true",
+      "generated": null,
+      "identity": null,
+      "name": "enabled",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "10",
+      "generated": null,
+      "identity": null,
+      "name": "initial_backfill_count",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "initial_import_completed_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "guild_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "varchar(24)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "varchar(11)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "video_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "forum_generation",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "varchar(20)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "starter_message_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "type": "varchar(11)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "video_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "varchar(24)",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_entry_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "url",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "description",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "source_updated_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "first_seen_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": "now()",
+      "generated": null,
+      "identity": null,
+      "name": "last_seen_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "menu_seq",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "created_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "id",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "source_articles_menu_date_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "delete_at",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "ticket_closures_due_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "ticket_closures"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "guild_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "state",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "youtube_publication_intents_guild_state_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "channel_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "enabled",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "youtube_subscriptions_channel_enabled_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "channel_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "published_at",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "video_id",
+          "isExpression": false,
+          "asc": false,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "youtube_videos_channel_date_id_idx",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "netmarble_news_settings",
+      "columnsTo": [
+        "guild_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "netmarble_articles_8xOa7mup0VOf_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "source_article_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "source_articles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_articles_source_article_id_source_articles_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_articles_menu_seq_news_categories_menu_seq_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "netmarble_news_settings",
+      "columnsTo": [
+        "guild_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "netmarble_news_categories_wk0FZ4hZurC2_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "netmarble_news_categories_v0glLGw6YzdU_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "article_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "source_articles",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "source_article_media_article_id_source_articles_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "menu_seq"
+      ],
+      "schemaTo": "public",
+      "tableTo": "news_categories",
+      "columnsTo": [
+        "menu_seq"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "source_articles_menu_seq_news_categories_menu_seq_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "source_articles"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id",
+        "channel_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_subscriptions",
+      "columnsTo": [
+        "guild_id",
+        "channel_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "youtube_publication_intents_RWwAZRz1RtDZ_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "channel_id",
+        "video_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_videos",
+      "columnsTo": [
+        "channel_id",
+        "video_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "youtube_publication_intents_R5F5KLvl4fmp_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_forum_settings",
+      "columnsTo": [
+        "guild_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "youtube_subscriptions_nMBvq1UyipJ4_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "channel_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_channels",
+      "columnsTo": [
+        "channel_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "youtube_subscriptions_N8R2yMta9n9T_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "guild_id",
+        "channel_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_subscriptions",
+      "columnsTo": [
+        "guild_id",
+        "channel_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "name": "youtube_video_publications_J6J968uIi5PC_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "channel_id",
+        "video_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_videos",
+      "columnsTo": [
+        "channel_id",
+        "video_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "youtube_video_publications_2YI8vAsiUWcG_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "channel_id"
+      ],
+      "schemaTo": "public",
+      "tableTo": "youtube_channels",
+      "columnsTo": [
+        "channel_id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "name": "youtube_videos_channel_id_youtube_channels_channel_id_fkey",
+      "entityType": "fks",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "source_article_id"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_articles_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "menu_seq"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_news_categories_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "netmarble_news_categories"
+    },
+    {
+      "columns": [
+        "article_id",
+        "position"
+      ],
+      "nameExplicit": false,
+      "name": "source_article_media_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "video_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_publication_intents_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "channel_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_subscriptions_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "columns": [
+        "guild_id",
+        "video_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_video_publications_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "columns": [
+        "guild_id"
+      ],
+      "nameExplicit": false,
+      "name": "command_log_settings_pkey",
+      "schema": "public",
+      "table": "command_log_settings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "guild_id"
+      ],
+      "nameExplicit": false,
+      "name": "netmarble_news_settings_pkey",
+      "schema": "public",
+      "table": "netmarble_news_settings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "menu_seq"
+      ],
+      "nameExplicit": false,
+      "name": "news_categories_pkey",
+      "schema": "public",
+      "table": "news_categories",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "source_articles_pkey",
+      "schema": "public",
+      "table": "source_articles",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "channel_id"
+      ],
+      "nameExplicit": false,
+      "name": "ticket_closures_pkey",
+      "schema": "public",
+      "table": "ticket_closures",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "channel_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_channels_pkey",
+      "schema": "public",
+      "table": "youtube_channels",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "guild_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_forum_settings_pkey",
+      "schema": "public",
+      "table": "youtube_forum_settings",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "video_id"
+      ],
+      "nameExplicit": false,
+      "name": "youtube_videos_pkey",
+      "schema": "public",
+      "table": "youtube_videos",
+      "entityType": "pks"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "thread_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "netmarble_articles_thread_id_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "guild_id",
+        "tag_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "youtube_subscriptions_guild_tag_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        "channel_id",
+        "video_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "youtube_videos_channel_video_unique",
+      "entityType": "uniques",
+      "schema": "public",
+      "table": "youtube_videos"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "thread_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "youtube_video_publications_thread_id_key",
+      "schema": "public",
+      "table": "youtube_video_publications",
+      "entityType": "uniques"
+    },
+    {
+      "nameExplicit": false,
+      "columns": [
+        "source_entry_id"
+      ],
+      "nullsNotDistinct": false,
+      "name": "youtube_videos_source_entry_id_key",
+      "schema": "public",
+      "table": "youtube_videos",
+      "entityType": "uniques"
+    },
+    {
+      "value": "\"sync_state\" = 'published'",
+      "name": "netmarble_articles_sync_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "value": "\"thread_id\" IS NOT NULL AND \"published_at\" IS NOT NULL",
+      "name": "netmarble_articles_publication_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_articles"
+    },
+    {
+      "value": "\"poll_interval_minutes\" > 0",
+      "name": "netmarble_news_settings_poll_interval_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"initial_import_mode\" IN ('backfill', 'future_only')",
+      "name": "netmarble_news_settings_import_mode_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"initial_backfill_count\" BETWEEN 0 AND 50",
+      "name": "netmarble_news_settings_backfill_count_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "netmarble_news_settings"
+    },
+    {
+      "value": "\"menu_seq\" IN (1, 13, 14, 32, 46)",
+      "name": "news_categories_menu_seq_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "news_categories"
+    },
+    {
+      "value": "\"position\" >= 0",
+      "name": "source_article_media_position_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "source_article_media"
+    },
+    {
+      "value": "\"channel_id\" ~ '^UC[A-Za-z0-9_-]{22}$'",
+      "name": "youtube_channels_id_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_channels"
+    },
+    {
+      "value": "\"forum_generation\" > 0",
+      "name": "youtube_forum_settings_generation_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "value": "\"lifecycle\" IN ('active', 'disabled', 'cleaning')",
+      "name": "youtube_forum_settings_lifecycle_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "value": "\"lifecycle\" <> 'active' OR \"forum_channel_id\" IS NOT NULL",
+      "name": "youtube_forum_settings_active_forum_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_forum_settings"
+    },
+    {
+      "value": "\"state\" IN ('excluded', 'pending', 'in_progress', 'published', 'needs_reconciliation')",
+      "name": "youtube_publication_intents_state_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "value": "\"mode\" IN ('initial', 'live', 'backfill')",
+      "name": "youtube_publication_intents_mode_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "value": "\"attempts\" >= 0 AND \"forum_generation\" > 0",
+      "name": "youtube_publication_intents_attempts_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "value": "\"state\" <> 'published' OR (\"thread_id\" IS NOT NULL AND \"starter_message_id\" IS NOT NULL)",
+      "name": "youtube_publication_intents_published_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_publication_intents"
+    },
+    {
+      "value": "\"initial_backfill_count\" BETWEEN 0 AND 15",
+      "name": "youtube_subscriptions_backfill_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_subscriptions"
+    },
+    {
+      "value": "\"forum_generation\" > 0",
+      "name": "youtube_video_publications_generation_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_video_publications"
+    },
+    {
+      "value": "\"video_id\" ~ '^[A-Za-z0-9_-]{11}$'",
+      "name": "youtube_videos_id_check",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "youtube_videos"
+    }
+  ],
+  "renames": []
+}

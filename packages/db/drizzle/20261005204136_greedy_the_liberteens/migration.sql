@@ -1,0 +1,1 @@
+ALTER TABLE "ticket_closures" ADD COLUMN "closure_id" uuid DEFAULT gen_random_uuid() NOT NULL;
