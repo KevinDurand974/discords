@@ -169,7 +169,15 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
     ],
   });
 }
+export const youtubeHelpDescription = [
+  "add: Opens a creator (URL, handle or channel ID) and forum-selection modal. Backfill count is 0–15, default 10; 0 follows only future videos. No forum is created implicitly.",
+  "status: Shows the configured forum, followed creators and publication status. sync: Publishes already-collected pending videos; does not trigger fresh RSS collection.",
+  "Requires Manage Messages, administrator access or server ownership. One forum is used per server; changing it while creators are followed requires removing that tracking first with /setup clean. User-owned forum permissions are not rewritten.",
+  "Example: `/youtube add backfill-count:10`",
+] as const;
+
 export const youtubeCommand = {
+  helpDescription: youtubeHelpDescription,
   data: new SlashCommandBuilder()
     .setName("youtube")
     .setDescription("Track YouTube guide videos")

@@ -29,6 +29,7 @@ export type CommandExecutionContext = {
 
 export type CommandDefinition = {
   data: SlashCommandBuilder | SlashCommandOptionsOnlyBuilder | SlashCommandSubcommandsOnlyBuilder;
+  helpDescription?: readonly string[];
   autocomplete?(interaction: AutocompleteInteraction): Promise<void>;
   execute(
     interaction: ChatInputCommandInteraction,

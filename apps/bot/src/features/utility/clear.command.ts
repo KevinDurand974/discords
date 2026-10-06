@@ -8,7 +8,15 @@ import {
 import type { CommandDefinition } from "@/core/command.ts";
 import { clearMessages, parseClearDuration } from "./clear-messages.ts";
 
+export const clearHelpDescription = [
+  "Deletes 1–100 messages; count defaults to 10. Channel defaults to the current channel. With user, searches only the latest 100 messages for that user's messages. Reports the actual deletion count privately.",
+  "Messages 14 days old or older are skipped. Duration accepts a positive whole number followed by m, h, d or w, up to 14 days (20160m, 336h, 14d or 2w). A duration filters candidates; it does not delete every message in that period.",
+  "Server only: text/announcement channels and active unlocked threads. You need View Channel and Manage Messages in the destination; the bot also needs Read Message History. Both need membership or Manage Threads in private threads.",
+  "Example: `/clear count:100 duration:6h channel:#general`",
+] as const;
+
 export const clearCommand = {
+  helpDescription: clearHelpDescription,
   data: new SlashCommandBuilder()
     .setName("clear")
     .setDescription("Delete recent messages in a channel (up to 14 days old)")

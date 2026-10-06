@@ -1,16 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  ApplicationCommandOptionType,
   ComponentType,
+  type AutocompleteInteraction,
   MessageFlags,
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
 } from "discord.js";
 import { commands, helpCommand } from "@/core/command-registry.ts";
 import type { CommandDefinition, CommandExecutionContext } from "@/core/command.ts";
-import { createHelpCommand, renderHelp } from "./help.command.ts";
+import { createHelpCommand, renderCommandHelp, renderHelp } from "./help.command.ts";
 
-function renderedText(definitions: readonly CommandDefinition[]) {
-  return renderHelp(definitions)
+function renderedText(definitions: readonly CommandDefinition[], name?: string) {
+  return (name === undefined ? renderHelp(definitions) : renderCommandHelp(definitions, name))
     .flatMap((page) =>
       page.components[0]!.toJSON().components.flatMap((component) =>
         component.type === ComponentType.TextDisplay ? [component.content] : [],
@@ -18,8 +20,9 @@ function renderedText(definitions: readonly CommandDefinition[]) {
     )
     .join("\n");
 }
-function interaction() {
+function interaction(selected: string | null = null) {
   return {
+    options: { getString: vi.fn(() => selected) },
     deferReply: vi.fn(),
     editReply: vi.fn(),
     user: { send: vi.fn<(message: unknown) => Promise<void>>(async () => {}) },
@@ -27,10 +30,13 @@ function interaction() {
 }
 const context = {} as CommandExecutionContext;
 describe("/help", () => {
-  it("is registered with no parameters or default permission restrictions", () => {
+  it("is registered with one optional autocompleted command and no default permission restrictions", () => {
     expect(commands).toContain(helpCommand);
     expect(helpCommand.data.toJSON().name).toBe("help");
-    expect(helpCommand.data.toJSON().options ?? []).toEqual([]);
+    expect(helpCommand.data.toJSON().options).toMatchObject([
+      { name: "command", type: ApplicationCommandOptionType.String, autocomplete: true },
+    ]);
+    expect(helpCommand.data.toJSON().options?.[0]?.required).not.toBe(true);
     expect(helpCommand.data.toJSON().default_member_permissions).toBeUndefined();
   });
   it("lists every registered command and nested subcommand using the current registry", () => {
@@ -146,6 +152,127 @@ describe("/help", () => {
     expect(request.editReply).not.toHaveBeenCalledWith(
       "The command list has been sent to you by DM.",
     );
+  });
+  it("offers every root command except help in autocomplete", async () => {
+    const respond = vi.fn();
+    await helpCommand.autocomplete!({
+      options: { getFocused: () => "" },
+      respond,
+    } as unknown as AutocompleteInteraction);
+    expect(respond).toHaveBeenCalledWith(
+      commands
+        .filter(({ data }) => data.name !== "help")
+        .map(({ data }) => ({ name: `/${data.name}`, value: data.name })),
+    );
+    expect(respond.mock.calls[0]![0]).not.toContainEqual(
+      expect.objectContaining({ value: "help" }),
+    );
+  });
+  it("filters autocomplete case-insensitively and limits suggestions to 25", async () => {
+    const definitions = Array.from({ length: 30 }, (_, index) => ({
+      data: new SlashCommandBuilder().setName(`test-${index}`).setDescription("Test"),
+      execute: vi.fn(),
+    }));
+    const command = createHelpCommand(() => definitions);
+    const respond = vi.fn();
+    await command.autocomplete!({
+      options: { getFocused: () => "/TEST" },
+      respond,
+    } as unknown as AutocompleteInteraction);
+    expect(respond.mock.calls[0]![0]).toHaveLength(25);
+    await helpCommand.autocomplete!({
+      options: { getFocused: () => "does-not-exist" },
+      respond,
+    } as unknown as AutocompleteInteraction);
+    expect(respond).toHaveBeenLastCalledWith([]);
+  });
+  it("documents every current command with extended feature-specific descriptions", () => {
+    commands
+      .filter(({ data }) => data.name !== "help")
+      .forEach(({ data, helpDescription }) => {
+        expect(helpDescription?.length).toBeGreaterThan(0);
+        const text = renderedText(commands, data.name);
+        expect(text).toContain(`/${data.name} — detailed help`);
+        expect(text).toContain(helpDescription![0]);
+        expect(data.toJSON()).not.toHaveProperty("helpDescription");
+      });
+    const clear = renderedText(commands, "clear");
+    expect(clear).toContain("count defaults to 10");
+    expect(clear).toContain("maximum: 100");
+    expect(clear).toContain("14 days old or older");
+    expect(clear).toContain("Manage Messages");
+    expect(clear).toContain("**channel** (optional)");
+    expect(clear).not.toContain("## /coinflip");
+    expect(renderedText(commands, "sla")).toContain("/sla news backfill");
+  });
+  it("reads detailed descriptions from command definitions, including commands registered later", async () => {
+    const definitions: CommandDefinition[] = [];
+    const command = createHelpCommand(() => definitions);
+    definitions.push({
+      data: new SlashCommandBuilder().setName("later").setDescription("Short description"),
+      helpDescription: ["A detailed description owned by this command.", "Example: `/later`"],
+      execute: vi.fn(),
+    });
+    const request = interaction("later");
+    await command.execute(request as unknown as ChatInputCommandInteraction, context);
+    const sent = JSON.stringify(request.user.send.mock.calls);
+    expect(sent).toContain("A detailed description owned by this command.");
+    expect(sent).toContain("Example: `/later`");
+    expect(sent).toContain("Short description");
+  });
+  it("falls back to the slash description for commands without detailed help", () => {
+    const definition: CommandDefinition = {
+      data: new SlashCommandBuilder().setName("later").setDescription("Fallback description"),
+      execute: vi.fn(),
+    };
+    expect(renderedText([definition], "later")).toContain("Fallback description");
+  });
+  it("sends selected-command help privately by DM and normalizes the command name", async () => {
+    const request = interaction(" /CLEAR ");
+    await helpCommand.execute(request as unknown as ChatInputCommandInteraction, context);
+    expect(request.options.getString).toHaveBeenCalledWith("command");
+    expect(JSON.stringify(request.user.send.mock.calls)).toContain("/clear — detailed help");
+    expect(JSON.stringify(request.user.send.mock.calls)).not.toContain("## /coinflip");
+    expect(request.editReply).toHaveBeenCalledWith(
+      "Detailed help for /clear has been sent to you by DM.",
+    );
+  });
+  it.each(["help", "unknown", ""])(
+    "rejects invalid selected command %s without sending a DM",
+    async (name) => {
+      const request = interaction(name);
+      await expect(
+        helpCommand.execute(request as unknown as ChatInputCommandInteraction, context),
+      ).rejects.toThrow("autocomplete list");
+      expect(request.user.send).not.toHaveBeenCalled();
+    },
+  );
+  it("reports blocked DMs for detailed help privately", async () => {
+    const request = interaction("pick");
+    request.user.send.mockRejectedValueOnce(new Error("Cannot send messages"));
+    await helpCommand.execute(request as unknown as ChatInputCommandInteraction, context);
+    expect(request.editReply).toHaveBeenCalledWith(
+      "Unable to send you detailed command help by DM. Make sure your direct messages are enabled, then try /help again.",
+    );
+  });
+  it("keeps detailed help within Components V2 limits", () => {
+    commands
+      .filter(({ data }) => data.name !== "help")
+      .forEach(({ data }) => {
+        renderCommandHelp(commands, data.name).forEach((page) => {
+          const components = page.components[0]!.toJSON().components;
+          expect(components.length + 1).toBeLessThanOrEqual(40);
+          expect(
+            components.reduce(
+              (length, component) =>
+                length +
+                (component.type === ComponentType.TextDisplay ? component.content.length : 0),
+              0,
+            ),
+          ).toBeLessThanOrEqual(4000);
+          expect(page.allowedMentions).toEqual({ parse: [] });
+        });
+      });
   });
   it("reads the registry at execution time, including commands registered later", async () => {
     const definitions: CommandDefinition[] = [];

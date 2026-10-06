@@ -7,7 +7,14 @@ import {
 } from "discord.js";
 import type { CommandDefinition } from "@/core/command.ts";
 
+export const slowmodeHelpDescription = [
+  "Sets slowmode in seconds, from 0 to 21600 (6 hours). Use 0 to disable it. Channel defaults to the current channel; only the selected channel is changed. Confirmation is private.",
+  "Server text or announcement channels only. Both you and the bot need Manage Channels in the destination.",
+  "Example: `/slowmode duration:30 channel:#general`",
+] as const;
+
 export const slowmodeCommand = {
+  helpDescription: slowmodeHelpDescription,
   data: new SlashCommandBuilder()
     .setName("slowmode")
     .setDescription("Set a channel's slowmode in seconds (0 to disable)")

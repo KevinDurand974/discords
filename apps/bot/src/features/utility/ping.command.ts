@@ -1,7 +1,13 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { CommandDefinition } from "@/core/command.ts";
 
+export const pingHelpDescription = [
+  "Replies privately with pong, the WebSocket ping and response latency in milliseconds. No options or special permissions are required.",
+  "Example: `/ping`",
+] as const;
+
 export const pingCommand = {
+  helpDescription: pingHelpDescription,
   data: new SlashCommandBuilder().setName("ping").setDescription("Replies with pong!"),
 
   async execute(interaction) {

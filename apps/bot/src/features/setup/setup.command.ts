@@ -110,7 +110,15 @@ const createLogChannel = async (
   });
 };
 
+export const setupHelpDescription = [
+  "logs: Select an existing text channel or omit channel to create a private command-log channel via a modal. Requires Manage Channels. Logging destinations are persisted; a deleted destination must be reconfigured.",
+  "youtube: Create or repair the default YouTube forum, without adding a creator. Requires Manage Channels or server ownership.",
+  "clean: Administrator/server-owner cleanup with a user-bound confirmation lasting 5 minutes. With tag, scopes cleanup to that creator; without tag, affects all tracked creators. Choose Videos only or Everything in scope. Deletion is permanent; user-owned forums and unrelated content are preserved.",
+  "Example: `/setup logs channel:#bot-logs`",
+] as const;
+
 export const setupCommand = {
+  helpDescription: setupHelpDescription,
   data: new SlashCommandBuilder()
     .setName("setup")
     .setDescription("Configure the bot")

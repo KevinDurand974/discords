@@ -7,7 +7,14 @@ import {
   visibilityChannelTypes,
 } from "./visibility.ts";
 
+export const visibilityHelpDescription = [
+  "Opens a modal with Default, Spoiler Channel and Age-Restricted Channel, preselecting the current setting. Channel defaults to the current channel. Nothing changes until you submit.",
+  "Changes content warnings, not role/member access permissions. Text, announcement, forum, media and voice channels are supported; threads inherit their parent's setting. Both you and the bot need View Channel and Manage Channels in the destination, checked again on submission. Confirmation is private.",
+  "Example: `/visibility channel:#general`",
+] as const;
+
 export const visibilityCommand = {
+  helpDescription: visibilityHelpDescription,
   data: new SlashCommandBuilder()
     .setName("visibility")
     .setDescription("Choose a channel's content visibility: default, spoiler or age-restricted")
