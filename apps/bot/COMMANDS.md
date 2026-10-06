@@ -9,6 +9,12 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping`  | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre.                                                                                                                                                         |
 | `/help`  | Envoie toutes les commandes et leurs paramètres en MP, en Components V2 avec séparateurs entre les catégories. La liste est générée depuis le registre du bot. Aucun paramètre ni permission particulière ; les MP doivent être ouverts. |
 
+## Coin flip
+
+`/coinflip` takes **no options** and publicly returns **Heads** with the application emoji `coinflip_1` or **Tails** with `coinflip_2`, loaded from the shared emoji cache, drawing a fresh result for each invocation with Node's **cryptographically secure `crypto.randomInt(0, 2)`**. The upper bound is exclusive, so each side has an equal chance without modulo bias. It does not use `Math.random`, require special permissions, or store results. It is also included automatically in `/help`.
+
+Restart/deploy the bot, then run `nub --cwd apps/bot run sync` to register the command.
+
 ## Clear messages
 
 `/clear [count] [user] [duration] [channel]` deletes messages in the selected text or announcement channel, or an active, unlocked thread. Optional `channel` defaults to the current channel, e.g. `/clear count:20 duration:6h channel:#general`. Only the destination is cleared; no messages are deleted in the invocation channel when a different channel is selected. `count` defaults to **10** and accepts whole numbers from **1 to 20**. With `user`, only that user's messages among the **latest 100 channel messages** are considered; otherwise, the latest `count` messages are considered. Messages **14 days old or older** are skipped because Discord does not allow bulk deletion of them. The private confirmation reports the actual number deleted, which may be lower than requested.

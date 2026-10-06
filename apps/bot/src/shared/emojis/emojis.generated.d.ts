@@ -50,6 +50,8 @@ declare type ApplicationEmoji =
   | { readonly name: "Class_Successor"; readonly id: "1552034299002495134" }
   | { readonly name: "Class_Supporter"; readonly id: "1552034300420034750" }
   | { readonly name: "Class_Tank"; readonly id: "1552034301758017586" }
+  | { readonly name: "coinflip_1"; readonly id: "1556960538884317275" }
+  | { readonly name: "coinflip_2"; readonly id: "1556960541539307571" }
   | { readonly name: "Core_Body_Baran01"; readonly id: "1552034302835826728" }
   | { readonly name: "Core_Body_Baran02"; readonly id: "1552034305599873114" }
   | { readonly name: "Core_Body_Bhaltair01"; readonly id: "1552034306870874192" }

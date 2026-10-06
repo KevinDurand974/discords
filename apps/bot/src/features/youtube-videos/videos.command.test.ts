@@ -97,6 +97,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "setup",
       "sla",
       "ping",
+      "coinflip",
       "slowmode",
       "clear",
       "visibility",

@@ -10,6 +10,7 @@ import { redeemComponentHandler } from "@/features/sla/redeem.ts";
 import { setupCommand, setupComponentHandler } from "@/features/setup/setup.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
+import { coinflipCommand } from "@/features/utility/coinflip.command.ts";
 import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
 import { clearCommand } from "@/features/utility/clear.command.ts";
 import { visibilityCommand } from "@/features/utility/visibility.command.ts";
@@ -28,6 +29,7 @@ export const commands: readonly CommandDefinition[] = [
   setupCommand,
   slaCommand,
   pingCommand,
+  coinflipCommand,
   slowmodeCommand,
   clearCommand,
   visibilityCommand,
