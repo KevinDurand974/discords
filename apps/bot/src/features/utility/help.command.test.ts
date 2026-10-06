@@ -44,7 +44,7 @@ describe("/help", () => {
     for (const path of [
       "/help",
       "/ping",
-      "/setup logs",
+      "/logs",
       "/setup youtube",
       "/setup clean",
       "/youtube add",
@@ -59,6 +59,7 @@ describe("/help", () => {
       "/sla news clean",
     ])
       expect(text).toContain(path);
+    expect(text).not.toContain("/setup logs");
     expect(text).not.toContain("/videos");
     expect(text).not.toContain("/setup news");
     expect(text).not.toContain("`/sla create ");

@@ -34,7 +34,7 @@ export const createCommandLogger = (client: Client, store: CommandLogStore): Com
           try {
             await store.clearChannel(entry.guildId, channelId);
             console.warn(
-              `[Command logger] Log channel ${channelId} for server ${entry.guildId} no longer exists. Logging disabled for that destination; run /setup logs to configure a new channel.`,
+              `[Command logger] Log channel ${channelId} for server ${entry.guildId} no longer exists. Logging disabled for that destination; run /logs to configure a new channel.`,
             );
           } catch (cleanupError) {
             console.error("[Command logger] Failed to clear deleted log channel.", cleanupError);

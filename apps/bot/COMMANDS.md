@@ -106,15 +106,15 @@ La gestion des news nécessite **Gérer les salons** ; leur suppression nécessi
 
 ## Configuration
 
-| Commande                | Description                                                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `/setup logs [channel]` | Configure le salon de logs. Permet d’utiliser un salon textuel existant ou d’en créer un via un formulaire.                                                  |
-| `/setup youtube`        | Crée ou répare le forum YouTube par défaut, sans ajouter de créateur. Réutilise le forum déjà configuré.                                                     |
-| `/setup clean [tag]`    | Nettoie les vidéos ou les ressources YouTube. Le paramètre `tag` propose la liste des tags créateurs du forum ; sans tag, tous les créateurs sont concernés. |
+| Commande             | Description                                                                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/logs [channel]`    | Configure le salon de logs. Permet d’utiliser un salon textuel existant ou d’en créer un via un formulaire.                                                  |
+| `/setup youtube`     | Crée ou répare le forum YouTube par défaut, sans ajouter de créateur. Réutilise le forum déjà configuré.                                                     |
+| `/setup clean [tag]` | Nettoie les vidéos ou les ressources YouTube. Le paramètre `tag` propose la liste des tags créateurs du forum ; sans tag, tous les créateurs sont concernés. |
 
-`/setup logs` et `/setup youtube` nécessitent **Gérer les salons** (le propriétaire peut également configurer YouTube). `/setup clean` est réservé aux **administrateurs / propriétaire**.
+`/logs` et `/setup youtube` nécessitent **Gérer les salons** (le propriétaire peut également configurer YouTube). `/setup clean` est réservé aux **administrateurs / propriétaire**.
 
-If a configured `/setup logs` destination is deleted, the next command log returning **Unknown Channel (10003)** disables that obsolete destination and prints a warning. Reconfigure it with `/setup logs channel:#your-log-channel` (or omit `channel` to create one). This logging destination is separate from the optional channel selected by `/visibility`, `/clear`, or `/slowmode`; logging failures do not fail those commands. Missing permissions and temporary errors preserve the saved logging configuration.
+`/logs [channel]` replaces `/setup logs`; the old subcommand is no longer registered. Existing saved logging destinations remain unchanged. If a configured `/logs` destination is deleted, the next command log returning **Unknown Channel (10003)** disables that obsolete destination and prints a warning. Reconfigure it with `/logs channel:#your-log-channel` (or omit `channel` to create one). This logging destination is separate from the optional channel selected by `/visibility`, `/clear`, or `/slowmode`; logging failures do not fail those commands. Missing permissions and temporary errors preserve the saved logging configuration.
 
 ### Choix de suppression YouTube
 

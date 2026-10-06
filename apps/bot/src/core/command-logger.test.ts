@@ -80,7 +80,7 @@ describe("database-backed command logger", () => {
     expect(store.clearChannel).toHaveBeenCalledExactlyOnceWith("123", "789");
     expect(send).not.toHaveBeenCalled();
     expect(errorLog).not.toHaveBeenCalled();
-    expect(warning).toHaveBeenCalledWith(expect.stringContaining("/setup logs"));
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("run /logs"));
     store.getChannel.mockResolvedValueOnce(null);
     await logger.log(entry);
     expect(fetch).toHaveBeenCalledOnce();

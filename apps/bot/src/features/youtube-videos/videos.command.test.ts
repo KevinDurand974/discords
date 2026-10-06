@@ -95,6 +95,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     expect(componentHandlers).toContain(youtubeComponentHandler);
     expect(commands.map((command) => command.data.name)).toEqual([
       "setup",
+      "logs",
       "sla",
       "ping",
       "coinflip",
@@ -122,7 +123,6 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     expect(setupCommand.data.toJSON().options?.map((option) => option.name)).toEqual([
       "youtube",
       "clean",
-      "logs",
     ]);
     expect(setupCommand.data.toJSON().options).toContainEqual(
       expect.objectContaining({

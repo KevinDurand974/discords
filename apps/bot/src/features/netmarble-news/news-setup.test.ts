@@ -62,7 +62,6 @@ describe("news Forum setup", () => {
     expect(setupCommand.data.toJSON().options?.map(({ name }) => name)).toEqual([
       "youtube",
       "clean",
-      "logs",
     ]);
     const news = slaCommand.data.toJSON().options?.find(({ name }) => name === "news");
     expect(news?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
