@@ -12,6 +12,8 @@ import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
 import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
 import { clearCommand } from "@/features/utility/clear.command.ts";
+import { visibilityCommand } from "@/features/utility/visibility.command.ts";
+import { visibilityComponentHandler } from "@/features/utility/visibility-modal.ts";
 import { pollCommand } from "@/features/polls/poll.command.ts";
 import { pollComponentHandler } from "@/features/polls/poll-modal.ts";
 import { ticketCommand } from "@/features/tickets/ticket.command.ts";
@@ -28,6 +30,7 @@ export const commands: readonly CommandDefinition[] = [
   pingCommand,
   slowmodeCommand,
   clearCommand,
+  visibilityCommand,
   helpCommand,
   youtubeCommand,
   pollCommand,
@@ -43,6 +46,7 @@ export const componentHandlers: readonly ComponentHandler[] = [
   newsCleanComponentHandler,
   youtubeComponentHandler,
   pollComponentHandler,
+  visibilityComponentHandler,
   ticketComponentHandler,
   ticketClosureComponentHandler,
 ];

@@ -99,6 +99,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "ping",
       "slowmode",
       "clear",
+      "visibility",
       "help",
       "youtube",
       "poll",

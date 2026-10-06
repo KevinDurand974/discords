@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Client } from "discord.js";
+import { DiscordAPIError, type Client } from "discord.js";
 import { createCommandLogger } from "./command-logger.ts";
 import type { CommandLogEntry } from "./command.ts";
 
@@ -18,6 +18,7 @@ function fixture() {
   const store = {
     getChannel: vi.fn().mockResolvedValue("789"),
     setChannel: vi.fn().mockResolvedValue(undefined),
+    clearChannel: vi.fn().mockResolvedValue(undefined),
   };
   return { logger: createCommandLogger(client, store), store, fetch, send };
 }
@@ -61,6 +62,89 @@ describe("database-backed command logger", () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it("disables a deleted logging destination instead of retrying Unknown Channel on every command", async () => {
+    const { logger, store, fetch, send } = fixture();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetch.mockRejectedValueOnce(
+      new DiscordAPIError(
+        { code: 10003, message: "Unknown Channel" },
+        10003,
+        404,
+        "GET",
+        "/channels/789",
+        {},
+      ),
+    );
+    await expect(logger.log({ ...entry, command: "/visibility" })).resolves.toBeUndefined();
+    expect(store.clearChannel).toHaveBeenCalledExactlyOnceWith("123", "789");
+    expect(send).not.toHaveBeenCalled();
+    expect(errorLog).not.toHaveBeenCalled();
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("/setup logs"));
+    store.getChannel.mockResolvedValueOnce(null);
+    await logger.log(entry);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("also recovers if the channel disappears between fetch and send", async () => {
+    const { logger, store, send } = fixture();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    send.mockRejectedValueOnce(
+      new DiscordAPIError(
+        { code: 10003, message: "Unknown Channel" },
+        10003,
+        404,
+        "POST",
+        "/channels/789/messages",
+        {},
+      ),
+    );
+    await expect(logger.log(entry)).resolves.toBeUndefined();
+    expect(store.clearChannel).toHaveBeenCalledExactlyOnceWith("123", "789");
+  });
+
+  it.each([50001, 50013])(
+    "keeps settings for Discord error %i instead of treating it as a deleted channel",
+    async (code) => {
+      const { logger, store, fetch } = fixture();
+      const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+      const error = new DiscordAPIError(
+        { code, message: "Missing access or permissions" },
+        code,
+        403,
+        "GET",
+        "/channels/789",
+        {},
+      );
+      fetch.mockRejectedValueOnce(error);
+      await expect(logger.log(entry)).resolves.toBeUndefined();
+      expect(store.clearChannel).not.toHaveBeenCalled();
+      expect(errorLog).toHaveBeenCalledWith("[Command logger] Failed to send command log.", error);
+    },
+  );
+
+  it("reports cleanup failures without failing the command", async () => {
+    const { logger, store, fetch } = fixture();
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    const error = new Error("database unavailable");
+    fetch.mockRejectedValueOnce(
+      new DiscordAPIError(
+        { code: 10003, message: "Unknown Channel" },
+        10003,
+        404,
+        "GET",
+        "/channels/789",
+        {},
+      ),
+    );
+    store.clearChannel.mockRejectedValueOnce(error);
+    await expect(logger.log(entry)).resolves.toBeUndefined();
+    expect(errorLog).toHaveBeenCalledWith(
+      "[Command logger] Failed to clear deleted log channel.",
+      error,
+    );
+  });
+
   it("isolates database and Discord failures from command execution", async () => {
     const { logger, store, send } = fixture();
     const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -69,5 +153,6 @@ describe("database-backed command logger", () => {
     send.mockRejectedValueOnce(new Error("Discord unavailable"));
     await expect(logger.log(entry)).resolves.toBeUndefined();
     expect(errorLog).toHaveBeenCalledTimes(2);
+    expect(store.clearChannel).not.toHaveBeenCalled();
   });
 });

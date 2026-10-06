@@ -1,10 +1,11 @@
 import { createDatabase } from "@discords/db";
-import { eq } from "@discords/db/orm";
+import { and, eq } from "@discords/db/orm";
 import { commandLogSettings } from "@discords/db/schema";
 
 export type CommandLogStore = {
   getChannel(guildId: string): Promise<string | null>;
   setChannel(guildId: string, channelId: string): Promise<void>;
+  clearChannel(guildId: string, channelId: string): Promise<void>;
 };
 
 export function createCommandLogRepository(
@@ -25,6 +26,13 @@ export function createCommandLogRepository(
         .insert(commandLogSettings)
         .values({ guildId, channelId })
         .onConflictDoUpdate({ target: commandLogSettings.guildId, set: { channelId } });
+    },
+    async clearChannel(guildId, channelId) {
+      await db
+        .delete(commandLogSettings)
+        .where(
+          and(eq(commandLogSettings.guildId, guildId), eq(commandLogSettings.channelId, channelId)),
+        );
     },
   };
 }

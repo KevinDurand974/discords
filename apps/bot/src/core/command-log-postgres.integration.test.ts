@@ -42,6 +42,20 @@ describe.skipIf(!database)("PostgreSQL command log settings", () => {
     expect(await store.getChannel(guildId)).toBe("456");
     expect(await store.getChannel(otherGuildId)).toBe("987");
   });
+
+  it("clears only the obsolete guild destination without removing a concurrently reconfigured channel", async () => {
+    const store = createCommandLogRepository(database!);
+    const reader = createCommandLogRepository(second!);
+    await store.setChannel(guildId, "old");
+    await reader.setChannel(guildId, "new");
+    await store.clearChannel(guildId, "old");
+    expect(await reader.getChannel(guildId)).toBe("new");
+    await store.clearChannel(guildId, "new");
+    expect(await reader.getChannel(guildId)).toBeNull();
+    expect(await reader.getChannel(otherGuildId)).toBe("987");
+    await store.clearChannel(guildId, "new");
+    expect(await reader.getChannel(guildId)).toBeNull();
+  });
 });
 
 it("rejects malformed legacy settings before touching the database", async () => {

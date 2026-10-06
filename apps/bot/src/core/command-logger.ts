@@ -1,5 +1,5 @@
 import type { CommandLogStore } from "./command-log-repository.ts";
-import { EmbedBuilder, type Client } from "discord.js";
+import { DiscordAPIError, EmbedBuilder, type Client } from "discord.js";
 import type { CommandLogger } from "./command.ts";
 
 export const createCommandLogger = (client: Client, store: CommandLogStore): CommandLogger => {
@@ -9,8 +9,9 @@ export const createCommandLogger = (client: Client, store: CommandLogStore): Com
     },
 
     async log(entry) {
+      let channelId: string | null = null;
       try {
-        const channelId = await store.getChannel(entry.guildId);
+        channelId = await store.getChannel(entry.guildId);
         if (!channelId) return;
         const channel = await client.channels.fetch(channelId);
         if (!channel?.isSendable()) return;
@@ -29,6 +30,17 @@ export const createCommandLogger = (client: Client, store: CommandLogStore): Com
           ],
         });
       } catch (error) {
+        if (channelId && error instanceof DiscordAPIError && error.code === 10003) {
+          try {
+            await store.clearChannel(entry.guildId, channelId);
+            console.warn(
+              `[Command logger] Log channel ${channelId} for server ${entry.guildId} no longer exists. Logging disabled for that destination; run /setup logs to configure a new channel.`,
+            );
+          } catch (cleanupError) {
+            console.error("[Command logger] Failed to clear deleted log channel.", cleanupError);
+          }
+          return;
+        }
         console.error("[Command logger] Failed to send command log.", error);
       }
     },
