@@ -9,6 +9,12 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping` | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre. |
 | `/help` | Envoie toutes les commandes et leurs paramètres en MP, en Components V2 avec séparateurs entre les catégories. La liste est générée depuis le registre du bot. Aucun paramètre ni permission particulière ; les MP doivent être ouverts. |
 
+## Slowmode
+
+`/slowmode <duration>` sets the current text or announcement channel's slowmode in **seconds**. The required duration is a whole number from **0 to 21600** (6 hours); **0 disables slowmode**. Both the user and bot need **Manage Channels** in that channel. Confirmation is private; DMs and other channel types are rejected. No database migration is needed.
+
+After deploying/restarting the bot, run `nub --cwd apps/bot run sync` to register the command.
+
 ## Polls
 
 `/poll` takes **no slash-command options**. It opens one modal with five labeled fields:

@@ -10,6 +10,7 @@ import { redeemComponentHandler } from "@/features/sla/redeem.ts";
 import { setupCommand, setupComponentHandler } from "@/features/setup/setup.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
+import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
 import { pollCommand } from "@/features/polls/poll.command.ts";
 import { pollComponentHandler } from "@/features/polls/poll-modal.ts";
 import { ticketCommand } from "@/features/tickets/ticket.command.ts";
@@ -24,6 +25,7 @@ export const commands: readonly CommandDefinition[] = [
   setupCommand,
   slaCommand,
   pingCommand,
+  slowmodeCommand,
   helpCommand,
   youtubeCommand,
   pollCommand,
