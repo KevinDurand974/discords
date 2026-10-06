@@ -17,9 +17,9 @@ export const clearCommand = {
     .addIntegerOption((option) =>
       option
         .setName("count")
-        .setDescription("Number of messages to delete, from 1 to 20 (default: 10)")
+        .setDescription("Number of messages to delete, from 1 to 100 (default: 10)")
         .setMinValue(1)
-        .setMaxValue(20),
+        .setMaxValue(100),
     )
     .addUserOption((option) =>
       option
@@ -51,8 +51,8 @@ export const clearCommand = {
     }
     const count = interaction.options.getInteger("count") ?? 10;
     const user = interaction.options.getUser("user");
-    if (!Number.isInteger(count) || count < 1 || count > 20) {
-      throw new Error("Count must be a whole number between 1 and 20.");
+    if (!Number.isInteger(count) || count < 1 || count > 100) {
+      throw new Error("Count must be a whole number between 1 and 100.");
     }
     const duration = interaction.options.getString("duration");
     const maxAgeMs = duration === null ? undefined : parseClearDuration(duration);

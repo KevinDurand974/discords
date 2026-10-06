@@ -20,7 +20,7 @@ function fixture(
   const member = { id: "moderator" };
   const bot = { id: "bot" };
   const messages = new Collection(
-    Array.from({ length: 25 }, (_, index) => [
+    Array.from({ length: Math.max(count ?? 0, 25) }, (_, index) => [
       String(index),
       {
         id: String(index),
@@ -87,7 +87,7 @@ describe("/clear", () => {
       contexts: [InteractionContextType.Guild],
       default_member_permissions: P.ManageMessages.toString(),
       options: [
-        { name: "count", type: ApplicationCommandOptionType.Integer, min_value: 1, max_value: 20 },
+        { name: "count", type: ApplicationCommandOptionType.Integer, min_value: 1, max_value: 100 },
         { name: "user", type: ApplicationCommandOptionType.User },
         { name: "duration", type: ApplicationCommandOptionType.String },
         {
@@ -106,7 +106,7 @@ describe("/clear", () => {
     expect(clearCommand.data.toJSON().options?.every((option) => !option.required)).toBe(true);
   });
 
-  it.each([null, 1, 20])(
+  it.each([null, 1, 20, 21, 100])(
     "deletes %s messages with a default of 10 and private confirmation",
     async (count) => {
       const f = fixture(count);
@@ -121,6 +121,17 @@ describe("/clear", () => {
       );
     },
   );
+
+  it("deletes up to 100 matching messages when targeting a user", async () => {
+    const f = fixture(100, "target");
+    f.messages.forEach((message) => {
+      message.author.id = "target";
+    });
+    await f.execute();
+    expect(f.channel.messages.fetch).toHaveBeenCalledWith({ limit: 100 });
+    expect(f.channel.bulkDelete).toHaveBeenCalledWith(f.messages.first(100), true);
+    expect(f.interaction.editReply).toHaveBeenCalledWith("Deleted 100 messages.");
+  });
 
   it("clears only the selected channel while combining count, user and duration", async () => {
     const origin = fixture();
@@ -269,9 +280,9 @@ describe("/clear", () => {
     );
   });
 
-  it.each([0, 21, 1.5, NaN])("rejects invalid count %s", async (count) => {
+  it.each([0, 101, 1.5, NaN])("rejects invalid count %s", async (count) => {
     const f = fixture(count);
-    await expect(f.execute()).rejects.toThrow("whole number between 1 and 20");
+    await expect(f.execute()).rejects.toThrow("whole number between 1 and 100");
     expect(f.channel.messages.fetch).not.toHaveBeenCalled();
   });
 
