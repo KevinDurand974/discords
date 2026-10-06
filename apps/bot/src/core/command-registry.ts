@@ -11,6 +11,8 @@ import { setupCommand, setupComponentHandler } from "@/features/setup/setup.comm
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
 import { coinflipCommand } from "@/features/utility/coinflip.command.ts";
+import { pickCommand } from "@/features/utility/pick.command.ts";
+import { pickComponentHandler } from "@/features/utility/pick-components.ts";
 import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
 import { clearCommand } from "@/features/utility/clear.command.ts";
 import { visibilityCommand } from "@/features/utility/visibility.command.ts";
@@ -30,6 +32,7 @@ export const commands: readonly CommandDefinition[] = [
   slaCommand,
   pingCommand,
   coinflipCommand,
+  pickCommand,
   slowmodeCommand,
   clearCommand,
   visibilityCommand,
@@ -49,6 +52,7 @@ export const componentHandlers: readonly ComponentHandler[] = [
   youtubeComponentHandler,
   pollComponentHandler,
   visibilityComponentHandler,
+  pickComponentHandler,
   ticketComponentHandler,
   ticketClosureComponentHandler,
 ];

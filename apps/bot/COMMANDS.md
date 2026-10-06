@@ -15,6 +15,14 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 
 Restart/deploy the bot, then run `nub --cwd apps/bot run sync` to register the command.
 
+## Pick an option
+
+`/pick` opens a multiline modal: **one line = one option**. Enter **2–50 options**, at most **100 characters per option** and **1500 characters total**. Blank lines are ignored and surrounding whitespace is trimmed; repeated lines count as separate entries.
+
+Submitting publicly lists the options in a **Components V2** message with a **Get result** button. Only the creator can press it to draw using **cryptographically secure `crypto.randomInt`**, never `Math.random`. Every line has the same chance. The result appears in the original message and the button is disabled; concurrent or repeated clicks retain the same result. Mentions are suppressed and option formatting is escaped.
+
+Draws expire after **15 minutes** and are kept in memory (up to **1000 active draws**), so a bot restart invalidates pending buttons. Run `/pick` again if a draw expires. Restart/deploy the bot and run `nub --cwd apps/bot run sync` to register the command.
+
 ## Clear messages
 
 `/clear [count] [user] [duration] [channel]` deletes messages in the selected text or announcement channel, or an active, unlocked thread. Optional `channel` defaults to the current channel, e.g. `/clear count:20 duration:6h channel:#general`. Only the destination is cleared; no messages are deleted in the invocation channel when a different channel is selected. `count` defaults to **10** and accepts whole numbers from **1 to 20**. With `user`, only that user's messages among the **latest 100 channel messages** are considered; otherwise, the latest `count` messages are considered. Messages **14 days old or older** are skipped because Discord does not allow bulk deletion of them. The private confirmation reports the actual number deleted, which may be lower than requested.
