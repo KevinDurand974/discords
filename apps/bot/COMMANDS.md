@@ -9,9 +9,17 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping` | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre. |
 | `/help` | Envoie toutes les commandes et leurs paramètres en MP, en Components V2 avec séparateurs entre les catégories. La liste est générée depuis le registre du bot. Aucun paramètre ni permission particulière ; les MP doivent être ouverts. |
 
+## Clear messages
+
+`/clear [count] [user] [duration] [channel]` deletes messages in the selected text or announcement channel, or an active, unlocked thread. Optional `channel` defaults to the current channel, e.g. `/clear count:20 duration:6h channel:#general`. Only the destination is cleared; no messages are deleted in the invocation channel when a different channel is selected. `count` defaults to **10** and accepts whole numbers from **1 to 20**. With `user`, only that user's messages among the **latest 100 channel messages** are considered; otherwise, the latest `count` messages are considered. Messages **14 days old or older** are skipped because Discord does not allow bulk deletion of them. The private confirmation reports the actual number deleted, which may be lower than requested.
+
+Optional `duration` limits deletion to messages newer than that period: a **positive whole number** followed by **m** (minutes), **h** (hours), **d** (days), or **w** (weeks), e.g. `/clear count:20 duration:6h` or `/clear user:@someone duration:3d`. The maximum is **14 days**, equivalent to **20160m**, **336h**, **14d**, or **2w**. Without it, the existing 14-day limit applies. Fractions, combined units (`1h30m`), zero, and values above the maximum are rejected before deletion. The count limit and latest-message scan described above still apply; this does not clear every message in the period.
+
+The user needs **View Channel** and **Manage Messages** in the destination; the bot also needs **Read Message History** there. Both must be members of a private thread or have **Manage Threads**. Permissions and private-thread access are checked in the destination before deletion. DMs, unsupported channels, and channels outside the current server are rejected. No database migration or additional gateway intent is needed. Restart/deploy the bot, then run `nub --cwd apps/bot run sync` to register the command.
+
 ## Slowmode
 
-`/slowmode <duration>` sets the current text or announcement channel's slowmode in **seconds**. The required duration is a whole number from **0 to 21600** (6 hours); **0 disables slowmode**. Both the user and bot need **Manage Channels** in that channel. Confirmation is private; DMs and other channel types are rejected. No database migration is needed.
+`/slowmode <duration> [channel]` sets a text or announcement channel's slowmode in **seconds**. Optional `channel` defaults to the current channel; for example, `/slowmode duration:30 channel:#general`. The required duration is a whole number from **0 to 21600** (6 hours); **0 disables slowmode**. Both the user and bot need **Manage Channels** in the destination, where permissions are checked before changing slowmode. Only the selected channel is changed. Confirmation is private; DMs, other channel types, and channels outside the current server are rejected. No database migration is needed.
 
 After deploying/restarting the bot, run `nub --cwd apps/bot run sync` to register the command.
 

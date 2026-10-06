@@ -10,7 +10,7 @@ import type { CommandDefinition } from "@/core/command.ts";
 export const slowmodeCommand = {
   data: new SlashCommandBuilder()
     .setName("slowmode")
-    .setDescription("Set this channel's slowmode in seconds (0 to disable)")
+    .setDescription("Set a channel's slowmode in seconds (0 to disable)")
     .setContexts(InteractionContextType.Guild)
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels)
     .addIntegerOption((option) =>
@@ -20,6 +20,12 @@ export const slowmodeCommand = {
         .setRequired(true)
         .setMinValue(0)
         .setMaxValue(21600),
+    )
+    .addChannelOption((option) =>
+      option
+        .setName("channel")
+        .setDescription("Channel to configure (default: the current channel)")
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement),
     ),
   async execute(interaction) {
     if (!interaction.inGuild() || !interaction.guild) {
@@ -30,12 +36,17 @@ export const slowmodeCommand = {
       throw new Error("Duration must be a whole number between 0 and 21600 seconds.");
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-    const channel = await interaction.guild.channels.fetch(interaction.channelId, { force: true });
+    const selectedChannel = interaction.options.getChannel("channel");
+    const channel = await interaction.guild.channels.fetch(
+      selectedChannel?.id ?? interaction.channelId,
+      { force: true },
+    );
     if (
       !channel ||
+      channel.guildId !== interaction.guild.id ||
       (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement)
     ) {
-      throw new Error("Run this command in a text or announcement channel.");
+      throw new Error("Choose a text or announcement channel in this server.");
     }
     const member = await interaction.guild.members.fetch({
       user: interaction.user.id,
@@ -50,7 +61,9 @@ export const slowmodeCommand = {
     }
     await channel.setRateLimitPerUser(duration, `Slowmode requested by ${interaction.user.id}`);
     await interaction.editReply(
-      duration === 0 ? "Slowmode disabled." : `Slowmode set to ${duration} seconds.`,
+      duration === 0
+        ? `Slowmode disabled${selectedChannel ? ` in <#${channel.id}>` : ""}.`
+        : `Slowmode set to ${duration} seconds${selectedChannel ? ` in <#${channel.id}>` : ""}.`,
     );
   },
 } satisfies CommandDefinition;
