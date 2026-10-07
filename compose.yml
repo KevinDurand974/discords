@@ -31,6 +31,7 @@ services:
     profiles: ["bot"]
     build:
       context: .
+      dockerfile: apps/bot/Dockerfile
       target: bot
     restart: unless-stopped
     environment:

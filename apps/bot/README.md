@@ -2,6 +2,44 @@
 
 On Windows, `nub run start` / `nub run dev` may launch a nested `cmd.exe` batch script even from Warp Bash. If Ctrl+C shows `Terminate batch job (Y/N)?`, type `Y` and Enter, or bypass the script shell from `apps/bot` with `nub src/index.ts` (start) or `nub watch src/index.ts` (dev). You can also use `nub run --script-shell bash start` / `nub run --script-shell bash dev` to keep the package scripts while selecting Bash explicitly.
 
+## Docker image
+
+Build from the **repository root**, like the API image:
+
+```sh
+docker build -f apps/bot/Dockerfile -t discords-bot .
+```
+
+This multi-stage image uses `ghcr.io/nubjs/nub:0.9.2-alpine`, installs dependencies from `nub.lock`, and includes the bot and shared database package, without API/jobs source. It runs as the non-root `node` user. Its entrypoint applies pending database migrations before starting the bot; migration failure exits without connecting to Discord. PostgreSQL must already exist, be reachable from inside the container, and permit migrations.
+
+Supply credentials through an untracked `.env.bot` file or your deployment's secret manager:
+
+```dotenv
+DATABASE_URL=postgresql://discords:your-password@your-postgres-host:5432/discords
+DISCORD_TOKEN=your-bot-token
+DISCORD_CLIENT_ID=your-application-id
+DISCORD_OWNER_CLIENT_ID=your-owner-id
+NEWS_API_URL=http://your-api-host:3000
+```
+
+`DISCORD_GUILD_ID`, `YOUTUBE_API_URL`, `NEWS_INTERNAL_TOKEN` and `JOBS_INTERNAL_TOKEN` are optional; configure matching internal tokens when using the API/jobs features. Do not put credentials in the image. Enable the privileged **Server Members Intent** in the Discord Developer Portal before starting the bot.
+
+```sh
+docker run --rm --name discords-bot --env-file .env.bot -v discords-bot-data:/app/apps/bot/data -p 127.0.0.1:3001:3001 discords-bot
+```
+
+Add `--network <service-network>` when PostgreSQL/API run in containers. Their hostnames must resolve within that network; the host's `localhost` is not accessible as a remote service from inside the bot container. The named volume is initialized with writable permissions for `node`; custom bind mounts must be writable by UID 1000.
+
+The image defaults to `BOT_HEALTH_HOST=0.0.0.0` and `BOT_HEALTH_PORT=3001`. Readiness checks both Discord and PostgreSQL. Change the port mapping if overriding the health port. Do not expose the internal jobs HTTP server publicly. The bot does not automatically register slash commands; deploy them explicitly:
+
+```sh
+docker run --rm --env-file .env.bot discords-bot nub --cwd apps/bot run sync
+```
+
+Add the same `--network` option for command deployment when needed. `nub run docker:bot:up` uses this Dockerfile in the existing Compose profile. Run only one gateway bot instance. The separate jobs worker still provides periodic publication and cleanup schedules.
+
+`nub run test:docker:bot` builds the image, automatically migrates an isolated empty PostgreSQL database, verifies runtime imports and aliases, writable volume permissions, health routes and the Docker healthcheck, and removes its temporary containers, volume and network. It uses dummy credentials and simulated Discord readiness: it does **not** log into Discord or send messages. Live gateway login and command behavior require real deployment credentials. The `discords-bot:test` image is retained for inspection.
+
 ## Bot invitation permissions (without Administrator)
 
 Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes. To enable all current features, select the permissions below — **do not grant Administrator**. Feature-specific permissions can be omitted when you do not use the corresponding feature.
