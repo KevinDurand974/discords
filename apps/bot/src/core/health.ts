@@ -6,6 +6,7 @@ export type BotJobHandlers = {
   synchronizeNews?: (() => Promise<void>) | undefined;
   synchronizeVideos?: (() => Promise<void>) | undefined;
   deleteDueTickets?: (() => Promise<void>) | undefined;
+  cleanupReactionRoles?: (() => Promise<void>) | undefined;
 };
 
 export function createBotHealthServer(
@@ -26,14 +27,17 @@ export function createBotHealthServer(
         "/internal/jobs/news-publication",
         "/internal/jobs/youtube-publication",
         "/internal/jobs/ticket-closures",
+        "/internal/jobs/reaction-role-cleanup",
       ].includes(request.url ?? "")
     ) {
       const synchronize =
-        request.url === "/internal/jobs/ticket-closures"
-          ? jobs.deleteDueTickets
-          : request.url === "/internal/jobs/youtube-publication"
-            ? jobs.synchronizeVideos
-            : jobs.synchronizeNews;
+        request.url === "/internal/jobs/reaction-role-cleanup"
+          ? jobs.cleanupReactionRoles
+          : request.url === "/internal/jobs/ticket-closures"
+            ? jobs.deleteDueTickets
+            : request.url === "/internal/jobs/youtube-publication"
+              ? jobs.synchronizeVideos
+              : jobs.synchronizeNews;
       if (!jobs.token || request.headers.authorization !== `Bearer ${jobs.token}`) {
         response.writeHead(401).end(JSON.stringify({ error: "Unauthorized" }));
         return;

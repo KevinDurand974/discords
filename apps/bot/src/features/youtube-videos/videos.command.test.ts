@@ -94,6 +94,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     expect(commands.map((command) => command.data.name)).toEqual([
       "logs",
       "welcome",
+      "reaction-roles",
       "rules",
       "trap",
       "untrap",

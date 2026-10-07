@@ -17,6 +17,13 @@ import { registerTrapRuntime } from "@/features/trap-bot/trap-runtime.ts";
 import { getWelcomeStore } from "@/features/welcome/welcome-repository.ts";
 import { registerWelcomeRuntime } from "@/features/welcome/welcome-runtime.ts";
 
+import { getReactionRoleStore } from "@/features/reaction-roles/reaction-role-repository.ts";
+import { registerReactionRoleRuntime } from "@/features/reaction-roles/reaction-role-runtime.ts";
+import {
+  cleanupReactionRoles,
+  registerReactionRoleCleanup,
+} from "@/features/reaction-roles/reaction-role-cleanup.ts";
+
 const client = createDiscordClient();
 const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
 const healthHost = process.env.BOT_HEALTH_HOST ?? "127.0.0.1";
@@ -27,6 +34,7 @@ createBotHealthServer(client, process.env.DATABASE_URL, {
   synchronizeNews: () => synchronizeNews(client),
   synchronizeVideos: () => synchronizeVideos(client),
   deleteDueTickets: () => deleteDueTickets(client),
+  cleanupReactionRoles: () => cleanupReactionRoles(client),
 }).listen(healthPort, healthHost, () => {
   console.info(`Bot health listening on ${healthHost}:${healthPort}`);
 });
@@ -34,6 +42,8 @@ const logDatabase = createDatabase(ENV.DATABASE_URL);
 const commandLogger = createCommandLogger(client, createCommandLogRepository(logDatabase));
 registerTrapRuntime(client, getTrapStore(), commandLogger);
 registerWelcomeRuntime(client, getWelcomeStore());
+registerReactionRoleRuntime(client, getReactionRoleStore());
+registerReactionRoleCleanup(client, getReactionRoleStore());
 const commandsByName = new Collection<string, CommandDefinition>();
 
 commands.forEach((command) => {

@@ -64,6 +64,35 @@ describe("bot health", () => {
     },
   );
 
+  it.each(["success", "failure", "unavailable"])(
+    "protects reaction role cleanup jobs and reports %s",
+    async (outcome) => {
+      const cleanupReactionRoles = vi.fn(async () => {
+        if (outcome === "failure") throw new Error("Cleanup incomplete");
+      });
+      server = createBotHealthServer({ isReady: () => true }, undefined, {
+        token: "jobs-token",
+        ...(outcome === "unavailable" ? {} : { cleanupReactionRoles }),
+      });
+      await new Promise<void>((resolve) => server!.listen(0, "127.0.0.1", resolve));
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("Expected TCP address");
+      const url = `http://127.0.0.1:${address.port}/internal/jobs/reaction-role-cleanup`;
+      expect((await fetch(url, { method: "POST" })).status).toBe(401);
+      expect(
+        (await fetch(url, { method: "POST", headers: { Authorization: "Bearer wrong-token" } }))
+          .status,
+      ).toBe(401);
+      expect(cleanupReactionRoles).not.toHaveBeenCalled();
+      expect((await fetch(url)).status).toBe(404);
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { Authorization: "Bearer jobs-token" },
+      });
+      expect(response.status).toBe(outcome === "success" ? 204 : outcome === "failure" ? 500 : 503);
+    },
+  );
+
   it("reports live before Discord connects, then becomes ready", async () => {
     let ready = false;
     server = createBotHealthServer({ isReady: () => ready }, undefined);

@@ -6,6 +6,7 @@ import { Queue, Worker } from "bullmq";
 import { Elysia } from "elysia";
 import { refreshYoutube, youtubeScheduler } from "./youtube-jobs.ts";
 import { closeDueTickets, ticketClosureScheduler } from "./ticket-jobs.ts";
+import { cleanReactionRoles, reactionRoleCleanupScheduler } from "./reaction-role-jobs.ts";
 
 const queueName = "discords-maintenance";
 const redisUrl = process.env.REDIS_URL ?? "redis://127.0.0.1:6379";
@@ -41,6 +42,7 @@ const worker = new Worker(
   queueName,
   async (job) => {
     if (job.name === "youtube-refresh") return refreshYoutube(youtubeApiUrl, botUrl, jobsToken);
+    if (job.name === "reaction-role-cleanup") return cleanReactionRoles(botUrl, jobsToken);
     const target =
       job.name === "news-ingestion"
         ? `${apiUrl}/internal/jobs/news-ingestion`
@@ -68,6 +70,11 @@ const worker = new Worker(
 });
 
 await Promise.all([
+  queue.upsertJobScheduler(
+    reactionRoleCleanupScheduler.id,
+    reactionRoleCleanupScheduler.repeat,
+    reactionRoleCleanupScheduler.template,
+  ),
   ticketQueue.upsertJobScheduler(
     ticketClosureScheduler.id,
     ticketClosureScheduler.repeat,

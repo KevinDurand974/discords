@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, foreignKey, index, integer, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, jsonb, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const commandLogSettings = pgTable("command_log_settings", {
   guildId: varchar("guild_id", { length: 20 }).primaryKey(),
@@ -11,6 +11,13 @@ export const welcomeSettings = pgTable("welcome_settings", {
   channelId: varchar("channel_id", { length: 20 }).notNull(),
   arrivalMessage: varchar("arrival_message", { length: 1000 }).notNull(),
   departureMessage: varchar("departure_message", { length: 1000 }).notNull(),
+});
+
+export const reactionRoleMessages = pgTable("reaction_role_messages", {
+  messageId: varchar("message_id", { length: 20 }).primaryKey(),
+  guildId: varchar("guild_id", { length: 20 }).notNull(),
+  channelId: varchar("channel_id", { length: 20 }).notNull(),
+  mappings: jsonb("mappings").$type<{ emoji: string; key: string; roleId: string }[]>().notNull(),
 });
 
 export const botTrapSettings = pgTable("bot_trap_settings", {

@@ -15,9 +15,10 @@ Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes.
 | **Embed Links** (`EmbedLinks`) | Send embeds in logs and publication channels. |
 | **Attach Files** (`AttachFiles`) | Upload news images and attachments. |
 | **Manage Channels** (`ManageChannels`) | Create/delete channels and forums; configure visibility and slowmode. |
-| **Manage Roles** (`ManageRoles`) | Create/assign acceptance and notification roles; configure channel permission overwrites. |
+| **Manage Roles** (`ManageRoles`) | Create/assign acceptance, notification and reaction roles; configure channel permission overwrites. |
+| **Add Reactions** (`AddReactions`) | Seed reaction-role messages with the configured emojis. |
 | **Manage Threads** (`ManageThreads`) | Manage forum posts, including locking and pinning; access private threads when needed. |
-| **Manage Messages** (`ManageMessages`) | Clear messages, replace existing rules, and delete banned users' trap messages. |
+| **Manage Messages** (`ManageMessages`) | Clear messages, replace existing rules, delete banned users' trap messages and reset/remove reaction-role clicks. |
 | **Pin Messages** (`PinMessages`) | Pin the initial ticket message. |
 | **Send Polls** (`SendPolls`) | Publish polls through `/poll`. |
 | **Ban Members** (`BanMembers`) | Ban roleless trap accounts and remove bans through `/unban`. |
@@ -26,10 +27,10 @@ Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes.
 
 **Rules ✓** is a permissionless acceptance marker; creating and assigning it requires **Manage Roles**, not additional text or voice permissions.
 
-The combined permission bitfield for this full list, **excluding Administrator**, is **`2815042093575220`**. Example invitation URL (replace `YOUR_APPLICATION_ID`):
+The combined permission bitfield for this full list, **excluding Administrator**, is **`2815042093575284`**. Example invitation URL (replace `YOUR_APPLICATION_ID`):
 
 ```text
-https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=2815042093575220
+https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=2815042093575284
 ```
 
 **Role hierarchy and channel access still apply:** place the bot's role above the roles it must assign/manage and the members it must ban. Ensure category/channel overwrites allow the relevant permissions; invitation permissions alone do not bypass a channel denial. `/youtube setup` requests a Forum directly without enforcing Community mode locally; Discord determines whether channel creation is available. Some commands are administrator-only for the **person using them**, but the **bot itself does not need Administrator**.
@@ -41,6 +42,12 @@ https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20a
 `/welcome setup` opens four fields: an optional existing text channel, a new channel name (default: `welcome`), a welcome message, and a departure message. Select a channel to reuse it; leave the selector empty to create a shared arrival/departure text channel. The new name is ignored when selecting an existing channel. Requires **Manage Server** for the caller; creation additionally requires **Manage Channels** for both caller and bot. The bot needs **View Channel** and **Send Messages** in the destination. Newly created channels use the server's default access with an explicit bot send/view overwrite; existing channels are not modified. If saving fails, the bot attempts to delete only the newly created channel. Notifications use **Components V2 containers** with a green arrival accent or muted gray departure accent, and the configured message in a Text Display. Templates accept **1–1000 characters** and support `{user}` (arrival mention, departure username), `{server}`, and `{memberCount}` (current server member count, including bots, not an all-time join number). The default welcome template includes rules/community guidance and the member count. Standalone `---` lines become native V2 **Separators** between Text Displays, including in departure messages; inline dashes remain text. Separator-only templates and more than 39 text/separator components are rejected before creating a channel. Saved custom templates are preserved; edit them via `/welcome setup` to use the new default. Only the arriving member can be pinged; role and everyone mentions are suppressed. Expanded messages are limited to 2000 characters. Run `/welcome setup` again to edit the saved settings. `/welcome reset` removes this server's saved configuration and disables notifications without deleting the channel or any messages. Reset requires Manage Server, works even when nothing is configured, and confirms privately for ten seconds. Configuration is stored per server in PostgreSQL `welcome_settings` and survives restarts.
 
 Enable **Server Members Intent** in the Developer Portal, run `nub run db:migrate`, restart/deploy the bot, then run `nub --cwd apps/bot run sync`. Existing members do not receive retroactive welcome messages. Live Discord modal rendering and membership events should be verified after deployment.
+
+## Reaction roles
+
+`/reaction-roles` requires Manage Roles and opens a **two-field modal**: destination text channel (default: current) and message content. The published message and private preview use a **Components V2 container** titled **🎭 Choose your roles**, with the entered text as the description. A separator and a text section list each `emoji → @role` mapping on the published message. The private preview offers **Add** and **Validate** buttons. Add opens an emoji text field (exactly one emoji, including combined emojis such as `❤️` and `👍🏽`) and a native role selector; no role mention needs to be typed. Unicode and available server custom emojis are supported, with up to 20 unique mappings. Validate publishes, or cancels if no reactions were added. Previews expire after 15 minutes or a restart. Each click on the published message toggles the mapped role and clears the user's reaction for the next click. Unconfigured human reactions are automatically removed, not blocked beforehand: Discord has no per-message restriction. Roles may have permissions, including Administrator; anyone who can react can obtain those permissions. The preview warns about this before publishing. Roles must still be unmanaged and below the bot/publisher's highest roles (publisher exception for server owner); @everyone is forbidden. Bot needs Manage Roles and destination View Channel, Send Messages, Read Message History, Add Reactions, Manage Messages. Caller also needs destination View Channel/Send Messages. Mention notifications are disabled. Configurations are cleaned on individual/bulk message deletion, at bot startup and by an hourly jobs-worker check; existing member roles stay unchanged. Access or network errors do not delete configurations. Restart both bot and jobs worker to activate the hourly schedule. See `COMMANDS.md` for examples.
+
+Mappings persist in PostgreSQL `reaction_role_messages`; apply `nub run db:migrate`, restart the bot and run `nub --cwd apps/bot run sync`. GuildMessageReactions intent and partials handle messages after restart without Message Content intent. Run a single gateway bot instance. Persistent messages remain; success confirmations disappear after ten seconds. Test live modal/reaction behavior after deployment.
 
 ## YouTube Latest Videos
 
