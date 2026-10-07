@@ -21,6 +21,7 @@
     "discord.js": "^14.27.0",
     "entities": "^8.1.0",
     "ofetch": "^1.5.1",
+    "p-each-series": "^3.0.0",
     "turndown": "^7.2.4"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@ import { clearMessages, parseClearDuration } from "./clear-messages.ts";
 
 export const clearHelpDescription = [
   "Deletes 1–100 messages; count defaults to 10. Channel defaults to the current channel. With user, searches only the latest 100 messages for that user's messages. Reports the actual deletion count privately.",
-  "Messages 14 days old or older are skipped. Duration accepts a positive whole number followed by m, h, d or w, up to 14 days (20160m, 336h, 14d or 2w). A duration filters candidates; it does not delete every message in that period.",
+  "Recent messages are bulk-deleted; messages 14 days old or older are deleted sequentially, which can take longer. Duration accepts a positive whole number followed by m, h, d or w, including periods beyond 14 days. A duration filters candidates; it does not delete every message in that period.",
   "Server only: text/announcement channels and active unlocked threads. You need View Channel and Manage Messages in the destination; the bot also needs Read Message History. Both need membership or Manage Threads in private threads.",
   "Example: `/clear count:100 duration:6h channel:#general`",
 ] as const;
@@ -19,7 +19,7 @@ export const clearCommand = {
   helpDescription: clearHelpDescription,
   data: new SlashCommandBuilder()
     .setName("clear")
-    .setDescription("Delete recent messages in a channel (up to 14 days old)")
+    .setDescription("Delete messages in a channel, including messages older than 14 days")
     .setContexts(InteractionContextType.Guild)
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
     .addIntegerOption((option) =>
@@ -37,9 +37,7 @@ export const clearCommand = {
     .addStringOption((option) =>
       option
         .setName("duration")
-        .setDescription(
-          "Only delete messages from this period: 30m, 6h, 3d, 2w (maximum: 14 days)",
-        ),
+        .setDescription("Only delete messages from this period: 30m, 6h, 3d, 2w, 30d"),
     )
     .addChannelOption((option) =>
       option
@@ -127,7 +125,7 @@ export const clearCommand = {
     await interaction.editReply(
       deleted === 0
         ? duration === null
-          ? "No matching messages under 14 days old were found."
+          ? "No matching messages were found."
           : "No matching messages within the requested duration were found."
         : `Deleted ${deleted} message${deleted === 1 ? "" : "s"}${selectedChannel ? ` in <#${channel.id}>` : ""}.`,
     );

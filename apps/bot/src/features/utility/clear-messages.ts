@@ -1,4 +1,11 @@
-import type { NewsChannel, TextChannel, ThreadChannel } from "discord.js";
+import {
+  DiscordAPIError,
+  RESTJSONErrorCodes,
+  type NewsChannel,
+  type TextChannel,
+  type ThreadChannel,
+} from "discord.js";
+import pEachSeries from "p-each-series";
 
 export const MAX_CLEAR_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
@@ -18,9 +25,9 @@ export function parseClearDuration(value: string): number {
   }
   const amount = Number(match[1]);
   const duration = amount * DURATION_UNITS[match[2] as keyof typeof DURATION_UNITS];
-  if (!Number.isSafeInteger(amount) || amount < 1 || duration > MAX_CLEAR_AGE_MS) {
+  if (!Number.isSafeInteger(amount) || amount < 1 || !Number.isSafeInteger(duration)) {
     throw new Error(
-      "Duration must be positive and cannot exceed 14 days (20160m, 336h, 14d or 2w).",
+      "Duration must be positive and represent a safe integer number of milliseconds.",
     );
   }
   return duration;
@@ -30,16 +37,37 @@ export async function clearMessages(
   channel: TextChannel | NewsChannel | ThreadChannel,
   count: number,
   userId?: string,
-  maxAgeMs = MAX_CLEAR_AGE_MS,
+  maxAgeMs?: number,
 ): Promise<number> {
   const messages = await channel.messages.fetch({ limit: userId ? 100 : count });
-  const cutoff = Date.now() - Math.min(maxAgeMs, MAX_CLEAR_AGE_MS);
+  const cutoff = maxAgeMs === undefined ? -Infinity : Date.now() - maxAgeMs;
   const selected = messages
     .filter(
       (message) => (!userId || message.author.id === userId) && message.createdTimestamp > cutoff,
     )
     .first(count);
   if (selected.length === 0) return 0;
-  const deleted = await channel.bulkDelete(selected, true);
-  return deleted.size;
+  const bulkCutoff = Date.now() - MAX_CLEAR_AGE_MS;
+  const recent = selected.filter((message) => message.createdTimestamp > bulkCutoff);
+  const bulkDeleted =
+    recent.length === 0 ? new Map<string, unknown>() : await channel.bulkDelete(recent, true);
+  let deletedCount = bulkDeleted.size;
+  await pEachSeries(
+    selected.filter((message) => !bulkDeleted.has(message.id)),
+    async (message) => {
+      try {
+        await message.delete();
+        deletedCount += 1;
+      } catch (error) {
+        if (error instanceof DiscordAPIError && error.code === RESTJSONErrorCodes.UnknownMessage)
+          return;
+        if (deletedCount === 0) throw error;
+        throw new Error(
+          `Deleted ${deletedCount} message${deletedCount === 1 ? "" : "s"}, but could not delete the remaining messages.`,
+          { cause: error },
+        );
+      }
+    },
+  );
+  return deletedCount;
 }

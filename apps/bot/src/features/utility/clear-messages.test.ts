@@ -15,6 +15,11 @@ describe("clear duration", () => {
     ["336h", MAX_CLEAR_AGE_MS],
     ["14d", MAX_CLEAR_AGE_MS],
     ["2w", MAX_CLEAR_AGE_MS],
+    ["15d", 15 * 24 * 60 * 60_000],
+    ["3w", 21 * 24 * 60 * 60_000],
+    ["30d", 30 * 24 * 60 * 60_000],
+    ["337h", 337 * 60 * 60_000],
+    ["20161m", 20161 * 60_000],
   ] as const)("parses %s as %i milliseconds", (input, expected) => {
     expect(parseClearDuration(input)).toBe(expected);
   });
@@ -29,10 +34,7 @@ describe("clear duration", () => {
     "1",
     "1h30m",
     "1 h",
-    "20161m",
-    "337h",
-    "15d",
-    "3w",
+    "9007199254740991w",
     "9999999999999999999999999m",
   ])("rejects malformed, nonpositive or excessive duration %s", (input) => {
     expect(() => parseClearDuration(input)).toThrow("Duration must");

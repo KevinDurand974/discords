@@ -63,6 +63,9 @@ importers:
       ofetch:
         specifier: ^1.5.1
         version: 1.5.1
+      p-each-series:
+        specifier: ^3.0.0
+        version: 3.0.0
       turndown:
         specifier: ^7.2.4
         version: 7.2.4
@@ -1578,6 +1581,10 @@ packages:
       vite-plus:
         optional: true
 
+  p-each-series@3.0.0:
+    resolution: {integrity: sha512-lastgtAdoH9YaLyDa5i5z64q+kzOcQHsQ5SsZJD3q0VEyI8mq872S3geuNbRUQLVAE9siMfgKrpj7MloKFHruw==}
+    engines: {node: '>=12'}
+
   path-expression-matcher@1.6.2:
     resolution: {integrity: sha512-enSlaiat05iasnzmgNxRj8reFdj3puY2QpNgP1aPIaVfT6nn9ICuPoFlKHk8EN22HcwewshO+mN2DGbkCEOtqQ==}
     engines: {node: '>=14.0.0'}
@@ -2750,6 +2757,8 @@ snapshots:
       '@oxlint/binding-win32-arm64-msvc': 1.83.0
       '@oxlint/binding-win32-ia32-msvc': 1.83.0
       '@oxlint/binding-win32-x64-msvc': 1.83.0
+
+  p-each-series@3.0.0: {}
 
   path-expression-matcher@1.6.2: {}
 

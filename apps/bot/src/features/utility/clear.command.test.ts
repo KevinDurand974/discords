@@ -26,6 +26,7 @@ function fixture(
         id: String(index),
         author: { id: index % 2 ? "other" : "target" },
         createdTimestamp: Date.now(),
+        delete: vi.fn(async () => {}),
       },
     ]),
   );
@@ -237,7 +238,7 @@ describe("/clear", () => {
     );
   });
 
-  it("accepts the 14-day maximum but still skips messages at Discord's age limit", async () => {
+  it("excludes messages at the requested duration boundary", async () => {
     const now = vi.spyOn(Date, "now").mockReturnValue(2_000_000_000_000);
     try {
       const f = fixture(20, null, "2w");
@@ -252,7 +253,7 @@ describe("/clear", () => {
     }
   });
 
-  it.each(["", "0m", "15d", "3w", "337h", "20161m", "1.5h", "1s", "garbage"])(
+  it.each(["", "0m", "999999999999999999d", "1.5h", "1s", "garbage"])(
     "rejects invalid duration %s before fetching or deleting messages",
     async (duration) => {
       const f = fixture(10, null, duration);
@@ -263,21 +264,39 @@ describe("/clear", () => {
     },
   );
 
-  it("skips old messages and reports the actual deletion count", async () => {
+  it("deletes old messages individually and reports the combined deletion count", async () => {
     const f = fixture(20, "target");
     f.messages.get("0")!.createdTimestamp = Date.now() - 14 * 24 * 60 * 60 * 1000;
     await f.execute();
     expect(f.channel.bulkDelete.mock.calls[0]?.[0]).toHaveLength(12);
-    expect(f.interaction.editReply).toHaveBeenCalledWith("Deleted 12 messages.");
+    expect(f.messages.get("0")!.delete).toHaveBeenCalledOnce();
+    expect(f.interaction.editReply).toHaveBeenCalledWith("Deleted 13 messages.");
+  });
+
+  it("accepts durations beyond 14 days and preserves count, user and channel filters", async () => {
+    const f = fixture(3, "target", "30d");
+    f.channel.id = "selected";
+    f.interaction.options.getChannel.mockReturnValue({ id: "selected" });
+    f.messages.forEach((message) => {
+      message.createdTimestamp = Date.now() - 20 * 24 * 60 * 60 * 1000;
+    });
+    f.messages.get("0")!.createdTimestamp = Date.now() - 31 * 24 * 60 * 60 * 1000;
+    await f.execute();
+    expect(f.channel.bulkDelete).not.toHaveBeenCalled();
+    expect(f.messages.get("0")!.delete).not.toHaveBeenCalled();
+    expect(f.messages.get("1")!.delete).not.toHaveBeenCalled();
+    expect(f.messages.get("2")!.delete).toHaveBeenCalledOnce();
+    expect(f.messages.get("4")!.delete).toHaveBeenCalledOnce();
+    expect(f.messages.get("6")!.delete).toHaveBeenCalledOnce();
+    expect(f.messages.get("8")!.delete).not.toHaveBeenCalled();
+    expect(f.interaction.editReply).toHaveBeenCalledWith("Deleted 3 messages in <#selected>.");
   });
 
   it("does not delete anything when no messages match", async () => {
     const f = fixture(10, "absent");
     await f.execute();
     expect(f.channel.bulkDelete).not.toHaveBeenCalled();
-    expect(f.interaction.editReply).toHaveBeenCalledWith(
-      "No matching messages under 14 days old were found.",
-    );
+    expect(f.interaction.editReply).toHaveBeenCalledWith("No matching messages were found.");
   });
 
   it.each([0, 101, 1.5, NaN])("rejects invalid count %s", async (count) => {
