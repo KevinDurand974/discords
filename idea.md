@@ -13,12 +13,12 @@
 - `/poll <question> <choix>` : créer un sondage ✅
 - `/ticket` : ouvrir un salon privé pour contacter l'équipe ✅
 - `/search` : ?
-- `/rules` : auto config rules
+- `/rules` : auto config rules ✅
 
 ## Informations et utilitaires
 
 - `/help` : afficher les commandes disponibles ✅
-- `/help [command]`: plus d'info par commande
+- `/help [command]`: plus d'info par commande ✅
 - `/ping` : afficher la latence du bot ✅
 
 ## Fun et activité

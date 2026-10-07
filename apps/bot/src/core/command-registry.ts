@@ -11,6 +11,9 @@ import { setupCommand } from "@/features/setup/setup.command.ts";
 import { logsCommand, logsComponentHandler } from "@/features/logs/logs.command.ts";
 import { ruleCommand, ruleComponentHandler } from "@/features/rules/rule.command.ts";
 import { ruleAcceptanceHandler } from "@/features/rules/rule-acceptance.ts";
+import { trapBotCommand, trapComponentHandler } from "@/features/trap-bot/trap-bot.command.ts";
+import { unbanCommand } from "@/features/moderation/unban.command.ts";
+import { untrapCommand } from "@/features/trap-bot/untrap.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
 import { coinflipCommand } from "@/features/utility/coinflip.command.ts";
@@ -34,6 +37,9 @@ export const commands: readonly CommandDefinition[] = [
   setupCommand,
   logsCommand,
   ruleCommand,
+  trapBotCommand,
+  untrapCommand,
+  unbanCommand,
   slaCommand,
   pingCommand,
   coinflipCommand,
@@ -55,6 +61,7 @@ export const componentHandlers: readonly ComponentHandler[] = [
   logsComponentHandler,
   ruleComponentHandler,
   ruleAcceptanceHandler,
+  trapComponentHandler,
   newsCleanComponentHandler,
   youtubeComponentHandler,
   pollComponentHandler,

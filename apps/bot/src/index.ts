@@ -12,6 +12,8 @@ import { synchronizeNews } from "@/features/netmarble-news/news-runtime.ts";
 import { synchronizeVideos } from "@/features/youtube-videos/videos-runtime.ts";
 import { fetchEmojis } from "@/shared/emojis/emoji-cache.ts";
 import { deleteDueTickets } from "@/features/tickets/ticket-runtime.ts";
+import { getTrapStore } from "@/features/trap-bot/trap-repository.ts";
+import { registerTrapRuntime } from "@/features/trap-bot/trap-runtime.ts";
 
 const client = createDiscordClient();
 const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
@@ -28,6 +30,7 @@ createBotHealthServer(client, process.env.DATABASE_URL, {
 });
 const logDatabase = createDatabase(ENV.DATABASE_URL);
 const commandLogger = createCommandLogger(client, createCommandLogRepository(logDatabase));
+registerTrapRuntime(client, getTrapStore(), commandLogger);
 const commandsByName = new Collection<string, CommandDefinition>();
 
 commands.forEach((command) => {

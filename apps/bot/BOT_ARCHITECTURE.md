@@ -147,6 +147,18 @@ export const CLAIM_MODAL_PREFIX = "sla:claim-modal:";
 
 The central router delegates an interaction based on its `customId` prefix. This prevents one large, unmaintainable component handler.
 
+## User-facing responses
+
+Command confirmations and error messages must be **short, simple, and focused on the outcome**. Do not expose business logic or implementation details such as database operations, internal state, permission-check sequences, or cleanup steps. Keep technical details in logs and documentation, not in replies to users.
+
+When an action fails or only partially succeeds, briefly state what happened and include only the next step the user needs. Necessary warnings and actionable permission requirements should remain clear.
+
+Every successful response to a deferred interaction (`deferReply()` followed by `editReply()`) must be **automatically deleted after 10 seconds**. Start the timer only after the success message has been displayed, not when deferring. Delete the interaction reply with `deleteReply()`, handle deletion failures without unhandled rejections, and do not let the timer keep the process alive. Error and partial-failure responses must not be automatically deleted. This applies to the interaction reply, not persistent feature messages published separately (rules, polls, trap warnings, etc.). `shared/interactions/success-reply.ts` provides `editSuccessReply()` to display the final success reply and schedule best-effort deletion with an unreferenced timer. `/trap`, `/untrap`, and `/unban` use this helper, including the no-trap-configured success response; failure paths do not.
+
+- Success: `Bot trap removed. The trap is now disabled.`
+- Partial failure: `Bot trap disabled, but I couldn't delete the channel. Please delete it manually.`
+- Avoid: explanations of how records were removed, configuration was persisted, or internal checks were performed.
+
 ## Command logging
 
 All chat-input command executions are logged by `core/command-logger.ts` after they succeed or fail. A log contains the command path, user, status, and timestamp; command option values are deliberately excluded to avoid recording sensitive inputs such as coupon codes or PIDs.
@@ -165,6 +177,18 @@ The root command is defined in `src/features/logs/logs.command.ts`, separate fro
 A newly created channel denies `View Channel` to `@everyone`, explicitly allows the bot to send embeds, and allows roles with **Manage Channels** to view it. The selected channel ID is persisted in PostgreSQL in `command_log_settings`, keyed by guild ID. The bot requires `DATABASE_URL`; run `nub run db:migrate` before starting it. Settings are read from the database for each log so changes are visible across bot instances. If a server has no configured channel, command logs are silently skipped. Database or Discord errors during log delivery are reported without failing the command; setup only confirms success once the database write succeeds. If fetching or sending to the configured log channel returns Discord's **Unknown Channel (10003)**, the logger removes that obsolete guild/channel setting and warns to run `/logs` again, avoiding repeated delivery errors. Removal checks both guild and channel IDs so a concurrently reconfigured destination is preserved. Permission errors and temporary failures do not disable logging.
 
 To migrate existing local settings, run `nub --cwd apps/bot run logs:import` after applying the schema migration, using the same `DATABASE_URL` as the bot. The script reads `apps/bot/data/log-channels.json` by default, validates all entries before writing, and imports missing guild settings without overwriting existing database settings. It is safe to rerun and leaves the JSON file untouched as a backup. The runtime no longer reads or writes that file. Command execution history still goes to Discord, not the database.
+
+## Bot trap monitoring
+
+`features/trap-bot/trap-bot.command.ts` defines `/trap` and its user/server-bound channel-name modal, prefilled with `trap`; channel creation and permissions live in `trap-service.ts`. `trap-repository.ts` persists one guild/channel mapping in PostgreSQL `bot_trap_settings`. Setup publishes a Components V2 warning before activating monitoring and making the new channel writable. Use `/untrap` or delete the channel to disarm it. `untrap.command.ts` delegates to `remove-trap.ts`, which rechecks the caller's Manage Channels/Ban Members permissions, clears only the current guild/channel mapping before deleting the channel, and confirms privately. Missing channels are harmless; failed Discord cleanup leaves monitoring disabled and reports the leftover channel. Failed database cleanup prevents deletion. Existing bans are unaffected. Apply the generated database migration before deploying.
+
+`trap-runtime.ts` registers message, role, channel-deletion, and ready listeners from `src/index.ts`. The client requests `Guilds` and `GuildMessages`; no privileged message-content or member intent is needed because the runtime only uses channel/author metadata and fetches the member's current roles through REST. A message (including in a child thread) in the configured channel triggers a ban only if the account has no role beyond @everyone, is not the owner/admin/bot itself, and remains bannable after a fresh role check. Webhook and system messages are ignored. The runtime attempts a DM with the reason and appeal guidance before banning, but blocked DMs do not prevent the ban. After a successful ban, it deletes the triggering message with Manage Messages granted in the trap's bot overwrite. Concurrent requests share the ban result but each delete their own trap message. Other channels' history is retained (`deleteMessageSeconds: 0`). Database, DM, ban, and deletion failures are contained and logged; activation and fresh roles are rechecked after the DM.
+
+All roles named `Rules ✓` have View Channel denied in the trap; startup and role-create/update listeners maintain these overwrites. Standard administrator bypasses still apply. Automatic bans are logged via the existing command logger when configured, as well as Discord's audit log and bot console. This mechanism intentionally catches roleless accounts, including human accounts; it is not a bot classifier.
+
+## Moderation
+
+`features/moderation/unban.command.ts` defines `/unban user-id:<ID>` with a required string ID, server-only availability, and default **Ban Members** permissions. `unban-user.ts` validates the Discord snowflake, fetches current caller/bot permissions, removes the current server's ban, and confirms privately. **Unknown Ban (10026)** is translated to an explanatory error; other failures use the central error handler. A successful unban does not automatically rejoin the user or restore roles. The normal command logger and Discord audit reason record moderator activity.
 
 ## Current packages
 

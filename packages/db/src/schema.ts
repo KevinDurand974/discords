@@ -6,6 +6,11 @@ export const commandLogSettings = pgTable("command_log_settings", {
   channelId: varchar("channel_id", { length: 20 }).notNull(),
 });
 
+export const botTrapSettings = pgTable("bot_trap_settings", {
+  guildId: varchar("guild_id", { length: 20 }).primaryKey(),
+  channelId: varchar("channel_id", { length: 20 }).notNull().unique(),
+});
+
 export const ticketClosures = pgTable("ticket_closures", {
   closureId: uuid("closure_id").notNull().defaultRandom(),
   channelId: varchar("channel_id", { length: 20 }).primaryKey(),

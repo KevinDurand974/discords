@@ -8,6 +8,10 @@ The shared PostgreSQL schema covers source news and per-guild publication state.
 
 The publication-only migration derives the cutoff from existing initial history, deletes legacy `skipped` rows, and adds published-only constraints. Stop the old bot, apply pending migrations, then restart with the updated code; published threads and their history are preserved.
 
+## Bot traps
+
+`bot_trap_settings` persists one trap channel per guild for `/trap`, with a unique channel ID. Apply the generated bot-trap migration before starting the updated bot. Activation inserts without overwriting an existing destination, and cleanup matches both guild and channel IDs so an old channel deletion cannot disarm a replacement. `/untrap` clears the saved guild/channel mapping before attempting channel deletion; missing channels are tolerated, and deletion failures leave monitoring disabled. Deleting the trap channel manually also disables its monitoring. No message content is stored in this table.
+
 ## Local workflow
 
 1. Copy the repository root `.env.example` to the untracked root `.env` and set matching `POSTGRES_PASSWORD` and host `DATABASE_URL` credentials.
