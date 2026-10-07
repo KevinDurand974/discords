@@ -8,6 +8,7 @@ import {
 } from "discord.js";
 import { componentHandlers } from "@/core/command-registry.ts";
 import { ruleAcceptanceHandler } from "./rule-acceptance.ts";
+import { RULE_ROLE_PERMISSIONS } from "./rule-role.ts";
 
 function fixture() {
   const everyone = {
@@ -18,7 +19,7 @@ function fixture() {
     id: "200",
     managed: false,
     editable: true,
-    permissions: new PermissionsBitField(everyone.permissions.bitfield),
+    permissions: new PermissionsBitField(RULE_ROLE_PERMISSIONS),
   };
   const member = {
     id: "300",
@@ -59,6 +60,12 @@ function fixture() {
 }
 
 describe("rules acceptance button", () => {
+  it("assigns the permissionless marker regardless of @everyone permissions", async () => {
+    const f = fixture();
+    f.role.permissions = new PermissionsBitField(RULE_ROLE_PERMISSIONS);
+    await f.execute();
+    expect(f.member.roles.add).toHaveBeenCalledWith(f.role, "Accepted the server rules");
+  });
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => {
     vi.clearAllTimers();

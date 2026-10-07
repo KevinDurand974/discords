@@ -2,6 +2,7 @@ import { PermissionFlagsBits as P, type Guild, type GuildMember, type Role } fro
 
 export const RULE_ROLE_NAME = "Rules ✓";
 export const RULE_ROLE_COLOR = 0x57f287;
+export const RULE_ROLE_PERMISSIONS = 0n;
 
 export function assertSafeRuleRole(role: Role, everyone: Role, bot: GuildMember) {
   if (
@@ -14,8 +15,8 @@ export function assertSafeRuleRole(role: Role, everyone: Role, bot: GuildMember)
       "Choose an unmanaged acceptance role below the bot's highest role, not @everyone.",
     );
   }
-  if ((role.permissions.bitfield & ~everyone.permissions.bitfield) !== 0n) {
-    throw new Error("The acceptance role cannot grant permissions beyond @everyone.");
+  if (role.permissions.bitfield !== RULE_ROLE_PERMISSIONS) {
+    throw new Error("Choose an acceptance role without permissions.");
   }
 }
 

@@ -24,6 +24,8 @@ Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes.
 | **Manage Server** (`ManageGuild`) | Designate a newly created rules channel as the Community Rules Channel. Only needed for that Community-server action. |
 | **Mention @everyone, @here, and All Roles** (`MentionEveryone`) | Required by news setup to notify non-mentionable `SLA:` roles. Omit if the news feature is not used. |
 
+**Rules ✓** is a permissionless acceptance marker; creating and assigning it requires **Manage Roles**, not additional text or voice permissions.
+
 The combined permission bitfield for this full list, **excluding Administrator**, is **`2815042093575220`**. Example invitation URL (replace `YOUR_APPLICATION_ID`):
 
 ```text

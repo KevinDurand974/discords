@@ -14,6 +14,7 @@ import {
   assertSafeRuleRole,
   RULE_ROLE_NAME,
   RULE_ROLE_COLOR,
+  RULE_ROLE_PERMISSIONS,
 } from "./rule-role.ts";
 
 export async function publishRules(interaction: ModalSubmitInteraction, form: RuleForm) {
@@ -76,7 +77,7 @@ export async function publishRules(interaction: ModalSubmitInteraction, form: Ru
       (createdRole = await guild.roles.create({
         name: RULE_ROLE_NAME,
         colors: { primaryColor: RULE_ROLE_COLOR },
-        permissions: everyone.permissions.bitfield,
+        permissions: RULE_ROLE_PERMISSIONS,
         hoist: false,
         mentionable: false,
         reason: `Rules acceptance role created by ${interaction.user.tag}`,

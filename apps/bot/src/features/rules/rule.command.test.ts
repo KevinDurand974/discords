@@ -18,6 +18,7 @@ import { DEFAULT_RULES } from "./default-rules.ts";
 import { createRuleComponents } from "./rule-components.ts";
 import { RULE_DELETION_WARNING } from "./rule-warning.ts";
 import { createRuleModal, ruleCommand, ruleComponentHandler } from "./rule.command.ts";
+import { RULE_ROLE_PERMISSIONS } from "./rule-role.ts";
 
 function fixture() {
   const member = {
@@ -27,7 +28,7 @@ function fixture() {
   };
   const bot = {
     id: "bot",
-    permissions: new PermissionsBitField([P.ManageChannels, P.ManageRoles]),
+    permissions: new PermissionsBitField([P.ManageChannels, P.ManageRoles, RULE_ROLE_PERMISSIONS]),
     roles: { highest: { comparePositionTo: vi.fn(() => 1) } },
   };
   const everyone = {
@@ -38,7 +39,7 @@ function fixture() {
     id: "role",
     managed: false,
     editable: true,
-    permissions: new PermissionsBitField(everyone.permissions.bitfield),
+    permissions: new PermissionsBitField(RULE_ROLE_PERMISSIONS),
     delete: vi.fn(async () => {}),
   };
   const existingRole = { ...role, id: "existing-role", delete: vi.fn(async () => {}) };
@@ -180,13 +181,13 @@ describe("/rules", () => {
     expect(f.guild.channels.create).not.toHaveBeenCalled();
   });
 
-  it("creates a green Rules ✓ role with exactly @everyone permissions before clearing", async () => {
+  it("creates a green Rules ✓ role without permissions before clearing", async () => {
     const f = fixture();
     await f.submit();
     expect(f.guild.roles.create).toHaveBeenCalledExactlyOnceWith({
       name: "Rules ✓",
       colors: { primaryColor: 0x57f287 },
-      permissions: f.everyone.permissions.bitfield,
+      permissions: RULE_ROLE_PERMISSIONS,
       hoist: false,
       mentionable: false,
       reason: "Rules acceptance role created by User",
@@ -194,6 +195,24 @@ describe("/rules", () => {
     expect(f.guild.roles.create.mock.invocationCallOrder[0]).toBeLessThan(
       f.channel.messages.fetch.mock.invocationCallOrder[0]!,
     );
+  });
+
+  it("does not copy unexpected @everyone privileges into the created role", async () => {
+    const f = fixture();
+    f.everyone.permissions.add([P.ManageMessages, P.MentionEveryone]);
+    await f.submit();
+    expect(f.guild.roles.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permissions: RULE_ROLE_PERMISSIONS,
+      }),
+    );
+  });
+
+  it("does not require member permissions on the bot to create the marker role", async () => {
+    const f = fixture();
+    await f.submit();
+    expect(f.guild.roles.create).toHaveBeenCalledWith(expect.objectContaining({ permissions: 0n }));
+    expect(f.channel.send).toHaveBeenCalledOnce();
   });
 
   it("uses a selected role without creating or modifying it", async () => {
