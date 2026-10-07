@@ -2,7 +2,11 @@ import { ActivityType, Client, GatewayIntentBits } from "discord.js";
 
 export const createDiscordClient = () =>
   new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    intents: [
+      GatewayIntentBits.Guilds,
+      GatewayIntentBits.GuildMessages,
+      GatewayIntentBits.GuildMembers,
+    ],
     presence: {
       activities: [
         {

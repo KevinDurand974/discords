@@ -93,6 +93,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     expect(componentHandlers).toContain(youtubeComponentHandler);
     expect(commands.map((command) => command.data.name)).toEqual([
       "logs",
+      "welcome",
       "rules",
       "trap",
       "untrap",

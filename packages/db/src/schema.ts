@@ -6,6 +6,13 @@ export const commandLogSettings = pgTable("command_log_settings", {
   channelId: varchar("channel_id", { length: 20 }).notNull(),
 });
 
+export const welcomeSettings = pgTable("welcome_settings", {
+  guildId: varchar("guild_id", { length: 20 }).primaryKey(),
+  channelId: varchar("channel_id", { length: 20 }).notNull(),
+  arrivalMessage: varchar("arrival_message", { length: 1000 }).notNull(),
+  departureMessage: varchar("departure_message", { length: 1000 }).notNull(),
+});
+
 export const botTrapSettings = pgTable("bot_trap_settings", {
   guildId: varchar("guild_id", { length: 20 }).primaryKey(),
   channelId: varchar("channel_id", { length: 20 }).notNull().unique(),

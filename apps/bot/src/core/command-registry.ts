@@ -1,4 +1,5 @@
 import type { CommandDefinition, ComponentHandler } from "./command.ts";
+import { welcomeCommand, welcomeComponentHandler } from "@/features/welcome/welcome.command.ts";
 import {
   youtubeCommand,
   youtubeComponentHandler,
@@ -34,6 +35,7 @@ export const helpCommand = createHelpCommand(() => commands);
 
 export const commands: readonly CommandDefinition[] = [
   logsCommand,
+  welcomeCommand,
   ruleCommand,
   trapBotCommand,
   untrapCommand,
@@ -57,6 +59,7 @@ export const componentHandlers: readonly ComponentHandler[] = [
   createCouponComponentHandler,
   redeemComponentHandler,
   logsComponentHandler,
+  welcomeComponentHandler,
   ruleComponentHandler,
   ruleAcceptanceHandler,
   trapComponentHandler,
