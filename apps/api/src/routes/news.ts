@@ -81,8 +81,7 @@ export function createNewsApp(reader: NewsReader, options: NewsAppOptions = {}) 
           status: "ok",
           categories: categories.map(({ menuSeq, lastSyncedAt }) => ({ menuSeq, lastSyncedAt })),
         };
-      } catch (error) {
-        console.error("[Healthcheck] Database error:", error);
+      } catch {
         return status(503, { status: "unavailable" });
       }
     })

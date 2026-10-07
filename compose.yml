@@ -15,7 +15,6 @@ services:
       NEWS_INTERNAL_TOKEN: ${NEWS_INTERNAL_TOKEN:-}
       JOBS_INTERNAL_TOKEN: ${JOBS_INTERNAL_TOKEN:?Set JOBS_INTERNAL_TOKEN in the root .env}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
-    command: ["sh", "-c", "nub run db:migrate && nub --cwd apps/api run start"]
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
