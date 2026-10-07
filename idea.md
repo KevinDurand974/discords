@@ -6,13 +6,12 @@
 
 ## Rôles et communauté
 
-- Reaction roles : attribuer des rôles via des réactions ou des boutons
-- `/role <rôle>` : prendre ou retirer un rôle autorisé en libre-service
-- `/welcome` : configurer les messages de bienvenue et de départ
-- `/autorole <rôle>` : attribuer automatiquement un rôle aux nouveaux membres
+- Reaction roles : attribuer des rôles via des réactions ou des boutons ✅
+- `/give-role <role> <user>` : ajoute un rôle à un utilisateur ✅
+- `/strip-role <role> <user>` : retire un rôle à un utilisateur ✅
+- `/welcome` : configurer les messages de bienvenue et de départ ✅
 - `/poll <question> <choix>` : créer un sondage ✅
 - `/ticket` : ouvrir un salon privé pour contacter l'équipe ✅
-- `/search` : ?
 - `/rules` : auto config rules ✅
 
 ## Informations et utilitaires

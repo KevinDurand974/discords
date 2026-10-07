@@ -99,6 +99,8 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "trap",
       "untrap",
       "unban",
+      "give-role",
+      "strip-role",
       "sla",
       "ping",
       "coinflip",

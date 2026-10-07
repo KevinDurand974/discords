@@ -101,6 +101,20 @@ Configuration lives in PostgreSQL **bot_trap_settings** and survives restarts. A
 
 The setting is removed **before** the channel is deleted, so monitoring stays disabled if Discord cleanup fails. The command reports partial cleanup and asks for manual channel deletion rather than claiming full success. Missing channels and **Unknown Channel (10003)** still permit successful database cleanup. If the database removal fails, the command does not attempt channel deletion. Cleanup matches both guild and saved channel IDs to preserve a concurrent replacement. With no configured trap, it changes nothing. Existing bans are not reversed; use `/unban` separately. No additional migration is required; restart the bot and run `nub --cwd apps/bot run sync`.
 
+## Give a role
+
+`/give-role role:@Role user:@Member` requires both options. Server only, restricted to members with **Manage Roles** (authorized moderators and administrators). The bot also needs Manage Roles. Current permissions, role and target membership are fetched again before assignment.
+
+Roles with permissions are allowed, but @everyone and managed/integration roles are rejected. The chosen role must be below the bot's and the caller's highest roles; the server owner is exempt only from the caller hierarchy restriction. Already assigned roles are left unchanged. Confirmation is private, mentions do not notify anyone, and success replies disappear after ten seconds.
+
+Restart/deploy the bot and run `nub --cwd apps/bot run sync` to register the command. No database migration is needed.
+
+## Strip a role
+
+`/strip-role role:@Role user:@Member` removes a role, with both options required. It has the same **Manage Roles**, server-only and role-hierarchy restrictions as `/give-role`; @everyone and managed roles cannot be removed. Roles with permissions are supported. If the member does not have the role, nothing changes. Private success replies suppress mentions and disappear after ten seconds.
+
+Restart the bot and run `nub --cwd apps/bot run sync` to register the command. No migration is needed.
+
 ## Unban
 
 `/unban user-id:<Discord ID>` removes a user's ban from the current server. **user-id** is a required string containing a valid 17–20 digit Discord user ID (not a mention or username). Only members with **Ban Members** can use it; both the caller's and bot's permissions are fetched and checked again at execution, even if command availability has been overridden. Successful confirmation is private and automatically disappears **10 seconds** after display; a non-banned target gets an explanatory error rather than a success message. The moderator's ID is recorded in Discord's audit reason; the existing command logger records the command execution when configured. Unbanning does not restore membership or roles: the user must rejoin with an invitation. Restart the bot and run `nub --cwd apps/bot run sync` to register the command.

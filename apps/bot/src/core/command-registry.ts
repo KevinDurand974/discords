@@ -17,6 +17,8 @@ import { ruleCommand, ruleComponentHandler } from "@/features/rules/rule.command
 import { ruleAcceptanceHandler } from "@/features/rules/rule-acceptance.ts";
 import { trapBotCommand, trapComponentHandler } from "@/features/trap-bot/trap-bot.command.ts";
 import { unbanCommand } from "@/features/moderation/unban.command.ts";
+import { giveRoleCommand } from "@/features/moderation/give-role.command.ts";
+import { stripRoleCommand } from "@/features/moderation/strip-role.command.ts";
 import { untrapCommand } from "@/features/trap-bot/untrap.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
@@ -45,6 +47,8 @@ export const commands: readonly CommandDefinition[] = [
   trapBotCommand,
   untrapCommand,
   unbanCommand,
+  giveRoleCommand,
+  stripRoleCommand,
   slaCommand,
   pingCommand,
   coinflipCommand,
