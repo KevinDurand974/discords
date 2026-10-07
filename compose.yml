@@ -2,6 +2,7 @@ services:
   api:
     build:
       context: .
+      dockerfile: apps/api/Dockerfile
       target: api
     restart: unless-stopped
     environment:
