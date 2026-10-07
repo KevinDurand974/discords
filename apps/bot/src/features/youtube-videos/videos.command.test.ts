@@ -13,13 +13,11 @@ import {
 } from "discord.js";
 import {
   autocompleteYoutubeTag,
-  handleYoutubeSetup,
   requireVideoPermission,
   youtubeCommand,
   youtubeComponentHandler,
 } from "./videos.command.ts";
 import { commands, componentHandlers } from "../../core/command-registry.ts";
-import { setupCommand } from "../setup/setup.command.ts";
 import { slaCommand } from "../sla/sla.command.ts";
 import { pingCommand } from "../utility/ping.command.ts";
 import type { CommandExecutionContext } from "../../core/command.ts";
@@ -71,7 +69,7 @@ async function addModal() {
 }
 async function cleanupPrompt(tag: string | null = null) {
   const editReply = vi.fn();
-  await handleYoutubeSetup({
+  await youtubeCommand.execute({
     ...actor([P.Administrator]),
     options: { getSubcommand: () => "clean", getString: () => tag },
     deferReply: vi.fn(),
@@ -90,11 +88,10 @@ function button(customId: string, userId = "moderator") {
   } as unknown as ButtonInteraction;
 }
 describe("YouTube commands, permissions and confirmation ownership", () => {
-  it("registers /youtube instead of /videos and removes clean from it", () => {
+  it("registers all YouTube subcommands under /youtube and removes /setup", () => {
     expect(commands).toContain(youtubeCommand);
     expect(componentHandlers).toContain(youtubeComponentHandler);
     expect(commands.map((command) => command.data.name)).toEqual([
-      "setup",
       "logs",
       "rules",
       "trap",
@@ -114,21 +111,18 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "close-ticket",
     ]);
     expect(youtubeCommand.data.toJSON().options?.map((option) => option.name)).toEqual([
+      "setup",
+      "clean",
       "add",
       "status",
       "sync",
     ]);
-    expect(youtubeCommand.data.toJSON().default_member_permissions).toBe(
-      P.ManageMessages.toString(),
-    );
+    expect(youtubeCommand.data.toJSON().default_member_permissions).toBeUndefined();
   });
-  it("moves news to /sla and registers /setup youtube and /setup clean with tag autocomplete", () => {
+  it("keeps news under /sla and registers /youtube clean with tag autocomplete", () => {
     expect(slaCommand.data.toJSON().options?.map((option) => option.name)).toContain("news");
-    expect(setupCommand.data.toJSON().options?.map((option) => option.name)).toEqual([
-      "youtube",
-      "clean",
-    ]);
-    expect(setupCommand.data.toJSON().options).toContainEqual(
+    expect(youtubeCommand.autocomplete).toBe(autocompleteYoutubeTag);
+    expect(youtubeCommand.data.toJSON().options).toContainEqual(
       expect.objectContaining({
         name: "clean",
         options: [expect.objectContaining({ name: "tag", autocomplete: true })],
@@ -151,10 +145,10 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       requireVideoPermission(actor([P.Administrator]) as ChatInputCommandInteraction, true),
     ).not.toThrow();
   });
-  it("creates the Forum explicitly via /setup youtube with Manage Channels", async () => {
-    await handleYoutubeSetup({
+  it("creates the Forum explicitly via /youtube setup with only Manage Channels", async () => {
+    await youtubeCommand.execute({
       ...actor([P.ManageChannels]),
-      options: { getSubcommand: () => "youtube" },
+      options: { getSubcommand: () => "setup" },
       deferReply: vi.fn(),
       editReply: vi.fn(),
     } as unknown as ChatInputCommandInteraction);
@@ -163,12 +157,49 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
   });
   it("requires Manage Channels for setup", async () => {
     await expect(
-      handleYoutubeSetup({
+      youtubeCommand.execute({
         ...actor([P.ManageMessages]),
-        options: { getSubcommand: () => "youtube" },
+        options: { getSubcommand: () => "setup" },
       } as unknown as ChatInputCommandInteraction),
     ).rejects.toThrow("Manage Channels");
     expect(runtime.setup).not.toHaveBeenCalled();
+  });
+  it.each([
+    { action: "setup", permissions: [], error: "Manage Channels" },
+    { action: "clean", permissions: [P.ManageChannels], error: "administrator" },
+    { action: "clean", permissions: [P.ManageMessages], error: "administrator" },
+    { action: "add", permissions: [P.ManageChannels], error: "Manage Messages" },
+    { action: "status", permissions: [], error: "Manage Messages" },
+    { action: "sync", permissions: [], error: "Manage Messages" },
+  ])(
+    "rejects unauthorized /youtube $action before side effects",
+    async ({ action, permissions, error }) => {
+      const deferReply = vi.fn();
+      await expect(
+        youtubeCommand.execute({
+          ...actor(permissions),
+          options: { getSubcommand: () => action },
+          deferReply,
+        } as unknown as ChatInputCommandInteraction),
+      ).rejects.toThrow(error);
+      expect(deferReply).not.toHaveBeenCalled();
+      expect(runtime.setup).not.toHaveBeenCalled();
+      expect(runtime.clean).not.toHaveBeenCalled();
+      expect(runtime.add).not.toHaveBeenCalled();
+      expect(runtime.sync).not.toHaveBeenCalled();
+    },
+  );
+  it.each(["setup", "clean"])("allows the server owner to use /youtube %s", async (action) => {
+    const editReply = vi.fn();
+    await youtubeCommand.execute({
+      ...actor([], "owner"),
+      options: { getSubcommand: () => action, getString: () => null },
+      deferReply: vi.fn(),
+      editReply,
+    } as unknown as ChatInputCommandInteraction);
+    expect(editReply).toHaveBeenCalledOnce();
+    if (action === "setup") expect(runtime.setup).toHaveBeenCalledWith("guild");
+    else expect(editReply.mock.calls[0]![0].components).toHaveLength(1);
   });
   it("opens a creator modal with a Forum selector defaulting to the configured channel", async () => {
     const modal = (await addModal()).toJSON();

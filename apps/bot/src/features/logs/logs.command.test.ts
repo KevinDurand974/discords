@@ -11,7 +11,6 @@ import {
 } from "discord.js";
 import { commands, componentHandlers } from "@/core/command-registry.ts";
 import type { CommandExecutionContext } from "@/core/command.ts";
-import { setupCommand } from "@/features/setup/setup.command.ts";
 import { logsCommand, logsComponentHandler, logsHelpDescription } from "./logs.command.ts";
 
 function fixture(channel: { id: string; type: ChannelType } | null = null) {
@@ -66,10 +65,7 @@ describe("/logs", () => {
       },
     ]);
     expect(definition.options?.[0]?.required).not.toBe(true);
-    expect(setupCommand.data.toJSON().options?.map(({ name }) => name)).toEqual([
-      "youtube",
-      "clean",
-    ]);
+    expect(commands.some((command) => command.data.name === "setup")).toBe(false);
     expect(logsCommand.helpDescription).toBe(logsHelpDescription);
   });
   it("saves an existing selected channel and confirms privately without opening a modal", async () => {

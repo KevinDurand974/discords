@@ -7,7 +7,6 @@ import { claimComponentHandler } from "@/features/sla/claim-components.ts";
 import { createCouponComponentHandler } from "@/features/sla/create-coupon.ts";
 import { newsCleanComponentHandler } from "@/features/netmarble-news/news-setup-command.ts";
 import { redeemComponentHandler } from "@/features/sla/redeem.ts";
-import { setupCommand } from "@/features/setup/setup.command.ts";
 import { logsCommand, logsComponentHandler } from "@/features/logs/logs.command.ts";
 import { ruleCommand, ruleComponentHandler } from "@/features/rules/rule.command.ts";
 import { ruleAcceptanceHandler } from "@/features/rules/rule-acceptance.ts";
@@ -34,7 +33,6 @@ import { createHelpCommand } from "@/features/utility/help.command.ts";
 export const helpCommand = createHelpCommand(() => commands);
 
 export const commands: readonly CommandDefinition[] = [
-  setupCommand,
   logsCommand,
   ruleCommand,
   trapBotCommand,

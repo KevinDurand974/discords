@@ -64,7 +64,7 @@ export function buildVideosRuntime(
     await store.createSettings(guildId);
     let setup = (await store.get(guildId))!;
     if (setup.lifecycle === "cleaning")
-      throw new Error("Cleanup is incomplete; an administrator must finish /setup clean first.");
+      throw new Error("Cleanup is incomplete; an administrator must finish /youtube clean first.");
     let forum = await getVideoForum(guild, setup.forumChannelId);
     if (!forum) {
       if (setup.forumChannelId) {
@@ -91,7 +91,7 @@ export function buildVideosRuntime(
   async function publish(setup: ForumSettings) {
     const guild = await client.guilds.fetch(setup.guildId);
     const forum = await getVideoForum(guild, setup.forumChannelId);
-    if (!forum) throw new Error("Latest Videos is missing; run /setup youtube to recreate it.");
+    if (!forum) throw new Error("Latest Videos is missing; run /youtube setup to recreate it.");
     await permissions(setup, forum);
     await repairTags(setup, forum);
     await store.enqueue(setup.guildId, setup.forumGeneration);
@@ -158,7 +158,7 @@ export function buildVideosRuntime(
           throw new Error("Choose a Forum channel in this server.");
         let setup = await store.get(guildId);
         if (setup?.lifecycle === "cleaning")
-          throw new Error("Finish /setup clean before adding a creator.");
+          throw new Error("Finish /youtube clean before adding a creator.");
         const tracked = await store.subscriptions(guildId);
         if (setup?.forumChannelId !== forum.id) {
           if (tracked.length)
@@ -172,7 +172,7 @@ export function buildVideosRuntime(
           await store.setForum(guildId, forum.id, setup.forumGeneration, false);
           setup = (await store.get(guildId))!;
         }
-        if (!setup || setup.lifecycle !== "active") throw new Error("Run /setup youtube first.");
+        if (!setup || setup.lifecycle !== "active") throw new Error("Run /youtube setup first.");
         await permissions(setup, forum);
         const existing = tracked.find(
           (row) => row.subscription.channelId === resolved.channel.channelId,

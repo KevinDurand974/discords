@@ -75,7 +75,7 @@ function consumeSession(interaction: Actor & { guildId: string }, kind: Session[
 }
 
 export const configureYoutubeSetup = (sub: SlashCommandSubcommandBuilder) =>
-  sub.setName("youtube").setDescription("Create or repair the default YouTube Forum");
+  sub.setName("setup").setDescription("Create or repair the default YouTube Forum");
 export const configureYoutubeClean = (sub: SlashCommandSubcommandBuilder) =>
   sub
     .setName("clean")
@@ -127,7 +127,7 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
   }
   const setup = await runtime.store.get(interaction.guildId);
   if (!setup) {
-    await interaction.editReply("YouTube is not configured; use /setup youtube.");
+    await interaction.editReply("YouTube is not configured; use /youtube setup.");
     return;
   }
   const tagId = interaction.options.getString("tag") ?? undefined;
@@ -170,9 +170,11 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
   });
 }
 export const youtubeHelpDescription = [
+  "setup: Create or repair the default YouTube forum without adding a creator. Requires Manage Channels or server ownership.",
+  "clean: Administrator/server-owner cleanup with a user-bound confirmation lasting 5 minutes. With tag, scopes cleanup to that creator; without tag, affects all tracked creators. Choose Videos only or Everything in scope. Deletion is permanent; user-owned forums and unrelated content are preserved.",
   "add: Opens a creator (URL, handle or channel ID) and forum-selection modal. Backfill count is 0–15, default 10; 0 follows only future videos. No forum is created implicitly.",
   "status: Shows the configured forum, followed creators and publication status. sync: Publishes already-collected pending videos; does not trigger fresh RSS collection.",
-  "Requires Manage Messages, administrator access or server ownership. One forum is used per server; changing it while creators are followed requires removing that tracking first with /setup clean. User-owned forum permissions are not rewritten.",
+  "Requires Manage Messages, administrator access or server ownership. One forum is used per server; changing it while creators are followed requires removing that tracking first with /youtube clean. User-owned forum permissions are not rewritten.",
   "Example: `/youtube add backfill-count:10`",
 ] as const;
 
@@ -182,7 +184,8 @@ export const youtubeCommand = {
     .setName("youtube")
     .setDescription("Track YouTube guide videos")
     .setContexts(InteractionContextType.Guild)
-    .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+    .addSubcommand(configureYoutubeSetup)
+    .addSubcommand(configureYoutubeClean)
     .addSubcommand((sub) =>
       sub
         .setName("add")
@@ -201,9 +204,14 @@ export const youtubeCommand = {
     .addSubcommand((sub) =>
       sub.setName("sync").setDescription("Publish pending videos already collected by the API"),
     ),
+  autocomplete: autocompleteYoutubeTag,
   async execute(interaction) {
-    requireVideoPermission(interaction);
     const action = interaction.options.getSubcommand();
+    if (action === "setup" || action === "clean") {
+      await handleYoutubeSetup(interaction);
+      return;
+    }
+    requireVideoPermission(interaction);
     const runtime = createVideosRuntime(interaction.client);
     if (action === "add") {
       const setup = await runtime.store.get(interaction.guildId);
@@ -254,7 +262,7 @@ export const youtubeCommand = {
     const setup = await runtime.store.get(interaction.guildId);
     if (!setup) {
       await interaction.editReply(
-        "YouTube is not configured; use /setup youtube or choose an existing Forum in /youtube add.",
+        "YouTube is not configured; use /youtube setup or choose an existing Forum in /youtube add.",
       );
       return;
     }
@@ -332,7 +340,7 @@ export const youtubeComponentHandler: ComponentHandler = {
       } catch {
         await interaction.editReply({
           content:
-            "Cleanup is incomplete or resources changed. Check bot permissions and run /setup clean with the same scope again to retry.",
+            "Cleanup is incomplete or resources changed. Check bot permissions and run /youtube clean with the same scope again to retry.",
           components: [],
         });
       }

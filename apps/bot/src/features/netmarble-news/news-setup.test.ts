@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApplicationCommandOptionType, PermissionFlagsBits } from "discord.js";
-import { setupCommand } from "../setup/setup.command.ts";
+import { commands } from "@/core/command-registry.ts";
 import { slaCommand } from "../sla/sla.command.ts";
 import { newsForumPermissions } from "./news-setup-command.ts";
 import {
@@ -59,10 +59,7 @@ function fixtures() {
 
 describe("news Forum setup", () => {
   it("registers publishing subcommands under /sla, not /setup", () => {
-    expect(setupCommand.data.toJSON().options?.map(({ name }) => name)).toEqual([
-      "youtube",
-      "clean",
-    ]);
+    expect(commands.some((command) => command.data.name === "setup")).toBe(false);
     const news = slaCommand.data.toJSON().options?.find(({ name }) => name === "news");
     expect(news?.type).toBe(ApplicationCommandOptionType.SubcommandGroup);
     if (news?.type !== ApplicationCommandOptionType.SubcommandGroup)

@@ -21,11 +21,11 @@ Run bot unit tests, typecheck and lint, plus the isolated PostgreSQL integration
 
 ## Commands
 
-- `/setup youtube`: explicitly creates or repairs the default Forum; it does not subscribe a creator or publish videos. Requires Manage Channels (or the owner).
+- `/youtube setup`: explicitly creates or repairs the default Forum; it does not subscribe a creator or publish videos. Requires Manage Channels (or the owner).
 - `/youtube add [backfill-count:0..15]`: opens an actor-bound, five-minute modal for a channel URL, bare `@handle` or `UC...` ID and a required Forum selector. The configured Forum is selected by default; an existing Forum can be explicitly chosen without creating any channel. Default import is ten posts per creator.
 - `/youtube status`: displays configuration, creator source timestamps/errors and publication-state counts.
 - `/youtube sync`: publishes pending **stored** sources. It does not trigger an immediate RSS request; routine source refresh belongs to the worker.
-- `/setup clean [tag]`: administrator-only, with creator-tag autocomplete and an actor-bound five-minute choice/confirmation. Omit the tag to target all creators. **Videos only** deletes managed posts while retaining subscriptions/tags/Forum for future videos; existing stored sources are excluded so they do not immediately reappear. **Everything in scope** removes that creator's posts/owned tag/subscription, or, without a tag, the feature-owned Forum and all guild tracking. An explicitly selected, unowned Forum and its unrelated posts/tags are preserved. Cancellation has no side effects. Global creator/video history and other guilds are never removed.
+- `/youtube clean [tag]`: administrator-only, with creator-tag autocomplete and an actor-bound five-minute choice/confirmation. Omit the tag to target all creators. **Videos only** deletes managed posts while retaining subscriptions/tags/Forum for future videos; existing stored sources are excluded so they do not immediately reappear. **Everything in scope** removes that creator's posts/owned tag/subscription, or, without a tag, the feature-owned Forum and all guild tracking. An explicitly selected, unowned Forum and its unrelated posts/tags are preserved. Cancellation has no side effects. Global creator/video history and other guilds are never removed.
 
 Ordinary management requires Manage Messages; Administrator/owner bypass is supported. In feature-created Forums, ordinary members cannot create posts or comment. Moderators can create posts but have no Send Messages in Threads grant. The bot may send multi-part descriptions. Discord administrators bypass channel denies and therefore cannot be prevented from commenting.
 
@@ -58,7 +58,7 @@ Check `/youtube status`, worker history and saved `youtube_publication_intents`.
 
 - For a known surviving thread, rerun `/youtube sync` to resume unsent parts and commit publication history.
 - For an ambiguous/deleted known thread or scan-limit failure, inspect the Forum and persisted intent before manual repair. No blind automatic repost is attempted for missing known IDs. There is no dedicated repair command yet.
-- If the configured Forum was deleted, rerun `/setup youtube`: it creates a fresh Forum generation, rebuilds subscriptions/tags and applies fresh initial-import selections. This intentionally republishes the selected history into the replacement Forum.
+- If the configured Forum was deleted, rerun `/youtube setup`: it creates a fresh Forum generation, rebuilds subscriptions/tags and applies fresh initial-import selections. This intentionally republishes the selected history into the replacement Forum.
 - If a DB checkpoint failed after Forum creation, compensation is attempted; an orphan Forum ID is logged when compensation fails. Inspect that ID before manual removal; never remove a channel by name alone.
 - If cleanup is incomplete, saved resource IDs and `cleaning` lifecycle remain for administrator retry. This blocks add/publication and stops that guild's source polling contribution until cleanup succeeds.
 
@@ -71,5 +71,5 @@ Check `/youtube status`, worker history and saved `youtube_publication_intents`.
 - Ordinary member denied management/post/comment; Manage Messages moderator allowed management/post but denied comment; administrator bypass documented. Test multi-role combinations.
 - Missing bot permissions, removed creator tag, creator rename, interrupted posting/restart and API partial failure.
 - Administrator confirmation ownership/expiry/cancellation, creator-tag and all-creator scopes, videos-only versus full cleanup, archived posts, no automatic repost after videos-only cleanup, partial cleanup/retry, no roles removed, other guild/source records retained and recreation after cleanup.
-- Explicit `/setup youtube` creation, add modal's default Forum selection, user-selected Forum with preserved overwrites/unrelated posts, and rejection of a second Forum while tracking exists.
+- Explicit `/youtube setup` creation, add modal's default Forum selection, user-selected Forum with preserved overwrites/unrelated posts, and rejection of a second Forum while tracking exists.
 - Redis/worker restart recreates one recurring schedule, news remains operational, dashboard exposure remains restricted.

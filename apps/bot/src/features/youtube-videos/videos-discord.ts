@@ -300,7 +300,7 @@ export async function publishVideo(
   const guild = await client.guilds.fetch(setup.guildId);
   const forum = await getVideoForum(guild, setup.forumChannelId);
   if (!forum || !forum.availableTags.some((tag) => tag.id === tagId))
-    throw new Error("Video Forum/tag is missing; run /setup youtube or /youtube add to repair it.");
+    throw new Error("Video Forum/tag is missing; run /youtube setup or /youtube add to repair it.");
   const parts = renderVideo(video);
   let thread: ThreadChannel | undefined;
   if (intent.threadId) {

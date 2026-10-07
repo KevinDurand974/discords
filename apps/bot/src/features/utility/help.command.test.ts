@@ -45,8 +45,8 @@ describe("/help", () => {
       "/help",
       "/ping",
       "/logs",
-      "/setup youtube",
-      "/setup clean",
+      "/youtube setup",
+      "/youtube clean",
       "/youtube add",
       "/youtube status",
       "/youtube sync",
@@ -61,7 +61,7 @@ describe("/help", () => {
       expect(text).toContain(path);
     expect(text).not.toContain("/setup logs");
     expect(text).not.toContain("/videos");
-    expect(text).not.toContain("/setup news");
+    expect(text).not.toContain("/setup");
     expect(text).not.toContain("`/sla create ");
     expect(text).toContain("`/sla redeem`");
     expect(text).not.toContain("/sla redeem [");
