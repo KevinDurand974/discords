@@ -12,6 +12,39 @@ Run `nub run start` from the repository root. The root scripts load and validate
 - `GET /v1/news/articles?menuSeq=32&limit=20&cursor=...`: newest first; `menuSeq` is optional, `limit` is 1–50, and the cursor is scoped to the category filter.
 - `GET /v1/news/articles/109472?menuSeq=32`: normalized full HTML and ordered media metadata.
 
+## Docker image
+
+Build from the **repository root** so workspace dependencies and `nub.lock` are available:
+
+```sh
+docker build -f apps/api/Dockerfile -t discords-api .
+```
+
+The multi-stage image uses the official `ghcr.io/nubjs/nub:0.9.2-alpine` base (Node 26 and Nub 0.9.2), installs locked dependencies, includes the API and shared database package (not bot/jobs source), and runs as the non-root `node` user. Environment files and local dependencies are excluded from the build context. It exposes port 3000 and checks `/health/ready`. Set `PORT` and adjust the port mapping if needed.
+
+Provide these runtime variables through an untracked environment file or your deployment's secret manager:
+
+```dotenv
+DATABASE_URL=postgresql://discords:your-password@your-postgres-host:5432/discords
+POSTGRES_USER=discords
+POSTGRES_DB=discords
+POSTGRES_PASSWORD=your-password
+PORT=3000
+```
+
+`NEWS_INTERNAL_TOKEN`, `JOBS_INTERNAL_TOKEN`, `NEWS_CORS_ORIGINS` and `YOUTUBE_API_KEY` are optional. Internal job routes require `JOBS_INTERNAL_TOKEN` to be enabled. The PostgreSQL hostname must be reachable **from inside the container**, not the host's `localhost`.
+
+With an existing PostgreSQL server, run migrations first, then start the API:
+
+```sh
+docker run --rm --env-file .env.api discords-api nub run db:migrate
+docker run --rm --name discords-api --env-file .env.api -p 3000:3000 discords-api
+```
+
+For containerized PostgreSQL, add `--network <database-network>` to both commands. The image itself does not automatically migrate; Compose handles migrations before API startup. The existing `nub run start` workflow now uses this Dockerfile and preserves its PostgreSQL readiness dependency and migration startup command.
+
+`nub run test:docker:api` builds the image, starts an isolated temporary PostgreSQL instance, runs migrations, checks API routes, non-root execution and the Docker healthcheck, then removes its temporary containers and network. Requires Docker. It retains the `discords-api:test` image for inspection and does not touch the normal Compose database or volumes.
+
 ## YouTube source foundation
 
 The API also resolves YouTube channel inputs, parses RSS with `fast-xml-parser`, and persists creator/video history. This is the first delivery slice: the `/videos` bot command, Discord publication and ten-minute BullMQ scheduler are not implemented yet.
