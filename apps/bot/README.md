@@ -2,6 +2,38 @@
 
 On Windows, `nub run start` / `nub run dev` may launch a nested `cmd.exe` batch script even from Warp Bash. If Ctrl+C shows `Terminate batch job (Y/N)?`, type `Y` and Enter, or bypass the script shell from `apps/bot` with `nub src/index.ts` (start) or `nub watch src/index.ts` (dev). You can also use `nub run --script-shell bash start` / `nub run --script-shell bash dev` to keep the package scripts while selecting Bash explicitly.
 
+## Bot invitation permissions (without Administrator)
+
+Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes. To enable all current features, select the permissions below — **do not grant Administrator**. Feature-specific permissions can be omitted when you do not use the corresponding feature.
+
+| Permission | Used for |
+| --- | --- |
+| **View Channels** (`ViewChannel`) | Access configured channels and forums. |
+| **Send Messages** (`SendMessages`) | Publish rules, warnings, logs, tickets, and other messages. |
+| **Send Messages in Threads** (`SendMessagesInThreads`) | Publish forum content and respond in threads. |
+| **Read Message History** (`ReadMessageHistory`) | Read existing messages for cleanup, rules replacement, and forum/ticket operations. |
+| **Embed Links** (`EmbedLinks`) | Send embeds in logs and publication channels. |
+| **Attach Files** (`AttachFiles`) | Upload news images and attachments. |
+| **Manage Channels** (`ManageChannels`) | Create/delete channels and forums; configure visibility and slowmode. |
+| **Manage Roles** (`ManageRoles`) | Create/assign acceptance and notification roles; configure channel permission overwrites. |
+| **Manage Threads** (`ManageThreads`) | Manage forum posts, including locking and pinning; access private threads when needed. |
+| **Manage Messages** (`ManageMessages`) | Clear messages, replace existing rules, and delete banned users' trap messages. |
+| **Pin Messages** (`PinMessages`) | Pin the initial ticket message. |
+| **Send Polls** (`SendPolls`) | Publish polls through `/poll`. |
+| **Ban Members** (`BanMembers`) | Ban roleless trap accounts and remove bans through `/unban`. |
+| **Manage Server** (`ManageGuild`) | Designate a newly created rules channel as the Community Rules Channel. Only needed for that Community-server action. |
+| **Mention @everyone, @here, and All Roles** (`MentionEveryone`) | Required by news setup to notify non-mentionable `SLA:` roles. Omit if the news feature is not used. |
+
+The combined permission bitfield for this full list, **excluding Administrator**, is **`2815042093575220`**. Example invitation URL (replace `YOUR_APPLICATION_ID`):
+
+```text
+https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=2815042093575220
+```
+
+**Role hierarchy and channel access still apply:** place the bot's role above the roles it must assign/manage and the members it must ban. Ensure category/channel overwrites allow the relevant permissions; invitation permissions alone do not bypass a channel denial. Creating forum channels requires Community mode. Some commands are administrator-only for the **person using them**, but the **bot itself does not need Administrator**.
+
+`Create Public Threads` and `Create Private Threads` are not required by the current features: forum post creation uses `Send Messages`, and the bot works with existing threads. No voice, kick, timeout, or audit-log-reading permission is needed for the current commands. Gateway intents are separate from invitation permissions; trap monitoring uses the unprivileged **Guild Messages** intent, without **Message Content** or **Guild Members** privileged intents.
+
 ## YouTube Latest Videos
 
 `/setup youtube` explicitly creates or repairs the **Latest Videos** Forum (Manage Channels). `/youtube add [backfill-count:0..15]` opens a creator URL/`@handle`/`UC...` modal with a Forum selector defaulting to the configured channel. It never creates a channel implicitly, reuses creator tags and imports ten videos by default. Only one Forum is supported per guild; changing channels with existing subscriptions requires cleaning all tracking first. `/youtube status` reports progress; `/youtube sync` publishes pending stored sources. Administrator-only `/setup clean [tag]` offers creator-tag autocomplete (omit for all creators), then asks whether to delete only videos or all scoped resources/tracking. Video-only cleanup retains tracking for future discoveries without reposting deleted sources. Explicitly selected existing Forums keep their overwrites and unrelated resources and are never deleted by cleanup. There is no Content Creator role. Manage Messages authorizes management; feature-created Forums deny human comments except Discord's Administrator bypass. See [`COMMANDS.md`](COMMANDS.md) for the full command list.
