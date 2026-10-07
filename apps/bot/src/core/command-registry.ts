@@ -9,6 +9,8 @@ import { newsCleanComponentHandler } from "@/features/netmarble-news/news-setup-
 import { redeemComponentHandler } from "@/features/sla/redeem.ts";
 import { setupCommand } from "@/features/setup/setup.command.ts";
 import { logsCommand, logsComponentHandler } from "@/features/logs/logs.command.ts";
+import { ruleCommand, ruleComponentHandler } from "@/features/rules/rule.command.ts";
+import { ruleAcceptanceHandler } from "@/features/rules/rule-acceptance.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
 import { coinflipCommand } from "@/features/utility/coinflip.command.ts";
@@ -31,6 +33,7 @@ export const helpCommand = createHelpCommand(() => commands);
 export const commands: readonly CommandDefinition[] = [
   setupCommand,
   logsCommand,
+  ruleCommand,
   slaCommand,
   pingCommand,
   coinflipCommand,
@@ -50,6 +53,8 @@ export const componentHandlers: readonly ComponentHandler[] = [
   createCouponComponentHandler,
   redeemComponentHandler,
   logsComponentHandler,
+  ruleComponentHandler,
+  ruleAcceptanceHandler,
   newsCleanComponentHandler,
   youtubeComponentHandler,
   pollComponentHandler,
