@@ -1,16 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   Collection,
+  ChannelType,
   ComponentType,
   PermissionsBitField,
   MessageFlags,
   PermissionFlagsBits as P,
   type ForumChannel,
+  type Guild,
 } from "discord.js";
 import {
   auditVideoPermissions,
   checkVideoPermissions,
   creatorTag,
+  provisionVideoForum,
   renderVideo,
   videoForumPermissions,
 } from "./videos-discord.ts";
@@ -40,6 +43,83 @@ function forumWithTags(tags: { id: string; name: string }[]) {
   return { state, forum: state as unknown as ForumChannel };
 }
 describe("video presentation and resources", () => {
+  function provisionFixture() {
+    const bot = {
+      id: "bot",
+      permissions: new PermissionsBitField([
+        P.ViewChannel,
+        P.ManageChannels,
+        P.ManageRoles,
+        P.ManageThreads,
+        P.SendMessages,
+        P.SendMessagesInThreads,
+        P.ReadMessageHistory,
+        P.EmbedLinks,
+      ]),
+    };
+    const forum = { id: "forum", type: ChannelType.GuildForum };
+    const create = vi.fn(
+      async (_options: { permissionOverwrites: ReturnType<typeof videoForumPermissions> }) => forum,
+    );
+    const guild = {
+      id: "guild",
+      features: [],
+      members: { fetchMe: vi.fn(async () => bot) },
+      roles: { fetch: vi.fn(), cache: new Collection() },
+      channels: { create },
+    };
+    return { bot, forum, create, guild };
+  }
+  it("requests a Forum without requiring the Community guild feature", async () => {
+    const f = provisionFixture();
+    expect(await provisionVideoForum(f.guild as unknown as Guild)).toBe(f.forum);
+    expect(f.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Latest Videos",
+        type: ChannelType.GuildForum,
+        permissionOverwrites: videoForumPermissions("guild", "bot", []),
+      }),
+    );
+  });
+  it("creates a Forum without overwriting Manage Roles, which Discord reserves for administrators", async () => {
+    const f = provisionFixture();
+    f.create.mockImplementation(async (payload) => {
+      const hasRestrictedOverwrite = payload.permissionOverwrites.some((overwrite) =>
+        [...(overwrite.allow ?? []), ...(overwrite.deny ?? [])].includes(P.ManageRoles),
+      );
+      if (hasRestrictedOverwrite) throw new Error("Missing Permissions");
+      return f.forum;
+    });
+    await expect(provisionVideoForum(f.guild as unknown as Guild)).resolves.toBe(f.forum);
+    expect(f.bot.permissions.has(P.Administrator)).toBe(false);
+    expect(f.bot.permissions.has(P.ManageRoles)).toBe(true);
+  });
+  it("only sets overwrite permissions held by a minimally permitted bot", () => {
+    const f = provisionFixture();
+    const overwrites = videoForumPermissions("guild", "bot", ["moderator"]);
+    overwrites.forEach((overwrite) => {
+      expect(f.bot.permissions.has(overwrite.allow ?? [])).toBe(true);
+      expect(f.bot.permissions.has(overwrite.deny ?? [])).toBe(true);
+    });
+  });
+  it("still rejects missing bot permissions before attempting Forum creation", async () => {
+    const f = provisionFixture();
+    f.bot.permissions.remove(P.ManageChannels);
+    await expect(provisionVideoForum(f.guild as unknown as Guild)).rejects.toThrow(
+      "Manage Channels",
+    );
+    expect(f.create).not.toHaveBeenCalled();
+  });
+  it("propagates Discord's Forum creation error without silently creating a text channel", async () => {
+    const f = provisionFixture();
+    const error = new Error("Discord rejected Forum creation");
+    f.create.mockRejectedValue(error);
+    await expect(provisionVideoForum(f.guild as unknown as Guild)).rejects.toBe(error);
+    expect(f.create).toHaveBeenCalledOnce();
+    expect(f.create).toHaveBeenCalledWith(
+      expect.objectContaining({ type: ChannelType.GuildForum }),
+    );
+  });
   it("checks unowned Forum permissions without rewriting them, and audits owned Forums with the fetched bot ID", async () => {
     const bot = { id: "bot" };
     const set = vi.fn();

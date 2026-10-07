@@ -30,9 +30,9 @@ The combined permission bitfield for this full list, **excluding Administrator**
 https://discord.com/oauth2/authorize?client_id=YOUR_APPLICATION_ID&scope=bot%20applications.commands&permissions=2815042093575220
 ```
 
-**Role hierarchy and channel access still apply:** place the bot's role above the roles it must assign/manage and the members it must ban. Ensure category/channel overwrites allow the relevant permissions; invitation permissions alone do not bypass a channel denial. Creating forum channels requires Community mode. Some commands are administrator-only for the **person using them**, but the **bot itself does not need Administrator**.
+**Role hierarchy and channel access still apply:** place the bot's role above the roles it must assign/manage and the members it must ban. Ensure category/channel overwrites allow the relevant permissions; invitation permissions alone do not bypass a channel denial. `/youtube setup` requests a Forum directly without enforcing Community mode locally; Discord determines whether channel creation is available. Some commands are administrator-only for the **person using them**, but the **bot itself does not need Administrator**.
 
-`Create Public Threads` and `Create Private Threads` are not required by the current features: forum post creation uses `Send Messages`, and the bot works with existing threads. No voice, kick, timeout, or audit-log-reading permission is needed for the current commands. Gateway intents are separate from invitation permissions; trap monitoring uses the unprivileged **Guild Messages** intent, without **Message Content** or **Guild Members** privileged intents.
+`Create Public Threads` and `Create Private Threads` are not required by the current features: forum post creation uses `Send Messages`, and the bot works with existing threads. YouTube Forum overwrites therefore do not include these bits. `Manage Roles` must be granted on the bot's **server role**, not added as a channel overwrite: Discord restricts setting that overwrite to administrators. No voice, kick, timeout, or audit-log-reading permission is needed for the current commands. Gateway intents are separate from invitation permissions; trap monitoring uses the unprivileged **Guild Messages** intent, without **Message Content** or **Guild Members** privileged intents.
 
 ## YouTube Latest Videos
 

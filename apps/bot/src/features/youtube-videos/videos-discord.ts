@@ -5,7 +5,6 @@ import {
   ChannelType,
   ContainerBuilder,
   ForumLayoutType,
-  GuildFeature,
   MessageFlags,
   PermissionFlagsBits as P,
   SeparatorBuilder,
@@ -34,17 +33,13 @@ export function videoForumPermissions(guildId: string, botId: string, moderatorI
     {
       id: guildId,
       allow: [P.ViewChannel, P.ReadMessageHistory],
-      deny: [
-        P.SendMessages,
-        P.SendMessagesInThreads,
-        P.CreatePublicThreads,
-        P.CreatePrivateThreads,
-      ],
+      deny: [P.SendMessages, P.SendMessagesInThreads],
     },
     ...moderatorIds
       .filter((id) => id !== guildId)
       .map((id) => ({ id, allow: [P.SendMessages], deny: [P.SendMessagesInThreads] })),
-    { id: botId, allow: required },
+    // Manage Roles stays on the guild role: only administrators can overwrite it in a channel.
+    { id: botId, allow: required.filter((permission) => permission !== P.ManageRoles) },
   ];
 }
 function descriptionChunks(description: string, videoUrl: string) {
@@ -124,8 +119,6 @@ export async function getVideoForum(guild: Guild, id: string | null): Promise<Fo
   }
 }
 export async function provisionVideoForum(guild: Guild) {
-  if (!guild.features.includes(GuildFeature.Community))
-    throw new Error("Latest Videos requires a Community server.");
   const bot = await guild.members.fetchMe();
   if (!bot.permissions.has(required))
     throw new Error(
