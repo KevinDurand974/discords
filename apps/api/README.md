@@ -34,16 +34,17 @@ PORT=3000
 
 `NEWS_INTERNAL_TOKEN`, `JOBS_INTERNAL_TOKEN`, `NEWS_CORS_ORIGINS` and `YOUTUBE_API_KEY` are optional. Internal job routes require `JOBS_INTERNAL_TOKEN` to be enabled. The PostgreSQL hostname must be reachable **from inside the container**, not the host's `localhost`.
 
-With an existing PostgreSQL server, run migrations first, then start the API:
+Start the image against an existing PostgreSQL server; the entrypoint automatically runs `nub run db:migrate` before starting the API:
 
 ```sh
-docker run --rm --env-file .env.api discords-api nub run db:migrate
 docker run --rm --name discords-api --env-file .env.api -p 3000:3000 discords-api
 ```
 
-For containerized PostgreSQL, add `--network <database-network>` to both commands. The image itself does not automatically migrate; Compose handles migrations before API startup. The existing `nub run start` workflow now uses this Dockerfile and preserves its PostgreSQL readiness dependency and migration startup command.
+The database must already exist and be reachable, but its schema may be empty. The database user needs permissions to apply migrations. Migration failure exits the container without starting the HTTP listener. Migrations run again safely on restart, applying only pending migrations. The entrypoint uses `exec` to forward shutdown signals to the API command.
 
-`nub run test:docker:api` builds the image, starts an isolated temporary PostgreSQL instance, runs migrations, checks API routes, non-root execution and the Docker healthcheck, then removes its temporary containers and network. Requires Docker. It retains the `discords-api:test` image for inspection and does not touch the normal Compose database or volumes.
+For containerized PostgreSQL, add `--network <database-network>`. The existing `nub run start` Compose workflow uses the same image entrypoint and retains its PostgreSQL readiness dependency; no separate migration command is needed.
+
+`nub run test:docker:api` builds the image, starts an isolated empty PostgreSQL instance, checks automatic migration, API routes, non-root execution, the Docker healthcheck, restart safety and failure handling, then removes its temporary containers and network. Requires Docker. It retains the `discords-api:test` image for inspection and does not touch the normal Compose database or volumes.
 
 ## YouTube source foundation
 
