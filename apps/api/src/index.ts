@@ -8,6 +8,8 @@ import { createYoutubeClient } from "./youtube/youtube-client.ts";
 import { createYoutubeIngestion } from "./youtube/ingestion.ts";
 import { createYoutubeReader, createYoutubeStore } from "./youtube/repository.ts";
 
+console.log(JSON.stringify(ENV, null, 2));
+
 const { db } = createDatabase(ENV.DATABASE_URL);
 const ingestion = createIngestion(db);
 const publicDb = createDatabase(ENV.DATABASE_URL, { max: 5 }).db;
