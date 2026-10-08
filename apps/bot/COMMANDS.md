@@ -9,6 +9,14 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping`           | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `/help [command]` | Sends the full command list by DM, or detailed help for the optional selected command. Autocomplete lists registered commands excluding `/help`. Detailed help includes usage, option descriptions and limits, defaults, permissions, workflow and examples. Each command exports its own detailed description and exposes it as `helpDescription` on its definition; `/help` reads it from the registry. Uses Components V2; no special permissions are required, but DMs must be enabled. |
 
+## Create a post
+
+`/post` opens a modal with a required **title** (1–100 characters), **multiline post content**, and a **channel selector** below them. The current channel is selected by default when supported. Choose a server text or announcement channel, or an active unlocked thread; Forums are not destinations for this command. Closing the modal publishes nothing.
+
+Submission publishes a **Components V2 container** with a heading and Markdown text. Each literal `---` becomes a native large-spacing **Separator**, up to **19 separators** (40 components including the container). Additional delimiters remain in the final text section; content is not truncated. The rendered title and text together must fit **4000 characters**. Mentions are suppressed.
+
+Both the caller and bot need **View Channel** and **Send Messages** in the selected destination, or **Send Messages in Threads** for threads. Private threads additionally require membership or **Manage Threads**. Permissions are checked again on submission. The private success confirmation disappears after **10 seconds**; the published post remains. No database migration or additional intent is needed. Deploy/restart the bot to synchronize the command, or run `nub --cwd apps/bot run sync`.
+
 ## Coin flip
 
 `/coinflip` takes **no options** and publicly returns **Heads** with the application emoji `coinflip_1` or **Tails** with `coinflip_2`, loaded from the shared emoji cache, drawing a fresh result for each invocation with Node's **cryptographically secure `crypto.randomInt(0, 2)`**. The upper bound is exclusive, so each side has an equal chance without modulo bias. It does not use `Math.random`, require special permissions, or store results. It is also included automatically in `/help`.

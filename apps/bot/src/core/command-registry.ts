@@ -29,6 +29,8 @@ import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
 import { clearCommand } from "@/features/utility/clear.command.ts";
 import { visibilityCommand } from "@/features/utility/visibility.command.ts";
 import { visibilityComponentHandler } from "@/features/utility/visibility-modal.ts";
+import { postCommand } from "@/features/posts/post.command.ts";
+import { postComponentHandler } from "@/features/posts/post-modal.ts";
 import { pollCommand } from "@/features/polls/poll.command.ts";
 import { pollComponentHandler } from "@/features/polls/poll-modal.ts";
 import { ticketCommand } from "@/features/tickets/ticket.command.ts";
@@ -59,6 +61,7 @@ export const commands: readonly CommandDefinition[] = [
   helpCommand,
   youtubeCommand,
   pollCommand,
+  postCommand,
   ticketCommand,
   closeCommand,
 ];
@@ -76,6 +79,7 @@ export const componentHandlers: readonly ComponentHandler[] = [
   newsCleanComponentHandler,
   youtubeComponentHandler,
   pollComponentHandler,
+  postComponentHandler,
   visibilityComponentHandler,
   pickComponentHandler,
   ticketComponentHandler,

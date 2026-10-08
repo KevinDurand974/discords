@@ -111,6 +111,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "help",
       "youtube",
       "poll",
+      "post",
       "ticket",
       "close-ticket",
     ]);
