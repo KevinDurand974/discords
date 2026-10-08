@@ -62,6 +62,7 @@ services:
     profiles: ["bot"]
     build:
       context: .
+      dockerfile: apps/jobs/Dockerfile
       target: jobs
     restart: unless-stopped
     environment:

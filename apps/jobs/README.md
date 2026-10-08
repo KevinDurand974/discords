@@ -27,6 +27,35 @@ See [`docs/youtube-videos-operations.md`](../../docs/youtube-videos-operations.m
 
 The worker listens only on loopback by default, so the dashboard is not exposed to the network. Do not expose it without adding authentication.
 
+## Docker image
+
+Build from the **repository root**, following the API/bot image pattern:
+
+```sh
+docker build -f apps/jobs/Dockerfile -t discords-jobs .
+```
+
+The multi-stage image uses `ghcr.io/nubjs/nub:0.9.2-alpine`, installs locked workspace dependencies, includes only jobs source, and runs as the non-root `node` user. It defaults to `JOBS_DASHBOARD_HOST=0.0.0.0` and `JOBS_DASHBOARD_PORT=3002`, with a Docker healthcheck on `/health/live`. This is a liveness check, not a guarantee that every downstream job succeeds. Jobs does not directly access PostgreSQL: API and bot containers handle database migrations before their own startup.
+
+Provide an untracked `.env.jobs` file or deployment secrets:
+
+```dotenv
+REDIS_URL=redis://your-redis-host:6379
+NEWS_API_URL=http://your-api-host:3000
+BOT_URL=http://your-bot-host:3001
+JOBS_INTERNAL_TOKEN=your-shared-secret
+```
+
+`YOUTUBE_API_URL` optionally overrides `NEWS_API_URL`. The token must match the API and bot. Start Redis and ready API/bot services first. Container hostnames must resolve on the same network; `localhost` inside the jobs container does not refer to other services.
+
+```sh
+docker run --rm --name discords-jobs --env-file .env.jobs --network your-service-network -p 127.0.0.1:3002:3002 discords-jobs
+```
+
+Bull Board at `http://127.0.0.1:3002/admin/queues` is unauthenticated: never publish the dashboard publicly without an authenticated proxy. For remote Docker hosts, bind locally and use an SSH tunnel. Adjust the mapping if overriding the dashboard port. Persist Redis data separately; no jobs container volume is required. `docker stop` allows the worker to drain active jobs and close its queues; configure a longer stop timeout if jobs can take minutes.
+
+`nub run test:docker:jobs` builds the image and runs the actual worker against isolated Redis and mock API/bot endpoints. It checks startup jobs and bearer authentication, recurring schedules, healthcheck, dashboard/static assets, non-root execution and graceful shutdown. No real API ingestion or Discord publication occurs. Temporary containers and network are removed; `discords-jobs:test` remains for inspection.
+
 ## Docker Compose
 
 `nub run docker:bot:up` starts Redis, the API, bot, and jobs worker. Redis is bound only to `127.0.0.1:6379`; Bull Board is bound only to `127.0.0.1:3002`. The Compose worker uses service DNS internally and starts only after Redis, API, and bot health checks succeed.
