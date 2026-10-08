@@ -133,14 +133,18 @@ createBullBoard({
   serverAdapter,
   options: { uiBasePath: "node_modules/@bull-board/ui" },
 });
-const dashboard = new Elysia({ adapter: node() })
+let stopDashboard: (() => void | Promise<void>) | undefined;
+new Elysia({ adapter: node() })
   .get("/health/live", () => ({ status: "ok" }))
   .use(await serverAdapter.registerPlugin())
-  .listen({ port: dashboardPort, hostname: dashboardHost });
+  .listen({ port: dashboardPort, hostname: dashboardHost }, (server) => {
+    // The Node adapter exposes its server here, not through Elysia's app.stop().
+    stopDashboard = () => server.stop();
+  });
 console.info(`Jobs dashboard listening on http://${dashboardHost}:${dashboardPort}/admin/queues`);
 
 async function shutdown() {
-  dashboard.stop();
+  await stopDashboard?.();
   await Promise.all([worker.close(), ticketWorker.close()]);
   await Promise.all([queue.close(), ticketQueue.close()]);
 }

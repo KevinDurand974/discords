@@ -24,6 +24,7 @@
     "test:integration": "node scripts/test-integration.mjs",
     "test:docker:api": "node scripts/test-api-docker.mjs",
     "test:docker:bot": "node scripts/test-bot-docker.mjs",
+    "test:docker:jobs": "node scripts/test-jobs-docker.mjs",
     "jobs:start": "nub --cwd apps/jobs run start",
     "jobs:dev": "nub --cwd apps/jobs run dev",
     "docker:bot:up": "nub exec varlock run --filter=#docker,#bot,#jobs --inject vars -- node scripts/docker.mjs --profile bot up -d --build --wait --wait-timeout 180"
