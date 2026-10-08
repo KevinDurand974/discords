@@ -5,6 +5,7 @@ import {
   ChannelType,
   ContainerBuilder,
   ForumLayoutType,
+  SortOrderType,
   MessageFlags,
   PermissionFlagsBits as P,
   SeparatorBuilder,
@@ -134,6 +135,7 @@ export async function provisionVideoForum(guild: Guild) {
     name: "Latest Videos",
     type: ChannelType.GuildForum,
     defaultForumLayout: ForumLayoutType.ListView,
+    defaultSortOrder: SortOrderType.CreationDate,
     topic:
       "Game guide videos from tracked YouTube creators. Moderators may create posts; comments are disabled. Videos, Shorts and livestreams are accepted.",
     permissionOverwrites: videoForumPermissions(guild.id, bot.id, moderators),

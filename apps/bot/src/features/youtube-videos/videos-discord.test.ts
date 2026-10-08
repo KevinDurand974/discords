@@ -3,6 +3,7 @@ import {
   Collection,
   ChannelType,
   ComponentType,
+  SortOrderType,
   PermissionsBitField,
   MessageFlags,
   PermissionFlagsBits as P,
@@ -77,6 +78,7 @@ describe("video presentation and resources", () => {
       expect.objectContaining({
         name: "Latest Videos",
         type: ChannelType.GuildForum,
+        defaultSortOrder: SortOrderType.CreationDate,
         permissionOverwrites: videoForumPermissions("guild", "bot", []),
       }),
     );
