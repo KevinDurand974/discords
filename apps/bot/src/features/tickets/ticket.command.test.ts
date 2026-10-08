@@ -97,10 +97,10 @@ afterEach(() => {
 });
 
 describe("/ticket command and modal", () => {
-  it("deletes only the creation confirmation five seconds after it is sent", async () => {
+  it("deletes only the creation confirmation ten seconds after it is sent", async () => {
     const f = fixture();
     await f.execute();
-    await vi.advanceTimersByTimeAsync(4_999);
+    await vi.advanceTimersByTimeAsync(9_999);
     expect(f.interaction.deleteReply).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(f.interaction.deleteReply).toHaveBeenCalledExactlyOnceWith();
@@ -111,7 +111,7 @@ describe("/ticket command and modal", () => {
     const f = fixture();
     f.interaction.deleteReply.mockRejectedValueOnce(new Error("Unknown message"));
     await f.execute();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
     expect(f.channel.delete).not.toHaveBeenCalled();
   });
@@ -376,7 +376,7 @@ describe("private ticket creation", () => {
     const f = fixture();
     f.channel.send.mockRejectedValueOnce(new Error("Missing Permissions"));
     f.channel.delete.mockRejectedValueOnce(new Error("Missing Permissions"));
-    await expect(f.execute()).rejects.toThrow("remove its empty channel");
+    await expect(f.execute()).rejects.toThrow("delete the incomplete ticket channel");
     expect(f.interaction.editReply).not.toHaveBeenCalled();
   });
 });

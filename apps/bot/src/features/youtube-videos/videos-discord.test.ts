@@ -152,7 +152,7 @@ describe("video presentation and resources", () => {
       guild: { members: { fetchMe: vi.fn(async () => ({ id: "bot" })) } },
       permissionsFor: () => ({ has: () => false }),
     } as unknown as ForumChannel;
-    await expect(checkVideoPermissions(forum)).rejects.toThrow("missing required permissions");
+    await expect(checkVideoPermissions(forum)).rejects.toThrow("The bot needs View Channel");
   });
   it("renders title, separator, description, publication date and link button without mentions", () => {
     const [message] = renderVideo(video);
@@ -286,7 +286,7 @@ describe("video presentation and resources", () => {
       Array.from({ length: 20 }, (_, i) => ({ id: `${i}`, name: `Creator ${i}` })),
     );
     await expect(creatorTag(forum, "New creator", video.channelId, null, [])).rejects.toThrow(
-      "20 creator-tag limit",
+      "already has 20 creator tags",
     );
     expect(state.setAvailableTags).not.toHaveBeenCalled();
   });

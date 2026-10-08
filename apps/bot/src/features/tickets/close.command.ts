@@ -1,7 +1,8 @@
-import { InteractionContextType, SlashCommandBuilder } from "discord.js";
+import { InteractionContextType, MessageFlags, SlashCommandBuilder } from "discord.js";
 import type { CommandDefinition } from "@/core/command.ts";
 import { closeTicket } from "./close-ticket.ts";
-import { ticketClosureMessage } from "./ticket-closure-components.ts";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 
 export const closeTicketHelpDescription = [
   "Run inside a ticket channel to schedule permanent deletion in 5 minutes, without a transcript or extra confirmation. Only the requester, ticket moderators, administrators or server owner can close it. The bot needs Manage Channels.",
@@ -18,14 +19,17 @@ export const closeCommand = {
     .setDefaultMemberPermissions(null),
   async execute(interaction) {
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Tickets can only be closed in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
-    await interaction.deferReply();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const closure = await closeTicket(
       interaction.guild,
       interaction.channelId,
       interaction.user.id,
     );
-    await interaction.editReply(ticketClosureMessage(closure));
+    await editSuccessReply(interaction, {
+      content: `Ticket closing <t:${Math.floor(closure.deleteAt.getTime() / 1000)}:R>. Use the channel notice to close now or reopen.`,
+      allowedMentions: { parse: [] },
+    });
   },
 } satisfies CommandDefinition;

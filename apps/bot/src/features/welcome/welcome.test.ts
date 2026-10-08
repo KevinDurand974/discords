@@ -177,7 +177,9 @@ describe("welcome setup", () => {
     await expect(saveWelcomeSettings(f.submit, f.store)).rejects.toThrow("Manage Server");
     f.interaction.memberPermissions.has.mockReturnValue(true);
     f.interaction.customId = "welcome:setup:v2:someone-else:guild";
-    await expect(saveWelcomeSettings(f.submit, f.store)).rejects.toThrow("another user or server");
+    await expect(saveWelcomeSettings(f.submit, f.store)).rejects.toThrow(
+      "This form is unavailable. Run /welcome setup again",
+    );
     expect(f.store.save).not.toHaveBeenCalled();
   });
   it("rejects inaccessible channels and blank templates before saving", async () => {

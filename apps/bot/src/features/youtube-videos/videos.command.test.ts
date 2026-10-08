@@ -259,13 +259,13 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
         }) as unknown as ModalSubmitInteraction;
       await expect(
         youtubeComponentHandler.execute(submit("different-moderator"), context),
-      ).rejects.toThrow("belongs to another user");
+      ).rejects.toThrow("This confirmation is unavailable");
       await expect(
         youtubeComponentHandler.execute(submit("moderator", "other-guild"), context),
-      ).rejects.toThrow("belongs to another user");
+      ).rejects.toThrow("This confirmation is unavailable");
       vi.advanceTimersByTime(300_001);
       await expect(youtubeComponentHandler.execute(submit("moderator"), context)).rejects.toThrow(
-        "expired",
+        "This confirmation is unavailable",
       );
     } finally {
       vi.useRealTimers();
@@ -294,7 +294,8 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     "asks for a choice and confirms %s cleanup within the selected creator scope",
     async (mode) => {
       const prompt = await cleanupPrompt(tagId);
-      expect(prompt.content).toContain("choose what to remove");
+      expect(prompt.content).toContain("**Permanent deletion**");
+      expect(prompt.content).toContain("Removed videos won't be reposted");
       expect(prompt.components[0].components).toHaveLength(3);
       expect(runtime.clean).not.toHaveBeenCalled();
       const customId = prompt.components[0].components.find(
@@ -303,7 +304,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       await youtubeComponentHandler.execute(button(customId), context);
       expect(runtime.clean).toHaveBeenCalledWith("guild", forumId, 1, mode, tagId);
       await expect(youtubeComponentHandler.execute(button(customId), context)).rejects.toThrow(
-        "expired",
+        "This confirmation is unavailable",
       );
     },
   );
@@ -319,7 +320,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     const customId = prompt.components[0].components[0].data.custom_id;
     await expect(
       youtubeComponentHandler.execute(button(customId, "other-admin"), context),
-    ).rejects.toThrow("belongs to another user");
+    ).rejects.toThrow("This confirmation is unavailable");
     expect(runtime.clean).not.toHaveBeenCalled();
   });
 });

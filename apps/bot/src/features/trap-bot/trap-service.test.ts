@@ -184,7 +184,7 @@ describe("trap-bot setup", () => {
   it("rejects DMs", async () => {
     const f = fixture();
     f.interaction.inGuild = () => false;
-    await expect(f.run()).rejects.toThrow("server-only");
+    await expect(f.run()).rejects.toThrow("Use this command in a server");
   });
   it("refuses a second trap while the registered channel exists", async () => {
     const f = fixture();

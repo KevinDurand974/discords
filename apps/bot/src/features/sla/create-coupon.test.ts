@@ -231,7 +231,9 @@ describe("interactive coupon creation", () => {
     expect(reply).toContain("Item 2");
     expect(reply).toContain("Item 8");
     expect(reply).not.toContain("Next items");
-    await expect(execute(actor(id("quantity-0", token)))).rejects.toThrow("no longer available");
+    await expect(execute(actor(id("quantity-0", token)))).rejects.toThrow(
+      "This draft is unavailable",
+    );
     await saveQuantity(token, "5", 1);
     await saveQuantity(token, "6", 7);
     await execute(actor(id("publish", token)));
@@ -275,11 +277,11 @@ describe("interactive coupon creation", () => {
     const current = await quantityModal(token, 1);
     const stale = actor(old.custom_id, true);
     stale.fields.getTextInputValue.mockReturnValue("99");
-    await expect(execute(stale)).rejects.toThrow("no longer available");
+    await expect(execute(stale)).rejects.toThrow("This draft is unavailable");
     const save = actor(current.custom_id, true);
     save.fields.getTextInputValue.mockReturnValue("2");
     await execute(save);
-    await expect(execute(save)).rejects.toThrow("no longer available");
+    await expect(execute(save)).rejects.toThrow("This draft is unavailable");
     await execute(actor(id("publish", token)));
     const sent = JSON.stringify(target.send.mock.calls);
     expect(sent).toContain("Gold:1551725274725359766> x10");
@@ -298,7 +300,7 @@ describe("interactive coupon creation", () => {
         if (reason === "cancelled") await execute(actor(id("cancel", token)));
         else vi.advanceTimersByTime(300_000);
       });
-      await expect(execute(save)).rejects.toThrow("no longer available");
+      await expect(execute(save)).rejects.toThrow("This form is unavailable");
       expect(save.editReply).not.toHaveBeenCalled();
       expect(target.send).not.toHaveBeenCalled();
     },
@@ -390,28 +392,37 @@ describe("interactive coupon creation", () => {
     );
   });
   it.each(["publish", "cancel"])(
-    "immediately dismisses the private draft after %s",
+    "shows a terminal confirmation and deletes it after 10 seconds on %s",
     async (action) => {
       vi.useFakeTimers();
       const { token } = await start();
       const request = actor(id(action, token));
       await execute(request);
-      expect(request.deleteReply).toHaveBeenCalledOnce();
+      expect(request.deleteReply).not.toHaveBeenCalled();
       expect(request.deferUpdate).toHaveBeenCalledOnce();
-      expect(request.editReply).not.toHaveBeenCalled();
-      expect(vi.getTimerCount()).toBe(0);
+      expect(request.editReply).toHaveBeenCalledOnce();
+      expect(JSON.stringify(request.editReply.mock.calls)).toContain(
+        action === "publish" ? "Coupon published" : "Coupon creation cancelled",
+      );
+      expect(vi.getTimerCount()).toBe(1);
       expect(target.send).toHaveBeenCalledTimes(action === "cancel" ? 0 : 1);
       if (action === "publish")
         expect(target.send.mock.invocationCallOrder[0]).toBeLessThan(
-          request.deleteReply.mock.invocationCallOrder[0]!,
+          request.editReply.mock.invocationCallOrder[0]!,
         );
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(request.deleteReply).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(request.deleteReply).toHaveBeenCalledOnce();
     },
   );
   it("ignores deletion errors on an already-dismissed reply and cancels without publication", async () => {
+    vi.useFakeTimers();
     const { token } = await start(["Gold"]);
     const cancel = actor(id("cancel", token));
     cancel.deleteReply.mockRejectedValueOnce(new Error("Unknown Message"));
     await execute(cancel);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(cancel.deleteReply).toHaveBeenCalledOnce();
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
     expect(target.send).not.toHaveBeenCalled();

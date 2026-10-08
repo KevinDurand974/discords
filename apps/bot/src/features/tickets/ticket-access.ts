@@ -1,13 +1,14 @@
 import { ChannelType, PermissionFlagsBits, type Guild, type TextChannel } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import { ticketOwnerId } from "./ticket-service.ts";
 
 export async function authorizeTicket(guild: Guild, channelId: string, actorId: string) {
   const channel = await guild.channels.fetch(channelId, { force: true });
   if (!channel || channel.type !== ChannelType.GuildText) {
-    throw new Error("Use /close-ticket inside a ticket text channel.");
+    throw new UserFacingError("Use /close-ticket inside a ticket text channel.");
   }
   const ownerId = ticketOwnerId(channel);
-  if (!ownerId) throw new Error("Use /close-ticket inside a ticket text channel.");
+  if (!ownerId) throw new UserFacingError("Use /close-ticket inside a ticket text channel.");
   await guild.roles.fetch();
   const member = await guild.members.fetch({ user: actorId, force: true });
   const allowed =
@@ -21,12 +22,14 @@ export async function authorizeTicket(guild: Guild, channelId: string, actorId: 
         role.permissions.has(PermissionFlagsBits.ManageMessages),
     );
   if (!allowed)
-    throw new Error("Only the ticket requester or a moderator can close or reopen this ticket.");
+    throw new UserFacingError(
+      "Only the ticket requester or a moderator can close or reopen this ticket.",
+    );
   return { channel, ownerId };
 }
 export async function requireTicketDeletionPermission(guild: Guild, channel: TextChannel) {
   const bot = await guild.members.fetchMe({ force: true });
   if (!channel.permissionsFor(bot)?.has(PermissionFlagsBits.ManageChannels)) {
-    throw new Error("The bot needs Manage Channels in this ticket to delete it.");
+    throw new UserFacingError("The bot needs Manage Channels in this ticket to delete it.");
   }
 }

@@ -34,6 +34,7 @@ const setup: NewsSetup = {
 function fixture() {
   const editReply = vi.fn(async (_payload: { content: string }) => {});
   const deferReply = vi.fn(async () => {});
+  const deleteReply = vi.fn(async () => {});
   const interaction = {
     inGuild: () => true,
     guild: { id: "guild" },
@@ -44,11 +45,13 @@ function fixture() {
     options: { getSubcommand: () => "create", getInteger: () => null },
     editReply,
     deferReply,
+    deleteReply,
   } as unknown as ChatInputCommandInteraction;
-  return { interaction, editReply, deferReply };
+  return { interaction, editReply, deferReply, deleteReply };
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   mocks.create.mockResolvedValue({ ...setup });
   mocks.sync.mockImplementation(async (_guildId, options) => {
@@ -58,7 +61,11 @@ beforeEach(() => {
     return { published: 2, skipped: 0, failures: [], initial: true };
   });
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe("news setup progress", () => {
   it("shows setup stages and throttles rapid edits while always sending final progress and summary", async () => {
@@ -67,13 +74,18 @@ describe("news setup progress", () => {
     await handleNewsSetup(f.interaction);
     expect(f.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
     const messages = f.editReply.mock.calls.map(([reply]) => reply.content);
-    expect(messages[0]).toContain("Forum and category roles");
+    expect(messages[0]).toBe("Setting up news…");
     expect(messages[1]).toBe("Fetching the latest news…");
-    expect(messages[2]).toContain("**0/2**");
-    expect(messages[3]).toContain("**2/2** processed — 2 published, 0 failed. Finalizing setup…");
+    expect(messages[2]).toBe("Publishing articles: 0/2.");
+    expect(messages[3]).toBe("Publishing articles: 2/2.");
     expect(messages[4]).toContain("News Forum ready: <#forum>");
     expect(messages).toHaveLength(5);
     expect(mocks.create.mock.calls[0]?.[2]).toBe(10);
+    expect(f.deleteReply).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(9_999);
+    expect(f.deleteReply).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.deleteReply).toHaveBeenCalledOnce();
   });
 
   it("shows intermediate progress and failures when enough time has elapsed", async () => {
@@ -85,14 +97,25 @@ describe("news setup progress", () => {
       await options?.onProgress?.({ completed: 0, total: 2, published: 0, failed: 0 });
       await options?.onProgress?.({ completed: 1, total: 2, published: 0, failed: 1 });
       await options?.onProgress?.({ completed: 2, total: 2, published: 1, failed: 1 });
-      return { published: 1, skipped: 0, failures: ["Article unavailable"], initial: true };
+      return {
+        published: 1,
+        skipped: 0,
+        failures: ["private-upstream-token: Article unavailable"],
+        initial: true,
+      };
     });
     const f = fixture();
     await handleNewsSetup(f.interaction);
     expect(f.editReply.mock.calls.map(([reply]) => reply.content)).toContain(
-      "Initial import: **1/2** processed — 0 published, 1 failed.",
+      "Publishing articles: 1/2.",
     );
-    expect(f.editReply.mock.lastCall?.[0].content).toContain("1 published, 0 skipped, 1 failed");
+    expect(f.editReply.mock.lastCall?.[0].content).toContain(
+      "Published 1 articles. 1 couldn't be published.",
+    );
+    expect(f.editReply.mock.lastCall?.[0].content).toContain("/sla news backfill");
+    expect(JSON.stringify(f.editReply.mock.calls)).not.toContain("private-upstream-token");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.deleteReply).not.toHaveBeenCalled();
   });
 
   it("finalizes empty imports without dividing by zero", async () => {
@@ -103,7 +126,7 @@ describe("news setup progress", () => {
     const f = fixture();
     await handleNewsSetup(f.interaction);
     expect(f.editReply.mock.calls.map(([reply]) => reply.content)).toContain(
-      "No articles to import. Finalizing setup…",
+      "Finishing news setup…",
     );
     expect(f.editReply.mock.lastCall?.[0].content).toContain("News Forum ready");
   });
@@ -113,7 +136,7 @@ describe("news setup progress", () => {
     const f = fixture();
     await handleNewsSetup(f.interaction);
     expect(mocks.sync).not.toHaveBeenCalled();
-    expect(f.editReply.mock.lastCall?.[0].content).toContain("Already imported");
+    expect(f.editReply.mock.lastCall?.[0].content).toBe("News Forum ready: <#forum>.");
   });
 
   it("keeps importing when a progress reply fails", async () => {

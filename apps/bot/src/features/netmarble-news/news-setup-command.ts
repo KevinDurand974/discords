@@ -1,3 +1,5 @@
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { randomUUID } from "node:crypto";
 import {
   ActionRowBuilder,
@@ -126,16 +128,18 @@ export function createNewsGuildGateway(
     guildId: guild.id,
     async preflight() {
       if (!guild.features.includes(GuildFeature.Community)) {
-        throw new Error("Forum Channels require a Community server.");
+        throw new UserFacingError("Enable Community for this server before creating a Forum.");
       }
       const bot = await guild.members.fetchMe();
       if (!bot.permissions.has(REQUIRED_BOT_PERMISSIONS)) {
-        throw new Error(
+        throw new UserFacingError(
           "The bot needs Manage Channels, Manage Roles, Manage Threads, Send Messages, Send Messages in Threads, Embed Links, Attach Files, Read Message History, and Mention Everyone permissions.",
         );
       }
       if (bot.roles.highest.comparePositionTo(guild.roles.everyone) <= 0) {
-        throw new Error("The bot role must be above @everyone to create notification roles.");
+        throw new UserFacingError(
+          "Move the bot's role above @everyone to create notification roles.",
+        );
       }
     },
     async resourcesExist(setup: NewsSetup) {
@@ -230,7 +234,7 @@ export async function handleNewsCleanConfirmation(interaction: ButtonInteraction
     !interaction.guildId ||
     !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
   )
-    throw new Error("Only a server administrator can clean news resources.");
+    throw new UserFacingError("Only a server administrator can clean news resources.");
   const token = interaction.customId.slice(CLEAN_PREFIX.length);
   const pending = pendingCleanups.get(token);
   if (
@@ -239,7 +243,7 @@ export async function handleNewsCleanConfirmation(interaction: ButtonInteraction
     pending.guildId !== interaction.guildId ||
     pending.userId !== interaction.user.id
   )
-    throw new Error(
+    throw new UserFacingError(
       "This confirmation expired or belongs to another administrator. Run /sla news clean again.",
     );
   pendingCleanups.delete(token);
@@ -258,15 +262,15 @@ export async function handleNewsCleanConfirmation(interaction: ButtonInteraction
   } catch (error) {
     console.error(`News cleanup failed in ${interaction.guildId}`, error);
     await interaction.editReply({
-      content: `Cleanup incomplete: ${error instanceof Error ? error.message : String(error)} Check /sla news status; if still configured, run /sla news clean again to retry.`,
+      content: "Cleanup incomplete. Check bot permissions, then run /sla news clean again.",
       components: [],
     });
     return;
   }
-  await interaction.editReply({
+  await editSuccessReply(interaction, {
     content: removed
-      ? "News Forum, notification roles and this server's publication history were removed. You may run /setup news create again."
-      : "News is already unconfigured; nothing was deleted.",
+      ? "News Forum and notification roles removed. News publishing is disabled."
+      : "News is not configured. Nothing was deleted.",
     components: [],
   });
 }
@@ -281,10 +285,10 @@ export const newsCleanComponentHandler: ComponentHandler = {
 
 export async function handleNewsSetup(interaction: ChatInputCommandInteraction) {
   if (!interaction.inGuild() || !interaction.guild || !interaction.guildId) {
-    throw new Error("This command can only be used in a server.");
+    throw new UserFacingError("Use this command in a server.");
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-    throw new Error("You need the Manage Channels permission to configure news.");
+    throw new UserFacingError("You need Manage Channels to configure news.");
   }
   const store = createNewsSetupRepository();
   const action = interaction.options.getSubcommand();
@@ -293,19 +297,14 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       content: setup
-        ? `News is **${setup.enabled ? "enabled" : "disabled"}** in <#${setup.forumChannelId}>. Initial import: ${setup.initialImportCompleted ? "complete" : `pending (${setup.initialImportMode}, ${setup.initialBackfillCount} newest)`}.\n${setup.mappings
-            .map(
-              ({ menuSeq, tagId, notificationRoleId }) =>
-                `${NEWS_TAGS.find((tag) => tag.menuSeq === menuSeq)?.name ?? menuSeq}: tag ${tagId}, <@&${notificationRoleId}>`,
-            )
-            .join("\n")}`
+        ? `News publishing is **${setup.enabled ? "enabled" : "disabled"}** in <#${setup.forumChannelId}>.${setup.initialImportCompleted ? "" : " First articles are still being published."}`
         : "News is not configured for this server.",
     });
     return;
   }
   if (action === "clean") {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator))
-      throw new Error("Only a server administrator can clean news resources.");
+      throw new UserFacingError("Only a server administrator can clean news resources.");
     const setup = await store.get(interaction.guildId);
     if (!setup) {
       await interaction.reply({
@@ -314,7 +313,6 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
       });
       return;
     }
-    const count = await store.publicationCount(interaction.guildId);
     const token = randomUUID();
     const roleIds = [
       ...new Set(setup.mappings.map(({ notificationRoleId }) => notificationRoleId)),
@@ -332,12 +330,12 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
     await interaction.reply({
       flags: MessageFlags.Ephemeral,
       allowedMentions: { parse: [] },
-      content: `**Permanent deletion for this server**\nForum: <#${setup.forumChannelId}> (ID ${setup.forumChannelId}); all posts, comments and attachments.\nNotification roles: ${roleIds.map((id) => `<@&${id}> (ID ${id})`).join(", ") || "none"}; all member assignments.\nPublication history: **${count}** imported-article records for this server.\nGlobal source data and other servers are unaffected. Confirm within 5 minutes or do nothing.`,
+      content: `**Permanent deletion**\nDelete <#${setup.forumChannelId}>, all its posts, and these notification roles: ${roleIds.map((id) => `<@&${id}>`).join(", ") || "none"}. News publishing will stop.\nConfirm within 5 minutes or do nothing.`,
       components: [
         new ActionRowBuilder<ButtonBuilder>().addComponents(
           new ButtonBuilder()
             .setCustomId(`${CLEAN_PREFIX}${token}`)
-            .setLabel("Delete Forum, roles and history")
+            .setLabel("Delete Forum and roles")
             .setStyle(ButtonStyle.Danger),
         ),
       ],
@@ -361,9 +359,13 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
       interaction.guildId,
       { mode: "backfill", count: interaction.options.getInteger("count") ?? 10 },
     );
-    await interaction.editReply({
-      content: `Backfill: ${result.published} published. ${result.failures.length} failed.${result.failures.length ? ` IDs: ${result.failures.join("; ").slice(0, 1000)}` : ""}`,
-    });
+    const response = {
+      content: `Published ${result.published} articles.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /sla news backfill again.` : ""}`,
+    };
+    if (result.failures.length) {
+      console.error("News backfill incomplete", result.failures);
+      await interaction.editReply(response);
+    } else await editSuccessReply(interaction, response);
     return;
   }
   if (action !== "create") throw new Error("Unknown news setup action.");
@@ -380,7 +382,7 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
         console.error(`Could not update news setup progress in ${interaction.guildId}`, error);
       }
     };
-    await updateProgress("Creating or reactivating the news Forum and category roles…");
+    await updateProgress("Setting up news…");
     const setup = await createNewsSetup(
       createNewsGuildGateway(interaction.guild!, botId, interaction.user.tag),
       store,
@@ -391,28 +393,23 @@ export async function handleNewsSetup(interaction: ChatInputCommandInteraction) 
     const result = setup.initialImportCompleted
       ? null
       : await synchronizer.syncGuild(interaction.guildId!, {
-          async onProgress({ completed, total, published, failed }) {
+          async onProgress({ completed, total }) {
             const now = Date.now();
             if (completed !== total && now - lastUpdate < 2000) return;
             lastUpdate = now;
             await updateProgress(
-              total === 0
-                ? "No articles to import. Finalizing setup…"
-                : `Initial import: **${completed}/${total}** processed — ${published} published, ${failed} failed.${completed === total ? " Finalizing setup…" : ""}`,
+              total === 0 ? "Finishing news setup…" : `Publishing articles: ${completed}/${total}.`,
             );
           },
         });
     return { setup, result };
   });
-  const summary = result
-    ? `Initial import: ${result.published} published, ${result.skipped} skipped, ${result.failures.length} failed.${result.failures.length ? ` IDs: ${result.failures.join("; ").slice(0, 800)}` : ""}`
-    : "Already imported; future synchronization remains active.";
-  await interaction.editReply({
-    content: `News Forum ready: <#${setup.forumChannelId}>.\n${setup.mappings
-      .map(
-        ({ menuSeq, notificationRoleId }) =>
-          `${NEWS_TAGS.find((tag) => tag.menuSeq === menuSeq)?.name ?? menuSeq}: <@&${notificationRoleId}>`,
-      )
-      .join("\n")}\n${summary}`,
-  });
+  const response = {
+    content: `News Forum ready: <#${setup.forumChannelId}>.${result ? ` Published ${result.published} articles.` : ""}${result?.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /sla news backfill again.` : ""}`,
+    allowedMentions: { parse: [] as const },
+  };
+  if (result?.failures.length) {
+    console.error("News setup publication incomplete", result.failures);
+    await interaction.editReply(response);
+  } else await editSuccessReply(interaction, response);
 }

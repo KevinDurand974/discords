@@ -73,13 +73,16 @@ describe("simplified /sla redeem", () => {
       isModalSubmit: () => true,
       fields: { getTextInputValue: (name: string) => (name === "coupon" ? " CODE " : " PID ") },
       reply: vi.fn(),
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+      deleteReply: vi.fn(async () => {}),
     };
     await redeemComponentHandler.execute(interaction as unknown as ComponentInteraction, context);
     expect(redeemCoupon).toHaveBeenCalledExactlyOnceWith("CODE", "PID");
-    expect(interaction.reply).toHaveBeenCalledWith(
+    expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
+    expect(interaction.editReply).toHaveBeenCalledWith(
       expect.objectContaining({
-        flags: MessageFlags.Ephemeral,
-        embeds: [expect.objectContaining({ title: "Coupon added!", description: "Reward" })],
+        embeds: [expect.objectContaining({ title: "Coupon redeemed.", description: "Reward" })],
       }),
     );
   });
@@ -89,10 +92,17 @@ describe("simplified /sla redeem", () => {
       isModalSubmit: () => true,
       fields: { getTextInputValue: () => "VALUE" },
       reply: vi.fn(),
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+      deleteReply: vi.fn(async () => {}),
     };
     await expect(
       redeemComponentHandler.execute(interaction as unknown as ComponentInteraction, context),
-    ).rejects.toThrow(errorCode === 24004 ? "already added" : "doesn't exist");
+    ).rejects.toThrow(
+      errorCode === 24004 ? "already been claimed" : "Check your coupon code and player ID",
+    );
+    expect(interaction.editReply).not.toHaveBeenCalled();
+    expect(interaction.deleteReply).not.toHaveBeenCalled();
     expect(interaction.reply).not.toHaveBeenCalled();
   });
 });

@@ -43,6 +43,16 @@ describe("successful deferred reply cleanup", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
   });
+  it("supports plain-text confirmations", async () => {
+    const f = fixture();
+    await editSuccessReply(
+      f.interaction as unknown as Parameters<typeof editSuccessReply>[0],
+      "Done.",
+    );
+    expect(f.interaction.editReply).toHaveBeenCalledWith("Done.");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
+  });
   it("does not keep the process alive", async () => {
     const f = fixture();
     const timer = vi.spyOn(globalThis, "setTimeout");

@@ -21,6 +21,8 @@ import {
   type SlashCommandSubcommandBuilder,
 } from "discord.js";
 import type { CommandDefinition, ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { createVideosRuntime } from "./videos-runtime.ts";
 
 type Actor = ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction;
@@ -34,13 +36,13 @@ export function requireVideoPermission(
   admin = false,
 ): asserts interaction is Actor & { guild: Guild; guildId: string } {
   if (!interaction.guild || !interaction.guildId)
-    throw new Error("YouTube can only be managed in a server.");
+    throw new UserFacingError("Use this command in a server.");
   const permission = admin ? PermissionFlagsBits.Administrator : PermissionFlagsBits.ManageMessages;
   if (
     interaction.user.id !== interaction.guild.ownerId &&
     !interaction.memberPermissions?.has(permission)
   )
-    throw new Error(
+    throw new UserFacingError(
       admin
         ? "Only an administrator can clean YouTube resources."
         : "You need Manage Messages to manage YouTube.",
@@ -67,9 +69,7 @@ function consumeSession(interaction: Actor & { guildId: string }, kind: Session[
     pending.guildId !== interaction.guildId ||
     pending.userId !== interaction.user.id
   )
-    throw new Error(
-      "This form/confirmation expired or belongs to another user; run the command again.",
-    );
+    throw new UserFacingError("This confirmation is unavailable. Run the command again.");
   sessions.delete(id);
   return pending;
 }
@@ -105,7 +105,7 @@ export async function autocompleteYoutubeTag(interaction: AutocompleteInteractio
 }
 export async function handleYoutubeSetup(interaction: ChatInputCommandInteraction) {
   if (!interaction.guild || !interaction.guildId)
-    throw new Error("YouTube can only be configured in a server.");
+    throw new UserFacingError("Use this command in a server.");
   const clean = interaction.options.getSubcommand() === "clean";
   if (clean) requireVideoPermission(interaction, true);
   else {
@@ -113,14 +113,14 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
       interaction.user.id !== interaction.guild.ownerId &&
       !interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)
     )
-      throw new Error("You need Manage Channels to configure the YouTube Forum.");
+      throw new UserFacingError("You need Manage Channels to configure the YouTube Forum.");
   }
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const runtime = createVideosRuntime(interaction.client);
   if (!clean) {
     const { forum } = await runtime.setup(interaction.guildId);
-    await interaction.editReply({
-      content: `YouTube Forum ready: <#${forum.id}>. Use /youtube add to track a creator.`,
+    await editSuccessReply(interaction, {
+      content: `YouTube Forum ready: <#${forum.id}>. Use /youtube add to follow a creator.`,
       allowedMentions: { parse: [] },
     });
     return;
@@ -134,7 +134,8 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
   const tag = tagId
     ? (await runtime.creatorTags(interaction.guildId)).find((item) => item.id === tagId)
     : undefined;
-  if (tagId && !tag) throw new Error("Choose a current creator tag from the suggested list.");
+  if (tagId && !tag)
+    throw new UserFacingError("Choose a current creator tag from the suggested list.");
   const token = createSession({
     kind: "clean",
     guildId: interaction.guildId,
@@ -144,12 +145,12 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
     ...(tagId ? { tagId } : {}),
   });
   const resources = tag
-    ? "Delete this creator's videos, owned tag and tracking; keep the Forum and other creators."
+    ? "Remove this creator's videos and tag, and stop following them."
     : setup.ownsForum
-      ? "Delete the Forum, all its posts/tags and this server's YouTube tracking."
-      : "Delete managed videos, owned creator tags and YouTube tracking; keep the user-selected Forum and unrelated posts/tags.";
+      ? "Delete the Forum and all its posts, and stop following all creators."
+      : "Remove followed creators' videos and tags, and stop following them. Keep the Forum and unrelated posts.";
   await interaction.editReply({
-    content: `**Permanent deletion — choose what to remove**\nForum: ${setup.forumChannelId ? `<#${setup.forumChannelId}>` : "missing"}. Scope: ${tag ? tag.name : "all creators"}.\n**Videos only:** delete managed video posts; retain the Forum, tags and subscriptions for future videos. Deleted videos will not be reposted.\n**Everything in scope:** ${resources}\nGlobal YouTube history and other servers are unaffected. Confirm within 5 minutes.`,
+    content: `**Permanent deletion** — ${tag ? tag.name : "all creators"}\nForum: ${setup.forumChannelId ? `<#${setup.forumChannelId}>` : "missing"}.\n**Videos only:** remove existing videos and keep following creators. Removed videos won't be reposted.\n**Everything in scope:** ${resources}\nChoose within 5 minutes.`,
     allowedMentions: { parse: [] },
     components: [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
@@ -254,9 +255,11 @@ export const youtubeCommand = {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     if (action === "sync") {
       const result = await runtime.sync(interaction.guildId);
-      await interaction.editReply(
-        `Published ${result.published}; failed ${result.failures.length}. Failed publications remain retryable; check /youtube status.`,
-      );
+      const content = `Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}`;
+      if (result.failures.length) {
+        console.error("YouTube sync incomplete", result.failures);
+        await interaction.editReply(content);
+      } else await editSuccessReply(interaction, content);
       return;
     }
     const setup = await runtime.store.get(interaction.guildId);
@@ -270,17 +273,20 @@ export const youtubeCommand = {
     const creators = tracked
       .map(
         ({ creator }) =>
-          `${creator.displayName.slice(0, 40)} — ${creator.lastSyncedAt?.toISOString() ?? "not synced"}${creator.lastError ? ` (${creator.lastError})` : ""}`,
+          `${creator.displayName.slice(0, 40)} — ${creator.lastError ? "Update failed; try /youtube sync." : creator.lastSyncedAt ? "Up to date" : "Waiting for videos"}`,
       )
       .join("\n");
-    await interaction.editReply({
+    const response = {
       content:
-        `YouTube: ${setup.forumChannelId ? `<#${setup.forumChannelId}>` : "setup required"} (${setup.lifecycle})\n${await runtime.store.counts(interaction.guildId)}\n${creators}`.slice(
+        `YouTube: ${setup.forumChannelId ? `<#${setup.forumChannelId}>` : "run /youtube setup"}.\n${await runtime.store.counts(interaction.guildId)}\n${creators || "No creators followed. Use /youtube add."}`.slice(
           0,
           1950,
         ),
-      allowedMentions: { parse: [] },
-    });
+      allowedMentions: { parse: [] as const },
+    };
+    if (setup.lifecycle !== "active" || tracked.some(({ creator }) => creator.lastError))
+      await interaction.editReply(response);
+    else await editSuccessReply(interaction, response);
   },
 } satisfies CommandDefinition;
 
@@ -300,22 +306,26 @@ export const youtubeComponentHandler: ComponentHandler = {
         ChannelType.GuildForum,
       ]);
       const forumId = channels.first()?.id;
-      if (!forumId) throw new Error("Choose a Forum channel in this server.");
+      if (!forumId) throw new UserFacingError("Choose a Forum channel in this server.");
       const result = await createVideosRuntime(interaction.client).add(
         interaction.guildId,
         interaction.fields.getTextInputValue("channel-url"),
         pending.count,
         forumId,
       );
-      await interaction.editReply({
-        content: `${result.reused ? "Creator reused" : "Creator added"} in <#${result.forumId}>. Published ${result.published}; failed ${result.failures.length}.`,
-        allowedMentions: { parse: [] },
-      });
+      const response = {
+        content: `Creator followed in <#${result.forumId}>. Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}`,
+        allowedMentions: { parse: [] as const },
+      };
+      if (result.failures.length) {
+        console.error("YouTube creator publication incomplete", result.failures);
+        await interaction.editReply(response);
+      } else await editSuccessReply(interaction, response);
     } else if (pending.kind === "clean" && interaction.isButton()) {
       await interaction.deferUpdate();
       if (interaction.customId.startsWith("youtube:cancel:")) {
-        await interaction.editReply({
-          content: "Cleanup cancelled; nothing was deleted.",
+        await editSuccessReply(interaction, {
+          content: "Cleanup cancelled. Nothing was deleted.",
           components: [],
         });
         return;
@@ -330,17 +340,17 @@ export const youtubeComponentHandler: ComponentHandler = {
           mode,
           pending.tagId,
         );
-        await interaction.editReply({
+        await editSuccessReply(interaction, {
           content:
             mode === "videos"
-              ? "Video posts removed. Forum, creator tags and tracking retained for future videos."
-              : "Selected YouTube resources and tracking removed. Shared YouTube history is retained.",
+              ? "Videos removed. New videos will still be posted."
+              : "YouTube cleanup complete.",
           components: [],
         });
-      } catch {
+      } catch (error) {
+        console.error("YouTube cleanup incomplete", error);
         await interaction.editReply({
-          content:
-            "Cleanup is incomplete or resources changed. Check bot permissions and run /youtube clean with the same scope again to retry.",
+          content: "Cleanup incomplete. Check bot permissions, then run /youtube clean again.",
           components: [],
         });
       }

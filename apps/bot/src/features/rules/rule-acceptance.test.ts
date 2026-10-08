@@ -73,13 +73,13 @@ describe("rules acceptance button", () => {
   });
 
   it.each([false, true])(
-    "deletes the acknowledgment only after five seconds (already accepted=%s)",
+    "deletes the acknowledgment only after ten seconds (already accepted=%s)",
     async (alreadyAccepted) => {
       const f = fixture();
       if (alreadyAccepted) f.member.roles.cache.set(f.role.id, f.role);
       await f.execute();
       expect(f.interaction.deleteReply).not.toHaveBeenCalled();
-      await vi.advanceTimersByTimeAsync(4_999);
+      await vi.advanceTimersByTimeAsync(9_999);
       expect(f.interaction.deleteReply).not.toHaveBeenCalled();
       await vi.advanceTimersByTimeAsync(1);
       expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
@@ -90,7 +90,7 @@ describe("rules acceptance button", () => {
     const f = fixture();
     f.interaction.deleteReply.mockRejectedValue(new Error("Unknown Message"));
     await f.execute();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
   });
 
@@ -98,7 +98,7 @@ describe("rules acceptance button", () => {
     const f = fixture();
     f.interaction.editReply.mockRejectedValue(new Error("Cannot edit"));
     await expect(f.execute()).rejects.toThrow("Cannot edit");
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(10_000);
     expect(f.interaction.deleteReply).not.toHaveBeenCalled();
   });
 
@@ -111,7 +111,7 @@ describe("rules acceptance button", () => {
     expect(f.guild.roles.fetch).toHaveBeenCalledWith("200", { force: true });
     expect(f.member.roles.add).toHaveBeenCalledExactlyOnceWith(f.role, "Accepted the server rules");
     expect(f.interaction.editReply).toHaveBeenCalledWith({
-      content: "Thank you! You have accepted the rules and received the acceptance role.",
+      content: "Rules accepted.",
       allowedMentions: { parse: [] },
     });
   });

@@ -1,5 +1,7 @@
 import { MessageFlags, PermissionFlagsBits as P } from "discord.js";
 import type { ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { assertSafeRuleRole } from "./rule-role.ts";
 
 const PREFIX = "rule-accept:";
@@ -11,7 +13,7 @@ export const ruleAcceptanceHandler = {
   async execute(interaction) {
     if (!interaction.isButton()) return;
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Rules can only be accepted in a server.");
+      throw new UserFacingError("Accept the rules in a server.");
     }
     const match = /^rule-accept:(\d+):(\d+)$/.exec(interaction.customId);
     if (
@@ -19,7 +21,9 @@ export const ruleAcceptanceHandler = {
       match[1] !== interaction.guild.id ||
       interaction.message.author.id !== interaction.client.user?.id
     ) {
-      throw new Error("Invalid rules acceptance button.");
+      throw new UserFacingError(
+        "This button is unavailable. Ask a moderator to republish the rules.",
+      );
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const guild = interaction.guild;
@@ -30,23 +34,17 @@ export const ruleAcceptanceHandler = {
       guild.roles.fetch(guild.id, { force: true }),
     ]);
     if (!role || !everyone)
-      throw new Error(
+      throw new UserFacingError(
         "The acceptance role no longer exists. Ask a moderator to republish the rules.",
       );
     if (!bot.permissions.has(P.ManageRoles))
-      throw new Error("The bot needs Manage Roles to assign the acceptance role.");
+      throw new UserFacingError("The bot needs Manage Roles to assign the acceptance role.");
     assertSafeRuleRole(role, everyone, bot);
     const alreadyAccepted = member.roles.cache.has(role.id);
     if (!alreadyAccepted) await member.roles.add(role, "Accepted the server rules");
-    await interaction.editReply({
-      content: alreadyAccepted
-        ? "You have already accepted the rules."
-        : "Thank you! You have accepted the rules and received the acceptance role.",
+    await editSuccessReply(interaction, {
+      content: alreadyAccepted ? "You have already accepted the rules." : "Rules accepted.",
       allowedMentions: { parse: [] },
     });
-    setTimeout(() => {
-      // Best-effort cleanup: the acknowledgment may already have been dismissed or deleted.
-      void interaction.deleteReply().catch(() => {});
-    }, 5_000).unref();
   },
 } satisfies ComponentHandler;

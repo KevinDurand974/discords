@@ -115,7 +115,9 @@ describe("public ticket closure notice", () => {
   it("rejects malformed custom ids without changing ticket state", async () => {
     const f = fixture();
     f.interaction.customId = "ticket:closure:reopen:invalid";
-    await expect(f.execute()).rejects.toThrow("Invalid ticket closure button");
+    await expect(f.execute()).rejects.toThrow(
+      "This button is unavailable. Run /close-ticket again",
+    );
     expect(changeTicketClosure).not.toHaveBeenCalled();
   });
   it("rejects DMs", async () => {

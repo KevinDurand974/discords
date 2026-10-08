@@ -4,16 +4,18 @@ import {
   PermissionFlagsBits as P,
   type ChatInputCommandInteraction,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { TrapStore } from "./trap-repository.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 
 export async function removeTrap(interaction: ChatInputCommandInteraction, store: TrapStore) {
-  if (!interaction.inGuild() || !interaction.guild) throw new Error("Bot traps are server-only.");
+  if (!interaction.inGuild() || !interaction.guild)
+    throw new UserFacingError("Use this command in a server.");
   const guild = interaction.guild;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const member = await guild.members.fetch({ user: interaction.user.id, force: true });
   if (!member.permissions.has([P.ManageChannels, P.BanMembers]))
-    throw new Error("You need Manage Channels and Ban Members to remove a bot trap.");
+    throw new UserFacingError("You need Manage Channels and Ban Members to remove a bot trap.");
   const channelId = await store.getChannel(guild.id);
   if (!channelId) {
     await editSuccessReply(interaction, {
@@ -37,7 +39,7 @@ export async function removeTrap(interaction: ChatInputCommandInteraction, store
   } catch (error) {
     if (!(error instanceof DiscordAPIError && error.code === 10003)) {
       console.error("[Trap bot] Monitoring disabled but channel cleanup failed", error);
-      throw new Error(
+      throw new UserFacingError(
         "Bot trap disabled, but I couldn't delete the channel. Please delete it manually.",
       );
     }

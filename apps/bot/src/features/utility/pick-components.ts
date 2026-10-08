@@ -12,6 +12,7 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { ComponentHandler } from "@/core/command.ts";
 import {
   createPickSessionStore,
@@ -76,7 +77,7 @@ export function createPickComponentHandler(store = createPickSessionStore()): Co
     async execute(interaction) {
       if (interaction.isModalSubmit()) {
         if (interaction.customId !== `${MODAL_PREFIX}${interaction.user.id}`)
-          throw new Error("This form belongs to another user. Run /pick to open your own form.");
+          throw new UserFacingError("This form is unavailable. Run /pick again.");
         const choices = parsePickChoices(interaction.fields.getTextInputValue("choices"));
         const { token, session } = store.create(interaction.user.id, choices);
         try {
@@ -90,7 +91,7 @@ export function createPickComponentHandler(store = createPickSessionStore()): Co
         }
       } else if (interaction.isButton()) {
         if (!interaction.customId.startsWith(BUTTON_PREFIX))
-          throw new Error("Invalid pick button.");
+          throw new UserFacingError("This draw is unavailable. Run /pick again.");
         const token = interaction.customId.slice(BUTTON_PREFIX.length);
         const session = store.draw(token, interaction.user.id);
         await interaction.update(renderPickChoices(token, session));

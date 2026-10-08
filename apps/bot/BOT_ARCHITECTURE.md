@@ -153,11 +153,13 @@ Command confirmations and error messages must be **short, simple, and focused on
 
 When an action fails or only partially succeeds, briefly state what happened and include only the next step the user needs. Necessary warnings and actionable permission requirements should remain clear.
 
-Every successful response to a deferred interaction (`deferReply()` followed by `editReply()`) must be **automatically deleted after 10 seconds**. Start the timer only after the success message has been displayed, not when deferring. Delete the interaction reply with `deleteReply()`, handle deletion failures without unhandled rejections, and do not let the timer keep the process alive. Error and partial-failure responses must not be automatically deleted. This applies to the interaction reply, not persistent feature messages published separately (rules, polls, trap warnings, etc.). `shared/interactions/success-reply.ts` provides `editSuccessReply()` to display the final success reply and schedule best-effort deletion with an unreferenced timer. `/trap`, `/untrap`, and `/unban` use this helper, including the no-trap-configured success response; failure paths do not.
+Every successful response to a deferred interaction (`deferReply()` followed by `editReply()`) must be **automatically deleted after 10 seconds**. Start the timer only after the success message has been displayed, not when deferring. Delete the interaction reply with `deleteReply()`, handle deletion failures without unhandled rejections, and do not let the timer keep the process alive. Error and partial-failure responses must not be automatically deleted. Interactive previews, progress updates and destructive-action confirmations must remain available until the user completes or cancels the action; only terminal success replies start the timer. This applies to the interaction reply, not persistent feature messages published separately (rules, polls, trap warnings, etc.). `shared/interactions/success-reply.ts` provides `editSuccessReply()` to display the final success reply and schedule best-effort deletion with an unreferenced timer. `/trap`, `/untrap`, and `/unban` use this helper, including the no-trap-configured success response; failure paths do not.
 
 - Success: `Bot trap removed. The trap is now disabled.`
 - Partial failure: `Bot trap disabled, but I couldn't delete the channel. Please delete it manually.`
 - Avoid: explanations of how records were removed, configuration was persisted, or internal checks were performed.
+
+Throw `UserFacingError` from `core/errors.ts` for concise, actionable validation or permission messages that are safe to display. Unexpected errors are logged in full and receive a generic retry/contact-administrator response; never interpolate raw exceptions, API failure details or saved error strings into interaction replies. Partial publication failures show the outcome and retry command, with technical details kept in logs.
 
 ## Command logging
 

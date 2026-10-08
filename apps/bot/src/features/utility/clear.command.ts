@@ -5,7 +5,9 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { CommandDefinition } from "@/core/command.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { clearMessages, parseClearDuration } from "./clear-messages.ts";
 
 export const clearHelpDescription = [
@@ -53,12 +55,12 @@ export const clearCommand = {
     ),
   async execute(interaction) {
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Messages can only be cleared in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
     const count = interaction.options.getInteger("count") ?? 10;
     const user = interaction.options.getUser("user");
     if (!Number.isInteger(count) || count < 1 || count > 100) {
-      throw new Error("Count must be a whole number between 1 and 100.");
+      throw new UserFacingError("Count must be a whole number between 1 and 100.");
     }
     const duration = interaction.options.getString("duration");
     const maxAgeMs = duration === null ? undefined : parseClearDuration(duration);
@@ -75,10 +77,12 @@ export const clearCommand = {
         channel.type !== ChannelType.GuildAnnouncement &&
         !channel.isThread())
     ) {
-      throw new Error("Choose a text or announcement channel, or a thread in this server.");
+      throw new UserFacingError(
+        "Choose a text or announcement channel, or a thread in this server.",
+      );
     }
     if (channel.isThread() && (channel.archived || channel.locked)) {
-      throw new Error("Messages cannot be cleared in an archived or locked thread.");
+      throw new UserFacingError("Messages cannot be cleared in an archived or locked thread.");
     }
     const member = await interaction.guild.members.fetch({
       user: interaction.user.id,
@@ -89,7 +93,7 @@ export const clearCommand = {
         .permissionsFor(member)
         ?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageMessages])
     ) {
-      throw new Error(
+      throw new UserFacingError(
         "You need View Channel and Manage Messages in this channel to clear messages.",
       );
     }
@@ -103,7 +107,7 @@ export const clearCommand = {
           PermissionFlagsBits.ManageMessages,
         ])
     ) {
-      throw new Error(
+      throw new UserFacingError(
         "The bot needs View Channel, Read Message History and Manage Messages in this channel.",
       );
     }
@@ -116,13 +120,14 @@ export const clearCommand = {
         ),
       );
       if (canAccess.some((allowed) => !allowed)) {
-        throw new Error(
+        throw new UserFacingError(
           "Both you and the bot must be members of the private thread or have Manage Threads.",
         );
       }
     }
     const deleted = await clearMessages(channel, count, user?.id, maxAgeMs);
-    await interaction.editReply(
+    await editSuccessReply(
+      interaction,
       deleted === 0
         ? duration === null
           ? "No matching messages were found."

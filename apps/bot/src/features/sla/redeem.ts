@@ -9,6 +9,8 @@ import {
   type ModalSubmitInteraction,
 } from "discord.js";
 import type { ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { redeemCoupon, type CouponSuccess } from "./coupon.client.ts";
 
 const REDEEM_MODAL_ID = "sla:redeem";
@@ -42,25 +44,29 @@ const createRedeemModal = () => {
 };
 
 const redeem = async (interaction: ModalSubmitInteraction, couponCode: string, pid: string) => {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const data = await redeemCoupon(couponCode, pid);
 
   if (data.errorCode === 24004) {
-    throw new Error("❌ Coupon already added to your account!");
+    throw new UserFacingError("This coupon has already been claimed.");
   }
   if (data.errorCode !== 200) {
-    throw new Error("❌ This coupon or PID doesn't exist!");
+    throw new UserFacingError(
+      "Couldn't redeem the coupon. Check your coupon code and player ID, then try again.",
+    );
   }
 
   const successData = (data as CouponSuccess).resultData[0];
   if (!successData) {
-    throw new Error("❌ An error occurred while creating success message");
+    throw new UserFacingError(
+      "Coupon redeemed, but reward details are unavailable. Check your in-game mailbox.",
+    );
   }
 
-  await interaction.reply({
-    flags: MessageFlags.Ephemeral,
+  await editSuccessReply(interaction, {
     embeds: [
       {
-        title: "Coupon added!",
+        title: "Coupon redeemed.",
         description: successData.productName,
         thumbnail: { url: successData.productImageUrl },
         type: EmbedType.Rich,

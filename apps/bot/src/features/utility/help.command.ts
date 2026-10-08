@@ -1,3 +1,5 @@
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import {
   ApplicationCommandOptionType,
   ContainerBuilder,
@@ -96,7 +98,7 @@ function detailedCommandSections(
 export function renderCommandHelp(commands: readonly CommandDefinition[], name: string) {
   const definition = commands.find(({ data }) => data.name === name && data.name !== "help");
   if (!definition)
-    throw new Error("Choose a command from the autocomplete list (excluding /help).");
+    throw new UserFacingError("Choose a command from the autocomplete list (excluding /help).");
   const command = definition.data.toJSON();
   const details = definition.helpDescription ?? [command.description];
   return renderHelpSections([
@@ -175,12 +177,13 @@ export function createHelpCommand(
       } catch {
         await interaction.editReply(
           selected === undefined
-            ? "Unable to send you the complete command list by DM. Make sure your direct messages are enabled, then try /help again."
-            : "Unable to send you detailed command help by DM. Make sure your direct messages are enabled, then try /help again.",
+            ? "Couldn't send you a DM. Enable direct messages, then try /help again."
+            : "Couldn't send you command help by DM. Enable direct messages, then try /help again.",
         );
         return;
       }
-      await interaction.editReply(
+      await editSuccessReply(
+        interaction,
         selected === undefined
           ? "The command list has been sent to you by DM."
           : `Detailed help for /${selected} has been sent to you by DM.`,

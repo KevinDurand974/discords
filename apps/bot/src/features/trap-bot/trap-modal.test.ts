@@ -88,6 +88,6 @@ describe("trap channel naming modal", () => {
     f.interaction.guild = null;
     await expect(f.submit()).rejects.toThrow("another user or server");
     expect(createTrapChannel).not.toHaveBeenCalled();
-    await expect(f.open()).rejects.toThrow("server-only");
+    await expect(f.open()).rejects.toThrow("Use this command in a server");
   });
 });

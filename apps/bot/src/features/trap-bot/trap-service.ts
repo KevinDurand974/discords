@@ -10,6 +10,7 @@ import {
   type ModalSubmitInteraction,
   type TextChannel,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { TrapStore } from "./trap-repository.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 
@@ -36,10 +37,11 @@ export async function createTrapChannel(
   store: TrapStore,
   channelName = "trap",
 ) {
-  if (!interaction.inGuild() || !interaction.guild) throw new Error("Bot traps are server-only.");
+  if (!interaction.inGuild() || !interaction.guild)
+    throw new UserFacingError("Use this command in a server.");
   const name = channelName.trim().toLowerCase().replace(/\s+/g, "-");
   if (!name || name.length > 100)
-    throw new Error("Channel name must be between 1 and 100 characters.");
+    throw new UserFacingError("Channel name must be between 1 and 100 characters.");
   const guild = interaction.guild;
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const [member, bot] = await Promise.all([
@@ -48,9 +50,9 @@ export async function createTrapChannel(
   ]);
   const permissions = [P.ManageChannels, P.BanMembers];
   if (!member.permissions.has(permissions))
-    throw new Error("You need Manage Channels and Ban Members to configure a bot trap.");
+    throw new UserFacingError("You need Manage Channels and Ban Members to configure a bot trap.");
   if (!bot.permissions.has([...permissions, P.ManageRoles]))
-    throw new Error(
+    throw new UserFacingError(
       "The bot needs Manage Channels, Ban Members, and Manage Roles to operate a bot trap.",
     );
   const existingId = await store.getChannel(guild.id);
@@ -62,7 +64,7 @@ export async function createTrapChannel(
         throw error;
       });
     if (existing)
-      throw new Error(
+      throw new UserFacingError(
         `A bot trap is already active in <#${existingId}>. Use /untrap or delete that channel before creating another.`,
       );
     await store.clearChannel(guild.id, existingId);
@@ -96,8 +98,8 @@ export async function createTrapChannel(
       allowedMentions: { parse: [] },
     });
     if (!(await store.activate(guild.id, channel.id))) {
-      throw new Error(
-        "Another bot trap was configured simultaneously. This duplicate was not activated.",
+      throw new UserFacingError(
+        "A bot trap is already configured. Use /untrap before creating another.",
       );
     }
     await channel.permissionOverwrites.edit(
@@ -119,7 +121,7 @@ export async function createTrapChannel(
     throw error;
   }
   await editSuccessReply(interaction, {
-    content: `Bot trap active in <#${channel.id}>. **Accounts without a role will be banned immediately if they post there.** Use /untrap to disable monitoring and remove the channel and stored configuration.`,
+    content: `Bot trap active in <#${channel.id}>. **Accounts without a role will be banned immediately if they post there.** Use /untrap to disable the trap.`,
     allowedMentions: { parse: [] },
   });
 }

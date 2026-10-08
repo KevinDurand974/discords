@@ -1,4 +1,5 @@
 import { ChannelType, type ModalSubmitInteraction } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import { createRuleComponents } from "./rule-components.ts";
 
 export type RuleForm = {
@@ -15,10 +16,10 @@ export function readRuleForm(interaction: ModalSubmitInteraction): RuleForm {
     .getSelectedChannels("channel", false, [ChannelType.GuildText])
     ?.first()?.id;
   if (!rules.trim() || rules.length > 4000) {
-    throw new Error("Rules must contain between 1 and 4000 characters.");
+    throw new UserFacingError("Rules must contain between 1 and 4000 characters.");
   }
   if (!channelId && (!name || name.length > 100)) {
-    throw new Error("Select a channel or enter a new channel name (1–100 characters).");
+    throw new UserFacingError("Select a channel or enter a new channel name (1–100 characters).");
   }
   const roleId = interaction.fields.getSelectedRoles("acceptance-role", false)?.first()?.id;
   createRuleComponents(rules, { guildId: interaction.guild!.id, roleId: roleId ?? "pending" });

@@ -3,6 +3,7 @@ import {
   PermissionFlagsBits as P,
   type ChatInputCommandInteraction,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 
 export async function changeMemberRole(
@@ -10,7 +11,7 @@ export async function changeMemberRole(
   action: "give" | "strip",
 ) {
   if (!interaction.inGuild() || !interaction.guild)
-    throw new Error("Use this command in a server.");
+    throw new UserFacingError("Use this command in a server.");
   const roleId =
     action === "strip"
       ? interaction.options.getString("role", true)
@@ -24,17 +25,17 @@ export async function changeMemberRole(
     guild.members.fetchMe({ force: true }),
   ]);
   if (!actor.permissions.has(P.ManageRoles))
-    throw new Error(`You need Manage Roles to ${verb} roles.`);
+    throw new UserFacingError(`You need Manage Roles to ${verb} roles.`);
   if (!bot.permissions.has(P.ManageRoles))
-    throw new Error(`The bot needs Manage Roles to ${verb} roles.`);
+    throw new UserFacingError(`The bot needs Manage Roles to ${verb} roles.`);
   const role = await guild.roles.fetch(roleId, { force: true });
-  if (!role) throw new Error("This role no longer exists.");
+  if (!role) throw new UserFacingError("This role no longer exists.");
   if (role.id === guild.id || role.managed)
-    throw new Error(`You cannot ${verb} @everyone or a managed role.`);
+    throw new UserFacingError(`You cannot ${verb} @everyone or a managed role.`);
   if (!role.editable || bot.roles.highest.comparePositionTo(role) <= 0)
-    throw new Error(`Move the bot's highest role above the role to ${verb}.`);
+    throw new UserFacingError(`Move the bot's highest role above the role to ${verb}.`);
   if (actor.id !== guild.ownerId && actor.roles.highest.comparePositionTo(role) <= 0)
-    throw new Error(`You can only ${verb} roles below your highest role.`);
+    throw new UserFacingError(`You can only ${verb} roles below your highest role.`);
   const target = await guild.members.fetch({ user: userId, force: true });
   const hasRole = target.roles.cache.has(roleId);
   if (action === "give" && !hasRole)

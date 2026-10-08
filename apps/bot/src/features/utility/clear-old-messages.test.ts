@@ -95,7 +95,7 @@ describe("old message deletion", () => {
     const f = fixture([0, MAX_CLEAR_AGE_MS, MAX_CLEAR_AGE_MS]);
     f.messages[1]!.delete.mockRejectedValueOnce(new Error("offline"));
     await expect(f.run()).rejects.toThrow(
-      "Deleted 1 message, but could not delete the remaining messages.",
+      "Deleted 1 message, but couldn't delete the rest. Check bot permissions, then try /clear again.",
     );
     expect(f.messages[2]!.delete).not.toHaveBeenCalled();
   });

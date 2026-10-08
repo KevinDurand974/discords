@@ -1,17 +1,18 @@
+import { UserFacingError } from "@/core/errors.ts";
 import { FetchError, ofetch } from "ofetch";
 
 function resolutionError(error: unknown): string {
   if (error instanceof FetchError) {
     if (error.statusCode === 401)
-      return "API service authentication failed. NEWS_INTERNAL_TOKEN must match in the bot and API; restart both applications after updating it.";
+      return "YouTube is unavailable. Ask an administrator to check the YouTube service.";
     // Whitelist fixed messages; never forward raw HTTP errors, request URLs or source text.
     const code: unknown = error.data?.code;
     if (code === "invalid_feed")
-      return "YouTube returned an invalid RSS feed. Check the API version and source feed, then retry.";
+      return "Couldn't load this creator's videos. Check the channel URL or ID, then try again.";
     if (code === "missing_api_key")
-      return "YOUTUBE_API_KEY is missing from the API. Configure it and restart the API, or use a direct UC channel ID.";
+      return "Channel search is unavailable. Try a direct YouTube channel ID or contact an administrator.";
   }
-  return "YouTube channel could not be resolved. Check the channel URL/ID, API key and API availability, then retry.";
+  return "Couldn't find this YouTube channel. Check its URL or ID, then try again.";
 }
 
 export type ResolvedCreator = {
@@ -49,7 +50,7 @@ export function createVideosApi(base: string, token: string | undefined) {
           throw new Error("Invalid response");
         return result;
       } catch (error) {
-        throw new Error(resolutionError(error));
+        throw new UserFacingError(resolutionError(error), { cause: error });
       }
     },
   };

@@ -8,6 +8,7 @@ import {
   TextInputStyle,
 } from "discord.js";
 import type { CommandDefinition, ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
 import { getTrapStore } from "./trap-repository.ts";
 import { createTrapChannel } from "./trap-service.ts";
 
@@ -44,9 +45,12 @@ export const trapBotCommand = {
     .setContexts(InteractionContextType.Guild)
     .setDefaultMemberPermissions(P.ManageChannels | P.BanMembers),
   async execute(interaction) {
-    if (!interaction.inGuild() || !interaction.guild) throw new Error("Bot traps are server-only.");
+    if (!interaction.inGuild() || !interaction.guild)
+      throw new UserFacingError("Use this command in a server.");
     if (!interaction.memberPermissions?.has([P.ManageChannels, P.BanMembers]))
-      throw new Error("You need Manage Channels and Ban Members to configure a bot trap.");
+      throw new UserFacingError(
+        "You need Manage Channels and Ban Members to configure a bot trap.",
+      );
     await interaction.showModal(createTrapModal(interaction.user.id, interaction.guild.id));
   },
 } satisfies CommandDefinition;
@@ -60,7 +64,7 @@ export const trapComponentHandler = {
       !interaction.guild ||
       interaction.customId !== `trap:create:${interaction.user.id}:${interaction.guild.id}`
     )
-      throw new Error(
+      throw new UserFacingError(
         "This form belongs to another user or server. Run /trap to open your own form.",
       );
     await createTrapChannel(

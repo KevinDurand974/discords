@@ -5,6 +5,8 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 
+import { UserFacingError } from "@/core/errors.ts";
+
 export const DEFAULT_ARRIVAL_MESSAGE = `# 👋 Welcome to {server}!
 
 Hey **{user}**, welcome!\x20\x20
@@ -37,11 +39,11 @@ export function createWelcomeMessageContainer(message: string, arrival: boolean)
     ];
   });
   if (!components.some((component) => component instanceof TextDisplayBuilder)) {
-    throw new Error("Welcome messages must contain text, not only separators.");
+    throw new UserFacingError("Welcome messages must contain text, not only separators.");
   }
   // Discord allows 40 components in total, including the container itself.
   if (components.length > 39) {
-    throw new Error("Too many welcome message sections. Use fewer separator lines.");
+    throw new UserFacingError("Too many welcome message sections. Use fewer separator lines.");
   }
   const container = new ContainerBuilder().setAccentColor(arrival ? 0x57f287 : 0x95a5a6);
   for (const component of components) {

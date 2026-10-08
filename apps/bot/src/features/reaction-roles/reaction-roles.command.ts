@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import { randomUUID } from "node:crypto";
 import {
   ActionRowBuilder,
@@ -48,8 +49,9 @@ const DRAFT_TTL = 15 * 60 * 1000;
 
 function assertCanConfigure(interaction: ChatInputCommandInteraction | ComponentInteraction) {
   if (!interaction.inGuild() || !interaction.guild)
-    throw new Error("Use reaction roles in a server.");
-  if (!interaction.memberPermissions?.has(P.ManageRoles)) throw new Error("You need Manage Roles.");
+    throw new UserFacingError("Use this command in a server.");
+  if (!interaction.memberPermissions?.has(P.ManageRoles))
+    throw new UserFacingError("You need Manage Roles.");
 }
 
 export function createReactionRolesModal(userId: string, guildId: string, channelId: string) {
@@ -163,29 +165,30 @@ export async function publishReactionRoles(
   assertCanConfigure(interaction);
   const guild = interaction.guild!;
   if (draft.userId !== interaction.user.id || draft.guildId !== guild.id)
-    throw new Error("This preview belongs to another user or server.");
+    throw new UserFacingError("This preview belongs to another user or server.");
   const { content, channelId, mappings } = draft;
   if (!content.trim() || content.length > 2000)
-    throw new Error("Enter 1–2000 characters for the message.");
+    throw new UserFacingError("Enter 1–2000 characters for the message.");
   if (!mappings.length || mappings.length > 20)
-    throw new Error("Add 1–20 reactions before publishing.");
+    throw new UserFacingError("Add 1–20 reactions before publishing.");
   const [channel, bot, publisher] = await Promise.all([
     guild.channels.fetch(channelId),
     guild.members.fetchMe(),
     guild.members.fetch({ user: interaction.user.id, force: true }),
   ]);
-  if (!publisher.permissions.has(P.ManageRoles)) throw new Error("You need Manage Roles.");
+  if (!publisher.permissions.has(P.ManageRoles))
+    throw new UserFacingError("You need Manage Roles.");
   if (!channel || channel.type !== ChannelType.GuildText)
-    throw new Error("Choose a text channel in this server.");
+    throw new UserFacingError("Choose a text channel in this server.");
   if (!channel.permissionsFor(publisher)?.has([P.ViewChannel, P.SendMessages]))
-    throw new Error("You need View Channel and Send Messages in the destination.");
+    throw new UserFacingError("You need View Channel and Send Messages in the destination.");
   if (
     !bot.permissions.has(P.ManageRoles) ||
     !channel
       .permissionsFor(bot)
       ?.has([P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AddReactions, P.ManageMessages])
   ) {
-    throw new Error(
+    throw new UserFacingError(
       "I need Manage Roles, plus View Channel, Send Messages, Read Message History, Add Reactions and Manage Messages in the destination.",
     );
   }
@@ -193,10 +196,10 @@ export async function publishReactionRoles(
   await Promise.all(
     mappings.map(async (mapping) => {
       const role = await guild.roles.fetch(mapping.roleId, { force: true });
-      if (!role) throw new Error("One of the selected roles no longer exists.");
+      if (!role) throw new UserFacingError("One of the selected roles no longer exists.");
       assertSafeReactionRole(role, bot, publisher);
       if (/^\d+$/.test(mapping.key) && !guild.emojis.cache.get(mapping.key)?.available)
-        throw new Error("Use available custom emojis from this server.");
+        throw new UserFacingError("Use available custom emojis from this server.");
     }),
   );
   const message = await channel.send(createReactionRoleMessagePayload(content, mappings));
@@ -215,9 +218,12 @@ export async function publishReactionRoles(
     ]);
     if (results.some((result) => result.status === "rejected")) {
       console.error("Reaction role setup cleanup failed", results);
-      throw new Error("Setup failed. Please delete the incomplete message and try again.", {
-        cause: error,
-      });
+      throw new UserFacingError(
+        "Setup failed. Please delete the incomplete message and try again.",
+        {
+          cause: error,
+        },
+      );
     }
     throw error;
   }
@@ -241,17 +247,17 @@ export function createReactionRolesComponentHandler(
       if (interaction.isModalSubmit() && interaction.customId.startsWith("reaction-roles:setup:")) {
         const match = /^reaction-roles:setup:(\d+):(\d+):(\d+)$/.exec(interaction.customId);
         if (!match || match[1] !== interaction.user.id || match[2] !== guild.id)
-          throw new Error("This form has expired. Run /reaction-roles again.");
+          throw new UserFacingError("This form has expired. Run /reaction-roles again.");
         const content = interaction.fields.getTextInputValue("content").trim();
         if (!content || content.length > 2000)
-          throw new Error("Enter 1–2000 characters for the message.");
+          throw new UserFacingError("Enter 1–2000 characters for the message.");
         const channelId =
           interaction.fields.getSelectedChannels("channel", false, [ChannelType.GuildText])?.first()
             ?.id ?? match[3]!;
         await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         const channel = await guild.channels.fetch(channelId);
         if (!channel || channel.type !== ChannelType.GuildText)
-          throw new Error("Choose a text channel in this server.");
+          throw new UserFacingError("Choose a text channel in this server.");
         const id = randomUUID();
         const draft: PendingDraft = {
           userId: interaction.user.id,
@@ -277,16 +283,17 @@ export function createReactionRolesComponentHandler(
       );
       const draft = match ? drafts.get(match[2]!) : undefined;
       if (!match || !draft || draft.expiresAt <= Date.now())
-        throw new Error("This preview has expired. Run /reaction-roles again.");
+        throw new UserFacingError("This preview has expired. Run /reaction-roles again.");
       if (draft.userId !== interaction.user.id || draft.guildId !== guild.id)
-        throw new Error("This preview belongs to another user or server.");
-      if (draft.publishing) throw new Error("This message is already being published.");
+        throw new UserFacingError("This preview belongs to another user or server.");
+      if (draft.publishing) throw new UserFacingError("This message is already being published.");
       const id = match[2]!;
       if (interaction.isButton()) {
         if (interaction.message.id !== draft.messageId)
-          throw new Error("Invalid reaction roles preview.");
+          throw new UserFacingError("This preview is unavailable. Run /reaction-roles again.");
         if (match[1] === "add") {
-          if (draft.mappings.length >= 20) throw new Error("You can add at most 20 reactions.");
+          if (draft.mappings.length >= 20)
+            throw new UserFacingError("You can add at most 20 reactions.");
           await interaction.showModal(createReactionRoleEntryModal(id));
         } else if (match[1] === "validate") {
           draft.publishing = true;
@@ -321,24 +328,28 @@ export function createReactionRolesComponentHandler(
         !interaction.isFromMessage() ||
         interaction.message.id !== draft.messageId
       )
-        throw new Error("Invalid reaction roles form.");
+        throw new UserFacingError("This form is unavailable. Run /reaction-roles again.");
       const emoji = parseReactionEmoji(interaction.fields.getTextInputValue("emoji"));
       const roleId = interaction.fields.getSelectedRoles("role", true).first()?.id;
-      if (!roleId) throw new Error("Select one role.");
+      if (!roleId) throw new UserFacingError("Select one role.");
       await interaction.deferUpdate();
       const [role, bot, publisher] = await Promise.all([
         guild.roles.fetch(roleId, { force: true }),
         guild.members.fetchMe(),
         guild.members.fetch({ user: interaction.user.id, force: true }),
       ]);
-      if (!publisher.permissions.has(P.ManageRoles)) throw new Error("You need Manage Roles.");
-      if (!role) throw new Error("The selected role no longer exists.");
+      if (!publisher.permissions.has(P.ManageRoles))
+        throw new UserFacingError("You need Manage Roles.");
+      if (!role) throw new UserFacingError("The selected role no longer exists.");
       assertSafeReactionRole(role, bot, publisher);
       if (draft.publishing || !drafts.has(id) || draft.expiresAt <= Date.now())
-        throw new Error("This preview is no longer available. Run /reaction-roles again.");
-      if (draft.mappings.length >= 20) throw new Error("You can add at most 20 reactions.");
+        throw new UserFacingError(
+          "This preview is no longer available. Run /reaction-roles again.",
+        );
+      if (draft.mappings.length >= 20)
+        throw new UserFacingError("You can add at most 20 reactions.");
       if (draft.mappings.some((mapping) => mapping.key === emoji.key))
-        throw new Error("This emoji is already configured.");
+        throw new UserFacingError("This emoji is already configured.");
       draft.mappings.push({ ...emoji, roleId });
       await interaction.editReply(createReactionRolePreview(id, draft));
     },
@@ -359,7 +370,7 @@ export const reactionRolesCommand = {
   async execute(interaction) {
     assertCanConfigure(interaction);
     if (interaction.channel?.type !== ChannelType.GuildText)
-      throw new Error("Run this command in a server text channel.");
+      throw new UserFacingError("Run this command in a server text channel.");
     await interaction.showModal(
       createReactionRolesModal(interaction.user.id, interaction.guildId!, interaction.channelId),
     );

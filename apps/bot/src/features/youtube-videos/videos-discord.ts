@@ -29,6 +29,8 @@ const required = [
 ];
 const marker = (videoId: string, part: number) =>
   `YouTube source: yt:video:${videoId} · part ${part}`;
+import { UserFacingError } from "@/core/errors.ts";
+
 export function videoForumPermissions(guildId: string, botId: string, moderatorIds: string[]) {
   return [
     {
@@ -122,8 +124,8 @@ export async function getVideoForum(guild: Guild, id: string | null): Promise<Fo
 export async function provisionVideoForum(guild: Guild) {
   const bot = await guild.members.fetchMe();
   if (!bot.permissions.has(required))
-    throw new Error(
-      "The bot needs View Channel, Manage Channels, Manage Roles (overwrites), Manage Threads, Send Messages, Send Messages in Threads, Read Message History and Embed Links.",
+    throw new UserFacingError(
+      "The bot needs View Channel, Manage Channels, Manage Roles, Manage Threads, Send Messages, Send Messages in Threads, Read Message History and Embed Links.",
     );
   await guild.roles.fetch();
   const moderators = guild.roles.cache
@@ -145,7 +147,9 @@ export async function provisionVideoForum(guild: Guild) {
 export async function checkVideoPermissions(forum: ForumChannel) {
   const bot = await forum.guild.members.fetchMe();
   if (!forum.permissionsFor(bot)?.has(required))
-    throw new Error("The bot is missing required permissions in Latest Videos.");
+    throw new UserFacingError(
+      "The bot needs View Channel, Manage Channels, Manage Roles, Manage Threads, Send Messages, Send Messages in Threads, Read Message History and Embed Links in the YouTube Forum.",
+    );
   return bot;
 }
 export async function auditVideoPermissions(forum: ForumChannel) {
@@ -186,12 +190,14 @@ export async function creatorTag(
   );
   if (compatible) return { id: compatible.id, owned: false };
   if (forum.availableTags.length >= 20)
-    throw new Error("Latest Videos has reached its 20 creator-tag limit.");
+    throw new UserFacingError(
+      "This Forum already has 20 creator tags. Remove a creator before adding another.",
+    );
   const name = forum.availableTags.some((tag) => tag.name === base)
     ? `${Array.from(base).slice(0, 10).join("")} ${channelId.slice(-9)}`
     : base;
   if (forum.availableTags.some((tag) => tag.name === name))
-    throw new Error("Creator tag name collision; rename the conflicting tag before retrying.");
+    throw new UserFacingError("A tag with this name already exists. Rename it, then try again.");
   await forum.setAvailableTags([...forum.availableTags, { name }]);
   const created = forum.availableTags.find((tag) => tag.name === name);
   if (!created) throw new Error("Discord did not return the creator tag.");

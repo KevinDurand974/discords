@@ -29,23 +29,21 @@ describe("YouTube API error reporting", () => {
   it("identifies service-token authentication failure without forwarding upstream text", async () => {
     const api = await failingApi(401);
     await expect(api.resolve("https://www.youtube.com/@heartfulharry2185")).rejects.toThrow(
-      "NEWS_INTERNAL_TOKEN must match",
+      "Ask an administrator to check the YouTube service",
     );
   });
   it("identifies a rejected RSS feed using only a known safe error code", async () => {
     const api = await failingApi(502, "invalid_feed");
-    await expect(api.resolve("@creator")).rejects.toThrow("invalid RSS feed");
+    await expect(api.resolve("@creator")).rejects.toThrow("Check the channel URL or ID");
   });
   it("identifies a missing API-only Google key", async () => {
     const api = await failingApi(503, "missing_api_key");
-    await expect(api.resolve("@creator")).rejects.toThrow(
-      "YOUTUBE_API_KEY is missing from the API",
-    );
+    await expect(api.resolve("@creator")).rejects.toThrow("Try a direct YouTube channel ID");
   });
   it("does not leak arbitrary API error messages/codes", async () => {
     const api = await failingApi(502, "private-api-key");
     await expect(api.resolve("@creator")).rejects.toThrow(
-      "YouTube channel could not be resolved. Check",
+      "Couldn't find this YouTube channel. Check",
     );
     await expect(api.resolve("@creator")).rejects.not.toThrow("private");
   });

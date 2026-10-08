@@ -8,6 +8,7 @@ import {
   TextDisplayBuilder,
 } from "discord.js";
 
+import { UserFacingError } from "@/core/errors.ts";
 import { ruleAcceptanceCustomId } from "./rule-acceptance.ts";
 
 export function createRuleComponents(
@@ -22,10 +23,10 @@ export function createRuleComponents(
       : []),
   ]);
   if (!components.some((component) => component instanceof TextDisplayBuilder)) {
-    throw new Error("Rules must contain text, not only separators.");
+    throw new UserFacingError("Rules must contain text, not only separators.");
   }
   if (components.length > (acceptance ? 37 : 39)) {
-    throw new Error("Too many rule sections. Use fewer separator lines.");
+    throw new UserFacingError("Too many rule sections. Use fewer separator lines.");
   }
   const container = new ContainerBuilder();
   components.forEach((component) => {

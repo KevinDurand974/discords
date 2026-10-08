@@ -497,7 +497,7 @@ describe("reaction role preview workflow", () => {
         { ...f.button, message: { id: "other" } } as unknown as ModalSubmitInteraction,
         undefined!,
       ),
-    ).rejects.toThrow("Invalid");
+    ).rejects.toThrow("This preview is unavailable. Run /reaction-roles again");
     await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
     await expect(
       f.handler.execute(f.button as unknown as ModalSubmitInteraction, undefined!),

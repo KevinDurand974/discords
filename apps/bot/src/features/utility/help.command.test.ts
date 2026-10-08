@@ -148,7 +148,7 @@ describe("/help", () => {
     request.user.send.mockRejectedValueOnce(new Error("Cannot send messages to this user"));
     await helpCommand.execute(request as unknown as ChatInputCommandInteraction, context);
     expect(request.editReply).toHaveBeenCalledWith(
-      "Unable to send you the complete command list by DM. Make sure your direct messages are enabled, then try /help again.",
+      "Couldn't send you a DM. Enable direct messages, then try /help again.",
     );
     expect(request.editReply).not.toHaveBeenCalledWith(
       "The command list has been sent to you by DM.",
@@ -253,7 +253,7 @@ describe("/help", () => {
     request.user.send.mockRejectedValueOnce(new Error("Cannot send messages"));
     await helpCommand.execute(request as unknown as ChatInputCommandInteraction, context);
     expect(request.editReply).toHaveBeenCalledWith(
-      "Unable to send you detailed command help by DM. Make sure your direct messages are enabled, then try /help again.",
+      "Couldn't send you command help by DM. Enable direct messages, then try /help again.",
     );
   });
   it("keeps detailed help within Components V2 limits", () => {

@@ -45,6 +45,7 @@ function fixture({
     ChannelType.AnnouncementThread,
   ].includes(type);
   const channel = {
+    id: destination ?? "current",
     type,
     archived,
     locked,
@@ -157,7 +158,7 @@ describe("native /poll", () => {
   it("rejects a form belonging to another user", async () => {
     const f = fixture();
     f.interaction.customId = "poll:create:someone-else";
-    await expect(f.execute()).rejects.toThrow("another user");
+    await expect(f.execute()).rejects.toThrow("This form is unavailable. Run /poll again");
     expect(f.fetch).not.toHaveBeenCalled();
   });
 
@@ -184,7 +185,7 @@ describe("native /poll", () => {
     expect(f.interaction.showModal).not.toHaveBeenCalled();
   });
 
-  it("posts a native poll and deletes the private response only after publication", async () => {
+  it("posts a native poll before displaying the private success confirmation", async () => {
     const f = fixture();
     await f.execute();
     expect(f.fetch).toHaveBeenCalledWith("current");
@@ -198,10 +199,13 @@ describe("native /poll", () => {
       },
       allowedMentions: { parse: [] },
     });
-    expect(f.interaction.editReply).not.toHaveBeenCalled();
-    expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
+    expect(f.interaction.editReply).toHaveBeenCalledWith({
+      content: `Poll published in <#${f.channel.id}>.`,
+      allowedMentions: { parse: [] },
+    });
+    expect(f.interaction.deleteReply).not.toHaveBeenCalled();
     expect(f.channel.send.mock.invocationCallOrder[0]).toBeLessThan(
-      f.interaction.deleteReply.mock.invocationCallOrder[0]!,
+      f.interaction.editReply.mock.invocationCallOrder[0]!,
     );
   });
 

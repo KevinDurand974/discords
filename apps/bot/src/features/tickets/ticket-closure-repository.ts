@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import { createDatabase } from "@discords/db";
 import { and, asc, eq, lte, sql } from "@discords/db/orm";
 import { ticketClosures } from "@discords/db/schema";
@@ -33,7 +34,9 @@ export function createTicketClosureRepository(url: string) {
         existing.guildId !== request.guildId ||
         existing.ownerId !== request.ownerId
       ) {
-        throw new Error("Unable to schedule this ticket: its closure record changed. Try again.");
+        throw new UserFacingError(
+          "Couldn't schedule this ticket's closure. Run /close-ticket again.",
+        );
       }
       return existing;
     },

@@ -49,6 +49,7 @@ function fixture({
     permissionsFor: vi.fn(
       (): PermissionsBitField | null => new PermissionsBitField(botPermissions),
     ),
+    send: vi.fn(async (_message: unknown) => {}),
     delete: vi.fn(async () => {}),
   };
   const guild = {
@@ -65,6 +66,7 @@ function fixture({
     inGuild: () => true,
     deferReply: vi.fn(),
     editReply: vi.fn(),
+    deleteReply: vi.fn(async () => {}),
     reply: vi.fn(),
   };
   return {
@@ -91,7 +93,9 @@ describe("/close-ticket", () => {
   it("schedules the requester's ticket and confirms the persisted deadline without deleting", async () => {
     const f = fixture();
     await f.execute();
-    expect(f.interaction.deferReply).toHaveBeenCalledExactlyOnceWith();
+    expect(f.interaction.deferReply).toHaveBeenCalledExactlyOnceWith({
+      flags: MessageFlags.Ephemeral,
+    });
     expect(f.guild.channels.fetch).toHaveBeenCalledWith("channel", { force: true });
     expect(f.guild.members.fetch).toHaveBeenCalledWith({ user: ownerId, force: true });
     expect(f.guild.members.fetchMe).toHaveBeenCalledWith({ force: true });
@@ -106,16 +110,20 @@ describe("/close-ticket", () => {
       f.guild,
     );
     expect(f.channel.delete).not.toHaveBeenCalled();
-    expect(f.interaction.editReply).toHaveBeenCalledWith(
+    expect(f.channel.send).toHaveBeenCalledWith(
       expect.objectContaining({
         flags: MessageFlags.IsComponentsV2,
         allowedMentions: { parse: [] },
       }),
     );
-    const message = JSON.stringify(f.interaction.editReply.mock.calls[0]);
+    const message = JSON.stringify(f.channel.send.mock.calls[0]);
     expect(message).toContain("<t:1893456300:R>");
     expect(message).toContain("Close now");
     expect(message).toContain("Reopen");
+    expect(f.interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ content: expect.stringContaining("Ticket closing") }),
+    );
+    expect(f.interaction.deleteReply).not.toHaveBeenCalled();
     expect(f.interaction.reply).not.toHaveBeenCalled();
   });
 
@@ -231,6 +239,17 @@ describe("/close-ticket", () => {
     f.guild.members.fetch.mockRejectedValueOnce(new Error("Unknown Member"));
     await expect(f.execute()).rejects.toThrow("Unknown Member");
     expect(f.channel.delete).not.toHaveBeenCalled();
+  });
+
+  it("reports a scheduled closure without claiming full success if the public notice fails", async () => {
+    const f = fixture();
+    f.channel.send.mockRejectedValueOnce(new Error("Missing permissions"));
+    await expect(f.execute()).rejects.toThrow(
+      "Ticket closure scheduled, but the notice couldn't be posted",
+    );
+    expect(f.schedule).toHaveBeenCalledOnce();
+    expect(f.interaction.editReply).not.toHaveBeenCalled();
+    expect(f.interaction.deleteReply).not.toHaveBeenCalled();
   });
 
   it("does not confirm a closure if persistence fails", async () => {

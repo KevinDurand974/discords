@@ -20,6 +20,8 @@ import {
   type ButtonInteraction,
   type ModalSubmitInteraction,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import type { ComponentHandler } from "@/core/command.ts";
 import { couponItems, displayEmoji } from "@/shared/emojis/emoji-cache.ts";
 import { CLAIM_BUTTON_PREFIX } from "./claim-components.ts";
@@ -70,14 +72,14 @@ type Draft = {
 const drafts = new Map<string, Draft>();
 function assertGuild(interaction: Actor): asserts interaction is Actor & { guildId: string } {
   if (!interaction.guild || !interaction.guildId)
-    throw new Error("Create a coupon in a server channel.");
+    throw new UserFacingError("Create a coupon in a server channel.");
 }
 function validateCode(value: string) {
   const code = value.trim();
   if (!code || /[`\r\n]/.test(code))
-    throw new Error("Enter a coupon code without backticks or line breaks.");
+    throw new UserFacingError("Enter a coupon code without backticks or line breaks.");
   if (`${CLAIM_BUTTON_PREFIX}${encodeURIComponent(code)}`.length > 100)
-    throw new Error("Coupon code is too long for the Claim button.");
+    throw new UserFacingError("Coupon code is too long. Enter a shorter code.");
   return code;
 }
 export function parseCouponReward(item: string | undefined, quantity: string): CouponReward | null {
@@ -90,7 +92,7 @@ export function parseCouponReward(item: string | undefined, quantity: string): C
     !Number.isSafeInteger(Number(value)) ||
     Number(value) < 1
   ) {
-    throw new Error(
+    throw new UserFacingError(
       "Choose an item and enter a positive whole-number quantity, or leave both fields empty.",
     );
   }
@@ -198,8 +200,12 @@ function draftView(token: string, draft: Draft) {
     flags: MessageFlags.IsComponentsV2 as const,
   };
 }
-async function dismissResponse(interaction: ButtonInteraction) {
-  await interaction.deleteReply().catch(() => {});
+async function confirmCoupon(interaction: ButtonInteraction, content: string) {
+  await editSuccessReply(interaction, {
+    flags: MessageFlags.IsComponentsV2,
+    components: [new TextDisplayBuilder().setContent(content)],
+    allowedMentions: { parse: [] },
+  });
 }
 export async function handleCreateCoupon(interaction: ChatInputCommandInteraction) {
   assertGuild(interaction);
@@ -208,9 +214,11 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
     const item = interaction.options.getString(`item_${index + 1}`);
     if (item === null) continue;
     if (!COUPON_ITEMS.some((allowed) => allowed === item))
-      throw new Error(`Choose item_${index + 1} from the coupon autocomplete suggestions.`);
+      throw new UserFacingError(
+        `Choose item_${index + 1} from the coupon autocomplete suggestions.`,
+      );
     if (items.some((selected) => selected.item === item))
-      throw new Error("Choose each coupon item only once.");
+      throw new UserFacingError("Choose each coupon item only once.");
     items.push({ index, item: item as CouponItem, quantity: null });
   }
   drafts.forEach((draft, token) => {
@@ -262,14 +270,14 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
 }
 async function publish(interaction: ButtonInteraction, token: string, draft: Draft) {
   if (draft.items.some(({ quantity }) => quantity === null))
-    throw new Error("Set a quantity for every selected item before publishing.");
+    throw new UserFacingError("Set a quantity for every selected item before publishing.");
   draft.stage = "publishing";
   try {
     await interaction.deferUpdate();
     const guild = interaction.guild!;
     const channel = await guild.channels.fetch(draft.channelId);
     if (!channel || !channel.isSendable() || !CHANNEL_TYPES.some((type) => type === channel.type))
-      throw new Error("Choose a sendable server text channel.");
+      throw new UserFacingError("Choose a server channel where the bot can send messages.");
     const sendPermission = channel.isThread()
       ? PermissionFlagsBits.SendMessagesInThreads
       : PermissionFlagsBits.SendMessages;
@@ -280,14 +288,14 @@ async function publish(interaction: ButtonInteraction, token: string, draft: Dra
       !channel.permissionsFor(member)?.has(required) ||
       !channel.permissionsFor(bot)?.has(required)
     )
-      throw new Error(
+      throw new UserFacingError(
         "Both you and the bot need permission to view and send messages in the selected channel.",
       );
     if (channel.isThread() && (channel.archived || channel.locked))
-      throw new Error("Choose an active, unlocked thread.");
+      throw new UserFacingError("Choose an active, unlocked thread.");
     const rewards = draft.items.map(({ item, quantity }) => {
       if (quantity === null)
-        throw new Error("Set a quantity for every selected item before publishing.");
+        throw new UserFacingError("Set a quantity for every selected item before publishing.");
       return { item, quantity };
     });
     await channel.send({
@@ -300,7 +308,7 @@ async function publish(interaction: ButtonInteraction, token: string, draft: Dra
     throw error;
   }
   drafts.delete(token);
-  await dismissResponse(interaction);
+  await confirmCoupon(interaction, `Coupon published in <#${draft.channelId}>.`);
 }
 export const createCouponComponentHandler: ComponentHandler = {
   matches: (customId) => customId.startsWith(PREFIX),
@@ -314,17 +322,18 @@ export const createCouponComponentHandler: ComponentHandler = {
       draft.userId !== interaction.user.id ||
       draft.guildId !== interaction.guildId
     )
-      throw new Error(
+      throw new UserFacingError(
         "This coupon draft expired or belongs to another user. Run /sla create-coupon again.",
       );
-    if (draft.stage === "publishing") throw new Error("This coupon is already being published.");
+    if (draft.stage === "publishing")
+      throw new UserFacingError("This coupon is already being published.");
     if (interaction.isModalSubmit()) {
       if (action === "start" && draft.stage === "start") {
         const code = validateCode(interaction.fields.getTextInputValue("code"));
         const channel = interaction.fields
           .getSelectedChannels("channel", true, CHANNEL_TYPES)
           .first();
-        if (!channel) throw new Error("Select a channel for the coupon.");
+        if (!channel) throw new UserFacingError("Select a channel for the coupon.");
         draft.code = code;
         draft.channelId = channel.id;
         draft.stage = "ready";
@@ -355,7 +364,7 @@ export const createCouponComponentHandler: ComponentHandler = {
           draft.stage !== "ready" ||
           draft.quantityForm !== form
         )
-          throw new Error("This quantity form is no longer available.");
+          throw new UserFacingError("This form is unavailable. Run /sla create-coupon again.");
         item.quantity = reward.quantity;
         draft.quantityForm = null;
         await interaction.editReply(draftView(token!, draft));
@@ -365,7 +374,7 @@ export const createCouponComponentHandler: ComponentHandler = {
       if (action === "cancel") {
         drafts.delete(token!);
         await interaction.deferUpdate();
-        await dismissResponse(interaction);
+        await confirmCoupon(interaction, "Coupon creation cancelled.");
         return;
       }
       if (action === "publish" && draft.stage === "ready") {
@@ -404,6 +413,6 @@ export const createCouponComponentHandler: ComponentHandler = {
         return;
       }
     }
-    throw new Error("This action is no longer available for this coupon draft.");
+    throw new UserFacingError("This draft is unavailable. Run /sla create-coupon again.");
   },
 };

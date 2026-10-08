@@ -13,15 +13,16 @@ import {
   type ModalSubmitInteraction,
 } from "discord.js";
 import type { CommandDefinition, ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { getWelcomeStore, type WelcomeSettings, type WelcomeStore } from "./welcome-repository.ts";
 import { DEFAULT_ARRIVAL_MESSAGE, createWelcomeMessageContainer } from "./welcome-messages.ts";
 
 function assertCanConfigure(interaction: ChatInputCommandInteraction | ModalSubmitInteraction) {
   if (!interaction.inGuild() || !interaction.guild)
-    throw new Error("Welcome messages can only be configured in a server.");
+    throw new UserFacingError("Use this command in a server.");
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild))
-    throw new Error("You need Manage Server to configure welcome messages.");
+    throw new UserFacingError("You need Manage Server to configure welcome messages.");
 }
 
 export function createWelcomeModal(
@@ -101,7 +102,7 @@ export async function saveWelcomeSettings(
   assertCanConfigure(interaction);
   const guild = interaction.guild!;
   if (interaction.customId !== `welcome:setup:v2:${interaction.user.id}:${guild.id}`)
-    throw new Error("This form belongs to another user or server. Run /welcome setup again.");
+    throw new UserFacingError("This form is unavailable. Run /welcome setup again.");
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const channelId = interaction.fields
     .getSelectedChannels("welcome-channel", false, [ChannelType.GuildText])
@@ -114,7 +115,7 @@ export async function saveWelcomeSettings(
     arrivalMessage.length > 1000 ||
     departureMessage.length > 1000
   )
-    throw new Error("Both messages must contain between 1 and 1000 characters.");
+    throw new UserFacingError("Both messages must contain between 1 and 1000 characters.");
   createWelcomeMessageContainer(arrivalMessage, true);
   createWelcomeMessageContainer(departureMessage, false);
   const bot = await guild.members.fetchMe();
@@ -122,11 +123,11 @@ export async function saveWelcomeSettings(
     interaction.fields.getTextInputValue("welcome-channel-name").trim() || "welcome";
   if (!channelId) {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels))
-      throw new Error("You need Manage Channels to create a welcome channel.");
+      throw new UserFacingError("You need Manage Channels to create a welcome channel.");
     if (!bot.permissions.has(PermissionFlagsBits.ManageChannels))
-      throw new Error("I need Manage Channels to create a welcome channel.");
+      throw new UserFacingError("I need Manage Channels to create a welcome channel.");
     if (channelName.length > 100)
-      throw new Error("The new channel name must be at most 100 characters.");
+      throw new UserFacingError("The new channel name must be at most 100 characters.");
   }
   const channel = channelId
     ? await guild.channels.fetch(channelId)
@@ -143,13 +144,13 @@ export async function saveWelcomeSettings(
       });
   try {
     if (!channel || channel.type !== ChannelType.GuildText)
-      throw new Error("Choose a text channel in this server.");
+      throw new UserFacingError("Choose a text channel in this server.");
     if (
       !channel
         .permissionsFor(bot)
         ?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages])
     )
-      throw new Error("I need View Channel and Send Messages in the selected channel.");
+      throw new UserFacingError("I need View Channel and Send Messages in the selected channel.");
     await store.save({
       guildId: guild.id,
       channelId: channel.id,
@@ -162,7 +163,7 @@ export async function saveWelcomeSettings(
         await channel.delete("Welcome setup failed");
       } catch (cleanupError) {
         console.error("Failed to remove incomplete welcome channel", cleanupError);
-        throw new Error(
+        throw new UserFacingError(
           "Welcome setup failed. Please delete the new channel manually and try again.",
           { cause: error },
         );
@@ -183,8 +184,7 @@ export async function resetWelcomeSettings(
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   await store.reset(interaction.guildId!);
   await editSuccessReply(interaction, {
-    content:
-      "Welcome and departure messages are disabled. The channel and its messages were kept. Run /welcome setup to configure them again.",
+    content: "Welcome and departure messages disabled.",
   });
 }
 

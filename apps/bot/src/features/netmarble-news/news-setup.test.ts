@@ -136,7 +136,9 @@ describe("news Forum setup", () => {
     await createNewsSetup(f.guild, f.store);
     await disableNewsSetup("123", f.store);
     f.guild.resourcesExist = vi.fn(async () => false);
-    await expect(createNewsSetup(f.guild, f.store)).rejects.toThrow("repair the configuration");
+    await expect(createNewsSetup(f.guild, f.store)).rejects.toThrow(
+      "Ask an administrator to check /sla news status",
+    );
     expect(f.store.setEnabled).toHaveBeenCalledTimes(1);
   });
 

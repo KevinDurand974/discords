@@ -149,7 +149,7 @@ describe("/logs", () => {
     request.fields.getTextInputValue.mockReturnValue("  ");
     await expect(
       logsComponentHandler.execute(request as unknown as ModalSubmitInteraction, context),
-    ).rejects.toThrow("cannot be empty");
+    ).rejects.toThrow("Enter a name for the log channel");
     expect(request.guild.channels.create).not.toHaveBeenCalled();
     expect(context.commandLogger.setChannel).not.toHaveBeenCalled();
   });

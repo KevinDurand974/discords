@@ -5,6 +5,7 @@ import {
   type TextChannel,
   type ThreadChannel,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import pEachSeries from "p-each-series";
 
 export const MAX_CLEAR_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -19,16 +20,14 @@ const DURATION_UNITS = {
 export function parseClearDuration(value: string): number {
   const match = /^(\d+)([mhdw])$/.exec(value.trim().toLowerCase());
   if (!match) {
-    throw new Error(
+    throw new UserFacingError(
       "Duration must be a positive whole number followed by m, h, d or w (for example, 30m or 2d).",
     );
   }
   const amount = Number(match[1]);
   const duration = amount * DURATION_UNITS[match[2] as keyof typeof DURATION_UNITS];
   if (!Number.isSafeInteger(amount) || amount < 1 || !Number.isSafeInteger(duration)) {
-    throw new Error(
-      "Duration must be positive and represent a safe integer number of milliseconds.",
-    );
+    throw new UserFacingError("Duration must be positive. Choose a shorter duration.");
   }
   return duration;
 }
@@ -62,8 +61,8 @@ export async function clearMessages(
         if (error instanceof DiscordAPIError && error.code === RESTJSONErrorCodes.UnknownMessage)
           return;
         if (deletedCount === 0) throw error;
-        throw new Error(
-          `Deleted ${deletedCount} message${deletedCount === 1 ? "" : "s"}, but could not delete the remaining messages.`,
+        throw new UserFacingError(
+          `Deleted ${deletedCount} message${deletedCount === 1 ? "" : "s"}, but couldn't delete the rest. Check bot permissions, then try /clear again.`,
           { cause: error },
         );
       }

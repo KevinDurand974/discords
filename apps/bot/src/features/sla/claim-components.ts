@@ -7,6 +7,8 @@ import {
   type ModalSubmitInteraction,
 } from "discord.js";
 import type { ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { redeemCoupon } from "./coupon.client.ts";
 
 export const CLAIM_BUTTON_PREFIX = "sla:claim:";
@@ -25,7 +27,7 @@ const couponCodeFromCustomId = (customId: string, prefix: string) => {
 
 const showClaimModal = async (interaction: ButtonInteraction) => {
   const couponCode = couponCodeFromCustomId(interaction.customId, CLAIM_BUTTON_PREFIX);
-  if (!couponCode) throw new Error("Invalid coupon button");
+  if (!couponCode) throw new UserFacingError("This coupon button is unavailable. Try /sla redeem.");
 
   await interaction.showModal(
     new ModalBuilder()
@@ -49,20 +51,23 @@ const showClaimModal = async (interaction: ButtonInteraction) => {
 
 const submitClaim = async (interaction: ModalSubmitInteraction) => {
   const couponCode = couponCodeFromCustomId(interaction.customId, CLAIM_MODAL_PREFIX);
-  if (!couponCode) throw new Error("Invalid coupon form");
+  if (!couponCode) throw new UserFacingError("This coupon form is unavailable. Try /sla redeem.");
 
   const pid = interaction.fields.getTextInputValue(PID_INPUT_ID).trim();
   await interaction.deferReply({ ephemeral: true });
 
   const result = await redeemCoupon(couponCode, pid);
   if (result.errorCode !== 200) {
+    console.error("Coupon claim failed", { errorCode: result.errorCode });
     await interaction.editReply(
-      `Coupon claim failed (${result.errorCode}): ${result.errorMessage ?? "Unknown error"}`,
+      result.errorCode === 24004
+        ? "This coupon has already been claimed."
+        : "Couldn't claim the coupon. Check your coupon code and player ID, then try again.",
     );
     return;
   }
 
-  await interaction.editReply("Coupon claimed successfully.");
+  await editSuccessReply(interaction, "Coupon claimed.");
 };
 
 export const claimComponentHandler: ComponentHandler = {

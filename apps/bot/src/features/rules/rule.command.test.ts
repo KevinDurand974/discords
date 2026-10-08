@@ -385,9 +385,7 @@ describe("/rules", () => {
   it("does not publish if clearing fails and warns about partial deletion", async () => {
     const f = fixture();
     f.channel.messages.fetch.mockRejectedValue(new Error("Cannot fetch"));
-    await expect(f.submit()).rejects.toThrow(
-      "Some messages may already have been permanently deleted",
-    );
+    await expect(f.submit()).rejects.toThrow("Some old messages were deleted");
     expect(f.channel.send).not.toHaveBeenCalled();
     expect(f.channel.delete).not.toHaveBeenCalled();
   });

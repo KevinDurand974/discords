@@ -12,6 +12,8 @@ import {
   type VoiceChannel,
 } from "discord.js";
 
+import { UserFacingError } from "@/core/errors.ts";
+
 export const visibilityChannelTypes = [
   ChannelType.GuildText,
   ChannelType.GuildAnnouncement,
@@ -50,11 +52,11 @@ export async function getVisibilityChannel(
   channelId: string,
 ): Promise<VisibilityChannel> {
   if (!interaction.inGuild() || !interaction.guild) {
-    throw new Error("Channel visibility can only be configured in a server.");
+    throw new UserFacingError("Use this command in a server.");
   }
   const channel = await interaction.guild.channels.fetch(channelId, { force: true });
   if (!channel || channel.guildId !== interaction.guild.id || !isVisibilityChannel(channel)) {
-    throw new Error(
+    throw new UserFacingError(
       "Choose a text, announcement, forum, media or voice channel in this server. Threads inherit their parent channel's content restrictions.",
     );
   }
@@ -64,12 +66,12 @@ export async function getVisibilityChannel(
   ]);
   const permissions = [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.ManageChannels];
   if (!channel.permissionsFor(member)?.has(permissions)) {
-    throw new Error(
+    throw new UserFacingError(
       "You need View Channel and Manage Channels in this channel to configure visibility.",
     );
   }
   if (!channel.permissionsFor(bot)?.has(permissions)) {
-    throw new Error(
+    throw new UserFacingError(
       "The bot needs View Channel and Manage Channels in this channel to configure visibility.",
     );
   }
@@ -83,7 +85,8 @@ export function getChannelVisibility(channel: VisibilityChannel): Visibility {
 
 export function parseVisibility(value: string): Visibility {
   const choice = visibilityChoices.find((option) => option.value === value);
-  if (!choice) throw new Error("Select Default, Spoiler Channel or Age-Restricted Channel.");
+  if (!choice)
+    throw new UserFacingError("Select Default, Spoiler Channel or Age-Restricted Channel.");
   return choice.value;
 }
 

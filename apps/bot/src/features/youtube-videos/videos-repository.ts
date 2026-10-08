@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import { createDatabase, type Database } from "@discords/db";
 import { and, asc, desc, eq, inArray, sql } from "@discords/db/orm";
 import {
@@ -29,7 +30,7 @@ export function createVideosRepository(url: string) {
         );
         locked = result.rows[0]?.locked ?? false;
         if (!locked)
-          throw new Error("Videos are already being updated for this server; retry shortly.");
+          throw new UserFacingError("YouTube is already being updated. Try again shortly.");
         return await work();
       } finally {
         try {
@@ -230,7 +231,17 @@ export function createVideosRepository(url: string) {
         .from(intents)
         .where(eq(intents.guildId, guildId))
         .groupBy(intents.state);
-      return result.map((row) => `${row.state}: ${row.count}`).join(", ") || "no videos";
+      const labels: Record<string, string> = {
+        pending: "Waiting to publish",
+        in_progress: "Publishing",
+        needs_reconciliation: "Needs retry",
+        published: "Published",
+        suppressed: "Removed",
+      };
+      return (
+        result.map((row) => `${labels[row.state] ?? "Other videos"}: ${row.count}`).join(", ") ||
+        "No videos yet."
+      );
     },
     async publicationThreads(guildId: string, channelId?: string) {
       const rows = await db

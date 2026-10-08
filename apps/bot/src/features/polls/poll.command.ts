@@ -1,4 +1,5 @@
 import { InteractionContextType, SlashCommandBuilder } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { CommandDefinition } from "@/core/command.ts";
 import { createPollModal } from "./poll-modal.ts";
 
@@ -17,7 +18,7 @@ export const pollCommand = {
     .setDefaultMemberPermissions(null),
   async execute(interaction) {
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Polls can only be created in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
     await interaction.showModal(createPollModal(interaction));
   },

@@ -6,6 +6,8 @@ import {
   type ModalSubmitInteraction,
   type Role,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { createRuleComponents } from "./rule-components.ts";
 import { clearRuleChannel } from "./clear-rule-channel.ts";
 import type { RuleForm } from "./rule-form.ts";
@@ -27,17 +29,19 @@ export async function publishRules(interaction: ModalSubmitInteraction, form: Ru
     guild.members.fetchMe(),
   ]);
   if (!member.permissions.has(P.ManageChannels)) {
-    throw new Error("You need Manage Channels to publish rules.");
+    throw new UserFacingError("You need Manage Channels to publish rules.");
   }
   if (!selected && !bot.permissions.has(P.ManageChannels)) {
-    throw new Error("The bot needs Manage Channels to create a rules channel.");
+    throw new UserFacingError("The bot needs Manage Channels to create a rules channel.");
   }
   const isCommunity = !selected && (await guild.fetch()).features.includes(GuildFeature.Community);
   if (isCommunity && !member.permissions.has(P.ManageGuild)) {
-    throw new Error("You need Manage Server to designate the Community Rules Channel.");
+    throw new UserFacingError("You need Manage Server to designate the Community Rules Channel.");
   }
   if (isCommunity && !bot.permissions.has(P.ManageGuild)) {
-    throw new Error("The bot needs Manage Server to designate the Community Rules Channel.");
+    throw new UserFacingError(
+      "The bot needs Manage Server to designate the Community Rules Channel.",
+    );
   }
   const { existing, everyone } = await prepareRuleRole(guild, member, bot, form.roleId);
   const channel = selected
@@ -49,25 +53,25 @@ export async function publishRules(interaction: ModalSubmitInteraction, form: Ru
         reason: `Rules channel created by ${interaction.user.tag}`,
       });
   if (!channel || channel.guildId !== guild.id || channel.type !== ChannelType.GuildText) {
-    throw new Error("Choose an existing text channel in this server.");
+    throw new UserFacingError("Choose an existing text channel in this server.");
   }
   let createdRole: Role | undefined;
   try {
     if (selected && !channel.permissionsFor(member)?.has([P.ViewChannel, P.SendMessages])) {
-      throw new Error("You need View Channel and Send Messages in the destination.");
+      throw new UserFacingError("You need View Channel and Send Messages in the destination.");
     }
     if (!channel.permissionsFor(bot)?.has([P.ViewChannel, P.SendMessages])) {
-      throw new Error("The bot needs View Channel and Send Messages in the destination.");
+      throw new UserFacingError("The bot needs View Channel and Send Messages in the destination.");
     }
     if (selected) {
       const deletionPermissions = [P.ManageMessages, P.ReadMessageHistory];
       if (!channel.permissionsFor(member)?.has(deletionPermissions)) {
-        throw new Error(
+        throw new UserFacingError(
           "You need Manage Messages and Read Message History to replace existing rules.",
         );
       }
       if (!channel.permissionsFor(bot)?.has(deletionPermissions)) {
-        throw new Error(
+        throw new UserFacingError(
           "The bot needs Manage Messages and Read Message History to replace existing rules.",
         );
       }
@@ -86,8 +90,8 @@ export async function publishRules(interaction: ModalSubmitInteraction, form: Ru
     const components = createRuleComponents(rules, { guildId: guild.id, roleId: role.id });
     if (selected) {
       await clearRuleChannel(channel).catch((error: unknown) => {
-        throw new Error(
-          "Could not clear the channel. Some messages may already have been permanently deleted; new rules were not published.",
+        throw new UserFacingError(
+          "Rules weren't published. Some old messages were deleted. Check bot permissions, then try /rule again.",
           { cause: error },
         );
       });
@@ -116,7 +120,7 @@ export async function publishRules(interaction: ModalSubmitInteraction, form: Ru
     }
     throw error;
   }
-  await interaction.editReply({
+  await editSuccessReply(interaction, {
     content: `Server rules published in <#${channel.id}>.`,
     allowedMentions: { parse: [] },
   });

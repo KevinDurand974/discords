@@ -5,7 +5,9 @@ import {
   RadioGroupBuilder,
   TextDisplayBuilder,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { ComponentHandler } from "@/core/command.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import {
   getVisibilityChannel,
   parseVisibility,
@@ -50,7 +52,7 @@ export const visibilityComponentHandler = {
   async execute(interaction) {
     if (!interaction.isModalSubmit()) return;
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Channel visibility can only be configured in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
     const [prefix, userId, guildId, channelId, extra] = interaction.customId.split(":");
     if (
@@ -60,7 +62,7 @@ export const visibilityComponentHandler = {
       userId !== interaction.user.id ||
       guildId !== interaction.guild.id
     ) {
-      throw new Error(
+      throw new UserFacingError(
         "This visibility form belongs to another user or server. Run /visibility to open your own form.",
       );
     }
@@ -69,7 +71,7 @@ export const visibilityComponentHandler = {
     const channel = await getVisibilityChannel(interaction, channelId);
     await setChannelVisibility(channel, visibility, interaction.user.id);
     const choice = visibilityChoices.find((option) => option.value === visibility)!;
-    await interaction.editReply({
+    await editSuccessReply(interaction, {
       content: `Content visibility for <#${channel.id}> set to **${choice.label}**.`,
       allowedMentions: { parse: [] },
     });

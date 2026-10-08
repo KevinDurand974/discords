@@ -1,3 +1,5 @@
+import { UserFacingError } from "@/core/errors.ts";
+
 export const NEWS_FORUM_NAME = "Solo Leveling: Arise - News";
 export const NOTICES_MENU_SEQ = 32;
 export const NEWS_TAGS = [
@@ -49,14 +51,14 @@ export async function createNewsSetup(
     initialBackfillCount < 0 ||
     initialBackfillCount > 10
   )
-    throw new RangeError("Backfill count must be between 0 and 10.");
+    throw new UserFacingError("Backfill count must be between 0 and 10.");
   const current = await store.get(guild.guildId);
-  if (current?.enabled) throw new Error("News is already configured for this server.");
+  if (current?.enabled) throw new UserFacingError("News is already configured for this server.");
   await guild.preflight();
   if (current) {
     if (!(await guild.resourcesExist(current))) {
-      throw new Error(
-        "Saved news channel or roles are missing; repair the configuration before enabling it.",
+      throw new UserFacingError(
+        "The news Forum or roles are missing. Ask an administrator to check /sla news status.",
       );
     }
     if (!(await store.setEnabled(guild.guildId, true))) {
@@ -114,7 +116,7 @@ export async function createNewsSetup(
 
 export async function disableNewsSetup(guildId: string, store: NewsSetupStore) {
   if (!(await store.setEnabled(guildId, false)))
-    throw new Error("News is not configured for this server.");
+    throw new UserFacingError("News is not configured. Run /sla news create.");
 }
 
 export async function cleanNewsSetup(

@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import type { GuildMember, Role } from "discord.js";
 
 export type ReactionRoleMapping = { emoji: string; key: string; roleId: string };
@@ -16,7 +17,7 @@ export function parseReactionEmoji(input: string): Pick<ReactionRoleMapping, "em
         emoji,
       )
     ) {
-      throw new Error("Enter exactly one emoji, not text or multiple emojis.");
+      throw new UserFacingError("Enter exactly one emoji, not text or multiple emojis.");
     }
   }
   return { emoji, key: custom?.[1] ?? emojiKey({ id: null, name: emoji }) };
@@ -27,14 +28,15 @@ export function parseReactionRoles(input: string): ReactionRoleMapping[] {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  if (lines.length < 1 || lines.length > 20) throw new Error("Enter 1–20 emoji - @role lines.");
+  if (lines.length < 1 || lines.length > 20)
+    throw new UserFacingError("Enter 1–20 emoji - @role lines.");
   const mappings = lines.map((line) => {
     const match = /^(\S+)\s+-\s+<@&(\d{17,20})>$/.exec(line);
-    if (!match) throw new Error("Use emoji - @role on each line (paste a role mention).");
+    if (!match) throw new UserFacingError("Use emoji - @role on each line (paste a role mention).");
     return { ...parseReactionEmoji(match[1]!), roleId: match[2]! };
   });
   if (new Set(mappings.map((mapping) => mapping.key)).size !== mappings.length) {
-    throw new Error("Each emoji may appear only once.");
+    throw new UserFacingError("Each emoji may appear only once.");
   }
   return mappings;
 }
@@ -46,13 +48,15 @@ export function assertSafeReactionRole(role: Role, bot: GuildMember, publisher?:
     !role.editable ||
     bot.roles.highest.comparePositionTo(role) <= 0
   ) {
-    throw new Error("Choose unmanaged roles below the bot's highest role, not @everyone.");
+    throw new UserFacingError(
+      "Choose unmanaged roles below the bot's highest role, not @everyone.",
+    );
   }
   if (
     publisher &&
     publisher.id !== role.guild.ownerId &&
     publisher.roles.highest.comparePositionTo(role) <= 0
   ) {
-    throw new Error("Reaction roles must be below your highest role.");
+    throw new UserFacingError("Reaction roles must be below your highest role.");
   }
 }

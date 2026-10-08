@@ -127,7 +127,7 @@ describe("/pick interactions", () => {
     const handler = createPickComponentHandler();
     const reply = vi.fn();
     await expect(handler.execute(modal(reply, "A\nB", "other"), context)).rejects.toThrow(
-      "another user",
+      "This form is unavailable. Run /pick again",
     );
     await expect(handler.execute(modal(reply, "A"), context)).rejects.toThrow("2–50");
     expect(reply).not.toHaveBeenCalled();

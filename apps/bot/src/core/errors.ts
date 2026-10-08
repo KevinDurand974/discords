@@ -11,12 +11,15 @@ type ReplyableInteraction =
   | ChatInputCommandInteraction
   | ModalSubmitInteraction;
 
+export class UserFacingError extends Error {}
+
 export const replyWithError = async (interaction: ReplyableInteraction, error: unknown) => {
+  console.error("Interaction failed", error);
   const data: InteractionReplyOptions = {
     content:
-      error instanceof Error
+      error instanceof UserFacingError
         ? error.message
-        : "There was an error while executing this interaction.",
+        : "Couldn't complete this action. Please try again. If it keeps failing, contact a server administrator.",
     flags: MessageFlags.Ephemeral,
   };
 

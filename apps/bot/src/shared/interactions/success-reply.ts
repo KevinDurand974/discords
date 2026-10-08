@@ -2,10 +2,12 @@ import type { ChatInputCommandInteraction, InteractionEditReplyOptions } from "d
 
 export async function editSuccessReply(
   interaction: Pick<ChatInputCommandInteraction, "editReply" | "deleteReply">,
-  options: InteractionEditReplyOptions,
+  options: string | InteractionEditReplyOptions,
 ): Promise<void> {
   await interaction.editReply(options);
   setTimeout(() => {
-    void interaction.deleteReply().catch(() => {});
+    void Promise.resolve()
+      .then(() => interaction.deleteReply())
+      .catch(() => {});
   }, 10_000).unref();
 }

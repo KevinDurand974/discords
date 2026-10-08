@@ -1,4 +1,5 @@
 import { InteractionContextType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import type { CommandDefinition } from "@/core/command.ts";
 import { createVisibilityModal } from "./visibility-modal.ts";
 import {
@@ -28,7 +29,7 @@ export const visibilityCommand = {
     ),
   async execute(interaction) {
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Channel visibility can only be configured in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
     const selected = interaction.options.getChannel("channel");
     const channel = await getVisibilityChannel(interaction, selected?.id ?? interaction.channelId);

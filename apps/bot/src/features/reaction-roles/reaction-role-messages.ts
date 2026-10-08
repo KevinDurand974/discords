@@ -1,5 +1,6 @@
 import { ContainerBuilder, MessageFlags, SeparatorBuilder, TextDisplayBuilder } from "discord.js";
 
+import { UserFacingError } from "@/core/errors.ts";
 import type { ReactionRoleMapping } from "./reaction-role-model.ts";
 
 export const REACTION_ROLE_TITLE = "## 🎭 Choose your roles";
@@ -16,7 +17,7 @@ export function createReactionRoleMessage(
   if (mappings.length) {
     const explanation = `**React to toggle a role**\n${mappings.map((mapping) => `${mapping.emoji} → <@&${mapping.roleId}>`).join("\n")}`;
     if (REACTION_ROLE_TITLE.length + content.length + explanation.length > 4000) {
-      throw new Error(
+      throw new UserFacingError(
         "The message and reaction role descriptions exceed 4000 characters. Shorten your message or use fewer reactions.",
       );
     }

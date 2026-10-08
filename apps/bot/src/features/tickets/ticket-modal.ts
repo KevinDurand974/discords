@@ -5,6 +5,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
 } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import type { ComponentHandler } from "@/core/command.ts";
 import {
   createTicket,
@@ -51,10 +53,10 @@ export const ticketComponentHandler = {
   async execute(interaction) {
     if (!interaction.isModalSubmit()) return;
     if (!interaction.inGuild() || !interaction.guild) {
-      throw new Error("Tickets can only be opened in a server.");
+      throw new UserFacingError("Use this command in a server.");
     }
     if (interaction.customId !== `${TICKET_MODAL_PREFIX}${interaction.user.id}`) {
-      throw new Error(
+      throw new UserFacingError(
         "This ticket form belongs to another user. Run /ticket to open your own form.",
       );
     }
@@ -64,10 +66,6 @@ export const ticketComponentHandler = {
     );
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const channel = await createTicket(interaction.guild, interaction.user, details);
-    await interaction.editReply(`Your private ticket is ready: <#${channel.id}>.`);
-    setTimeout(() => {
-      // Best-effort cleanup: the confirmation may already have been dismissed or deleted.
-      void interaction.deleteReply().catch(() => {});
-    }, 5_000).unref();
+    await editSuccessReply(interaction, `Your private ticket is ready: <#${channel.id}>.`);
   },
 } satisfies ComponentHandler;

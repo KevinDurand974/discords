@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import { randomBytes } from "node:crypto";
 import {
   ChannelType,
@@ -21,10 +22,12 @@ export const TICKET_DESCRIPTION_LIMIT = 4000;
 export function validateTicket(title: string, description: string): TicketDetails {
   const details = { title: title.trim(), description: description.trim() };
   if (!details.title || details.title.length > TICKET_TITLE_LIMIT) {
-    throw new Error("A ticket title is required and must contain between 1 and 100 characters.");
+    throw new UserFacingError(
+      "A ticket title is required and must contain between 1 and 100 characters.",
+    );
   }
   if (!details.description || details.description.length > TICKET_DESCRIPTION_LIMIT) {
-    throw new Error(
+    throw new UserFacingError(
       "A ticket description is required and must contain between 1 and 4000 characters.",
     );
   }
@@ -80,7 +83,7 @@ export async function createTicket(guild: Guild, requester: User, input: TicketD
     PermissionFlagsBits.ReadMessageHistory,
   ];
   if (!bot.permissions.has(required)) {
-    throw new Error(
+    throw new UserFacingError(
       "The bot needs Manage Channels, View Channel, Send Messages, Pin Messages, and Read Message History to create tickets.",
     );
   }
@@ -135,9 +138,11 @@ export async function createTicket(guild: Guild, requester: User, input: TicketD
   } catch (error) {
     try {
       await channel.delete("Ticket initialization failed; removing incomplete private channel");
-    } catch {
-      throw new Error(
-        "Unable to initialize the ticket or remove its empty channel. Ask a moderator to check the server's ticket channels.",
+    } catch (cleanupError) {
+      console.error("Ticket setup and channel cleanup failed", error, cleanupError);
+      throw new UserFacingError(
+        "Ticket creation failed. Ask a moderator to delete the incomplete ticket channel, then try again.",
+        { cause: error },
       );
     }
     throw error;

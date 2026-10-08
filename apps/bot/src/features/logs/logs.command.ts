@@ -17,6 +17,8 @@ import type {
   ComponentHandler,
 } from "@/core/command.ts";
 
+import { UserFacingError } from "@/core/errors.ts";
+
 const DEFAULT_LOG_CHANNEL_NAME = "bot-command-logs";
 const LOGS_MODAL_ID = "setup:logs";
 const CHANNEL_NAME_INPUT_ID = "channel-name";
@@ -25,10 +27,10 @@ const assertCanConfigureLogs = (
   interaction: ChatInputCommandInteraction | ModalSubmitInteraction,
 ) => {
   if (!interaction.inGuild() || !interaction.guild) {
-    throw new Error("This command can only be used in a server.");
+    throw new UserFacingError("Use this command in a server.");
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-    throw new Error("You need the Manage Channels permission to configure command logs.");
+    throw new UserFacingError("You need Manage Channels to configure command logs.");
   }
 };
 
@@ -58,7 +60,7 @@ const createLogChannel = async (
     throw new Error("Unable to identify this server.");
   }
   const channelName = interaction.fields.getTextInputValue(CHANNEL_NAME_INPUT_ID).trim();
-  if (!channelName) throw new Error("The log channel name cannot be empty.");
+  if (!channelName) throw new UserFacingError("Enter a name for the log channel.");
   const botUserId = interaction.client.user?.id;
   if (!botUserId) throw new Error("The bot user is not available.");
   const managerRoleOverwrites = [...(await guild.roles.fetch()).values()]

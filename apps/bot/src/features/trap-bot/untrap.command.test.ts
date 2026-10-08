@@ -161,7 +161,7 @@ describe("/untrap", () => {
     const f = fixture();
     if (kind === "dm") f.interaction.inGuild = () => false;
     else f.interaction.guild = null;
-    await expect(f.run()).rejects.toThrow("server-only");
+    await expect(f.run()).rejects.toThrow("Use this command in a server");
     expect(f.store.clearChannel).not.toHaveBeenCalled();
     expect(f.channel.delete).not.toHaveBeenCalled();
   });

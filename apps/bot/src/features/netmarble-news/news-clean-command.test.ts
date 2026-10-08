@@ -120,9 +120,11 @@ describe("administrator news cleanup confirmation", () => {
     const f = fixture(true);
     await handleNewsSetup(f.slash);
     const preview = f.reply.mock.calls[0]![0];
-    expect(preview.content).toContain("Forum: <#forum-1> (ID forum-1)");
-    expect(preview.content).toContain("<@&role-1> (ID role-1)");
-    expect(preview.content).toContain("**2** imported-article records");
+    expect(preview.content).toContain("**Permanent deletion**");
+    expect(preview.content).toContain("<#forum-1>, all its posts");
+    expect(preview.content).toContain("<@&role-1>");
+    expect(preview.content).not.toContain("records");
+    expect(preview.content).toContain("News publishing will stop");
     expect(mocks.setEnabled).not.toHaveBeenCalled();
     expect(mocks.delete).not.toHaveBeenCalled();
     const customId = preview.components[0]!.toJSON().components[0]!.custom_id;
@@ -142,7 +144,7 @@ describe("administrator news cleanup confirmation", () => {
         editReply,
       }) as unknown as ButtonInteraction;
     await expect(handleNewsCleanConfirmation(button("intruder"))).rejects.toThrow(
-      "belongs to another administrator",
+      "Run /sla news clean again",
     );
     await expect(handleNewsCleanConfirmation(button("admin-1", false))).rejects.toThrow(
       "Only a server administrator",

@@ -89,12 +89,15 @@ export function createPollModal(interaction: ChatInputCommandInteraction) {
     );
 }
 
+import { UserFacingError } from "@/core/errors.ts";
+import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
+
 async function submitPoll(interaction: ModalSubmitInteraction) {
   if (!interaction.inGuild() || !interaction.guild) {
-    throw new Error("Polls can only be created in a server.");
+    throw new UserFacingError("Use this command in a server.");
   }
   if (interaction.customId !== `${POLL_MODAL_PREFIX}${interaction.user.id}`) {
-    throw new Error("This poll form belongs to another user. Run /poll to open your own form.");
+    throw new UserFacingError("This form is unavailable. Run /poll again.");
   }
   const poll = createPollFromForm(
     interaction.fields.getTextInputValue("question"),
@@ -105,7 +108,7 @@ async function submitPoll(interaction: ModalSubmitInteraction) {
   const selected = interaction.fields
     .getSelectedChannels("channel", true, pollChannelTypes)
     .first();
-  if (!selected) throw new Error("Select a destination channel for the poll.");
+  if (!selected) throw new UserFacingError("Select a destination channel for the poll.");
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const channel = await interaction.guild.channels.fetch(selected.id);
   if (
@@ -113,10 +116,12 @@ async function submitPoll(interaction: ModalSubmitInteraction) {
     !pollChannelTypes.some((type) => type === channel.type) ||
     !channel.isSendable()
   ) {
-    throw new Error("Choose a server text channel, announcement channel, or thread for the poll.");
+    throw new UserFacingError(
+      "Choose a server text channel, announcement channel, or thread for the poll.",
+    );
   }
   if (channel.isThread() && (channel.archived || channel.locked)) {
-    throw new Error("Polls cannot be created in archived or locked threads.");
+    throw new UserFacingError("Polls cannot be created in archived or locked threads.");
   }
   const permissions = [
     PermissionFlagsBits.ViewChannel,
@@ -130,12 +135,12 @@ async function submitPoll(interaction: ModalSubmitInteraction) {
     interaction.guild.members.fetchMe(),
   ]);
   if (!channel.permissionsFor(member)?.has(permissions)) {
-    throw new Error(
+    throw new UserFacingError(
       "You need View Channel, Send Messages, and Send Polls in the destination (Send Messages in Threads for a thread).",
     );
   }
   if (!channel.permissionsFor(bot)?.has(permissions)) {
-    throw new Error(
+    throw new UserFacingError(
       "The bot needs View Channel, Send Messages, and Send Polls in the destination (Send Messages in Threads for a thread).",
     );
   }
@@ -148,13 +153,16 @@ async function submitPoll(interaction: ModalSubmitInteraction) {
       ),
     );
     if (canAccess.some((allowed) => !allowed)) {
-      throw new Error(
+      throw new UserFacingError(
         "Both you and the bot must be members of the private thread or have Manage Threads.",
       );
     }
   }
   await channel.send({ poll, allowedMentions: { parse: [] } });
-  await interaction.deleteReply();
+  await editSuccessReply(interaction, {
+    content: `Poll published in <#${channel.id}>.`,
+    allowedMentions: { parse: [] },
+  });
 }
 
 export const pollComponentHandler = {

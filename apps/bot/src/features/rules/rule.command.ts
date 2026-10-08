@@ -14,6 +14,7 @@ import {
   type ModalSubmitInteraction,
 } from "discord.js";
 import type { CommandDefinition, ComponentHandler } from "@/core/command.ts";
+import { UserFacingError } from "@/core/errors.ts";
 import { DEFAULT_RULES } from "./default-rules.ts";
 import { publishRules } from "./publish-rules.ts";
 import { readRuleForm } from "./rule-form.ts";
@@ -25,10 +26,10 @@ export function assertCanPublishRules(
   interaction: ChatInputCommandInteraction | ModalSubmitInteraction,
 ) {
   if (!interaction.inGuild() || !interaction.guild) {
-    throw new Error("Rules can only be published in a server.");
+    throw new UserFacingError("Use this command in a server.");
   }
   if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)) {
-    throw new Error("You need Manage Channels to publish rules.");
+    throw new UserFacingError("You need Manage Channels to publish rules.");
   }
 }
 
@@ -114,7 +115,7 @@ export const ruleComponentHandler = {
     if (
       interaction.customId !== `${RULE_MODAL_PREFIX}${interaction.user.id}:${interaction.guild!.id}`
     ) {
-      throw new Error(
+      throw new UserFacingError(
         "This form belongs to another user or server. Run /rules to open your own form.",
       );
     }

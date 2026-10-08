@@ -5,6 +5,7 @@ import {
   type TicketClosureRepository,
   type TicketClosureRequest,
 } from "./ticket-closure-repository.ts";
+import { UserFacingError } from "@/core/errors.ts";
 import { ticketOwnerId } from "./ticket-service.ts";
 import { authorizeTicket, requireTicketDeletionPermission } from "./ticket-access.ts";
 
@@ -27,11 +28,12 @@ export async function scheduleTicketClosure(
       request.requestedBy,
     );
     if (ownerId !== request.ownerId)
-      throw new Error("The ticket requester changed; closure refused.");
+      throw new UserFacingError("This ticket changed. Run /close-ticket again.");
     await requireTicketDeletionPermission(guild, channel);
     closure = await repository.schedule(request);
   });
-  if (!acquired || !closure) throw new Error("This ticket is being updated. Try again shortly.");
+  if (!acquired || !closure)
+    throw new UserFacingError("This ticket is being updated. Try again shortly.");
   return closure;
 }
 
@@ -52,7 +54,7 @@ export async function changeTicketClosure(
       closure.guildId !== guild.id ||
       closure.ownerId !== ownerId
     ) {
-      throw new Error(
+      throw new UserFacingError(
         "This closure is no longer active. Use /close-ticket to create a new closure.",
       );
     }
@@ -62,7 +64,7 @@ export async function changeTicketClosure(
     }
     await repository.complete(channelId);
   });
-  if (!acquired) throw new Error("This ticket is being updated. Try again shortly.");
+  if (!acquired) throw new UserFacingError("This ticket is being updated. Try again shortly.");
 }
 function isUnknownChannel(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && error.code === 10003;

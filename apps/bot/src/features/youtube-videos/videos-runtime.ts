@@ -1,4 +1,5 @@
 import type { Client, ForumChannel } from "discord.js";
+import { UserFacingError } from "@/core/errors.ts";
 import { createVideosApi } from "./videos-api.ts";
 import {
   auditVideoPermissions,
@@ -64,7 +65,7 @@ export function buildVideosRuntime(
     await store.createSettings(guildId);
     let setup = (await store.get(guildId))!;
     if (setup.lifecycle === "cleaning")
-      throw new Error("Cleanup is incomplete; an administrator must finish /youtube clean first.");
+      throw new UserFacingError("Ask an administrator to finish /youtube clean first.");
     let forum = await getVideoForum(guild, setup.forumChannelId);
     if (!forum) {
       if (setup.forumChannelId) {
@@ -91,7 +92,7 @@ export function buildVideosRuntime(
   async function publish(setup: ForumSettings) {
     const guild = await client.guilds.fetch(setup.guildId);
     const forum = await getVideoForum(guild, setup.forumChannelId);
-    if (!forum) throw new Error("Latest Videos is missing; run /youtube setup to recreate it.");
+    if (!forum) throw new UserFacingError("The YouTube Forum is missing. Run /youtube setup.");
     await permissions(setup, forum);
     await repairTags(setup, forum);
     await store.enqueue(setup.guildId, setup.forumGeneration);
@@ -149,21 +150,21 @@ export function buildVideosRuntime(
     },
     async add(guildId: string, input: string, count: number, forumId: string) {
       if (!Number.isInteger(count) || count < 0 || count > 15)
-        throw new Error("Backfill count must be between 0 and 15.");
+        throw new UserFacingError("Backfill count must be between 0 and 15.");
       const resolved = await api.resolve(input);
       return store.withGuild(guildId, async () => {
         const guild = await client.guilds.fetch(guildId);
         const forum = await getVideoForum(guild, forumId);
         if (!forum || forum.guildId !== guildId)
-          throw new Error("Choose a Forum channel in this server.");
+          throw new UserFacingError("Choose a Forum channel in this server.");
         let setup = await store.get(guildId);
         if (setup?.lifecycle === "cleaning")
-          throw new Error("Finish /youtube clean before adding a creator.");
+          throw new UserFacingError("Finish /youtube clean before adding a creator.");
         const tracked = await store.subscriptions(guildId);
         if (setup?.forumChannelId !== forum.id) {
           if (tracked.length)
-            throw new Error(
-              "Only one YouTube Forum is supported; clean the existing tracking before changing channels.",
+            throw new UserFacingError(
+              "A YouTube Forum is already configured. Use /youtube clean before changing it.",
             );
           await checkVideoPermissions(forum);
           await store.createSettings(guildId);
@@ -172,7 +173,8 @@ export function buildVideosRuntime(
           await store.setForum(guildId, forum.id, setup.forumGeneration, false);
           setup = (await store.get(guildId))!;
         }
-        if (!setup || setup.lifecycle !== "active") throw new Error("Run /youtube setup first.");
+        if (!setup || setup.lifecycle !== "active")
+          throw new UserFacingError("Run /youtube setup first.");
         await permissions(setup, forum);
         const existing = tracked.find(
           (row) => row.subscription.channelId === resolved.channel.channelId,
@@ -206,8 +208,11 @@ export function buildVideosRuntime(
     async sync(guildId: string) {
       return store.withGuild(guildId, async () => {
         const setup = await store.get(guildId);
-        if (!setup || setup.lifecycle !== "active")
-          throw new Error("Videos are not active for this server.");
+        if (!setup) throw new UserFacingError("YouTube is not configured. Run /youtube setup.");
+        if (setup.lifecycle !== "active")
+          throw new UserFacingError(
+            "YouTube publishing is paused. Finish /youtube clean before publishing again.",
+          );
         return publish(setup);
       });
     },

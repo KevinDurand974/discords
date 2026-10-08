@@ -121,7 +121,7 @@ describe("single-Forum setup and scoped YouTube cleanup", () => {
     const { runtime, forum, store } = fixture();
     discord.getVideoForum.mockResolvedValue({ ...forum, id: "different-forum" });
     await expect(runtime.add("guild", "@creator", 10, "different-forum")).rejects.toThrow(
-      "Only one YouTube Forum",
+      "A YouTube Forum is already configured",
     );
     expect(store.setForum).not.toHaveBeenCalled();
   });
@@ -199,7 +199,9 @@ describe("single-Forum setup and scoped YouTube cleanup", () => {
     await expect(runtime.clean("guild", "forum", 1, "videos", "tag-a")).rejects.toThrow(
       "Discord unavailable",
     );
-    await expect(runtime.sync("guild")).rejects.toThrow("not active");
+    await expect(runtime.sync("guild")).rejects.toThrow(
+      "YouTube publishing is paused. Finish /youtube clean",
+    );
     expect(store.excludeVideos).not.toHaveBeenCalled();
     await runtime.clean("guild", "forum", 1, "videos", "tag-a");
     expect(store.excludeVideos).toHaveBeenCalledWith("guild", "creator-a");

@@ -1,3 +1,4 @@
+import { UserFacingError } from "@/core/errors.ts";
 import type { NewsArticle, NewsSource } from "./news-api.ts";
 import type { NewsPublisher } from "./news-publisher.ts";
 import type { NewsPublicationStore } from "./news-publication-repository.ts";
@@ -32,9 +33,10 @@ export function createNewsSynchronizer(
   const cleaning = new Set<string>();
   return {
     async withGuildSetup(guildId, operation) {
-      if (cleaning.has(guildId)) throw new Error(`News cleanup is running for ${guildId}.`);
+      if (cleaning.has(guildId))
+        throw new UserFacingError("News cleanup is running. Try again shortly.");
       if (setupOperations.has(guildId))
-        throw new Error(`News setup is already running for ${guildId}.`);
+        throw new UserFacingError("News setup is already running. Try again shortly.");
       let resolve!: () => void;
       setupOperations.set(
         guildId,
@@ -50,7 +52,8 @@ export function createNewsSynchronizer(
       }
     },
     async withGuildCleanup(guildId, cleanup) {
-      if (cleaning.has(guildId)) throw new Error(`News cleanup is already running for ${guildId}.`);
+      if (cleaning.has(guildId))
+        throw new UserFacingError("News cleanup is already running. Try again shortly.");
       cleaning.add(guildId);
       try {
         await Promise.all([inFlight.get(guildId), setupOperations.get(guildId)]);
@@ -60,9 +63,10 @@ export function createNewsSynchronizer(
       }
     },
     async syncGuild(guildId, options = {}) {
-      if (cleaning.has(guildId)) throw new Error(`News cleanup is running for ${guildId}.`);
+      if (cleaning.has(guildId))
+        throw new UserFacingError("News cleanup is running. Try again shortly.");
       if (inFlight.has(guildId))
-        throw new Error(`News synchronization is already running for ${guildId}.`);
+        throw new UserFacingError("News publishing is already running. Try again shortly.");
       let resolve!: () => void;
       inFlight.set(
         guildId,
@@ -72,7 +76,10 @@ export function createNewsSynchronizer(
       );
       try {
         const setup = await setups.get(guildId);
-        if (!setup?.enabled) throw new Error("News publishing is not enabled in this server.");
+        if (!setup?.enabled)
+          throw new UserFacingError(
+            "News publishing is disabled. Run /sla news create to enable it.",
+          );
         const [listing, knownRows] = await Promise.all([source.list(), store.known(guildId)]);
         const { articles } = listing;
         const known = new Map(knownRows.map((row) => [row.id, row]));
