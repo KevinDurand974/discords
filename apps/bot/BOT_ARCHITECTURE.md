@@ -257,7 +257,7 @@ Commands are registered globally using `Routes.applicationCommands`, making them
 
 `DISCORD_GUILD_ID` is optional. When configured, deployment and deletion scripts also clear legacy guild-specific registrations for that server to prevent duplicates. Deployment registers global commands before clearing legacy guild commands.
 
-Run `nub --cwd apps/bot run sync` to deploy commands, or `nub --cwd apps/bot run rm` to delete them.
+Run `nub --cwd apps/bot run sync` to compare registry definitions with Discord and synchronize only when they differ, or `nub --cwd apps/bot run rm` to delete them. Comparison ignores Discord-generated metadata and normalizes omitted defaults, localization maps, and unordered contexts/integration types; option and choice order remains significant. Normal Docker startup runs the conditional sync after migrations and before gateway login. Sync errors prevent startup; unchanged restarts make no registration writes. Custom container commands bypass automatic sync.
 
 ## Naming conventions
 

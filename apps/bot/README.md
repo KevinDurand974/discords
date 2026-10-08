@@ -10,7 +10,7 @@ Build from the **repository root**, like the API image:
 docker build -f apps/bot/Dockerfile -t discords-bot .
 ```
 
-This multi-stage image uses `ghcr.io/nubjs/nub:0.9.2-alpine`, installs dependencies from `nub.lock`, and includes the bot and shared database package, without API/jobs source. It runs as the non-root `node` user. Its entrypoint applies pending database migrations before starting the bot; migration failure exits without connecting to Discord. PostgreSQL must already exist, be reachable from inside the container, and permit migrations.
+This multi-stage image uses `ghcr.io/nubjs/nub:0.9.2-alpine`, installs dependencies from `nub.lock`, and includes the bot and shared database package, without API/jobs source. It runs as the non-root `node` user. Its entrypoint applies pending database migrations and checks slash-command definitions against Discord before starting the bot. Changed definitions are synchronized globally; unchanged definitions produce no registration writes. Migration or synchronization failure exits without connecting to the gateway. The check runs on each normal container start (including restarts); custom commands bypass automatic synchronization. PostgreSQL must already exist, be reachable from inside the container, and permit migrations.
 
 Supply credentials through an untracked `.env.bot` file or your deployment's secret manager:
 
@@ -30,7 +30,7 @@ docker run --rm --name discords-bot --env-file .env.bot -v discords-bot-data:/ap
 
 Add `--network <service-network>` when PostgreSQL/API run in containers. Their hostnames must resolve within that network; the host's `localhost` is not accessible as a remote service from inside the bot container. The named volume is initialized with writable permissions for `node`; custom bind mounts must be writable by UID 1000.
 
-The image defaults to `BOT_HEALTH_HOST=0.0.0.0` and `BOT_HEALTH_PORT=3001`. Readiness checks both Discord and PostgreSQL. Change the port mapping if overriding the health port. Do not expose the internal jobs HTTP server publicly. The bot does not automatically register slash commands; deploy them explicitly:
+The image defaults to `BOT_HEALTH_HOST=0.0.0.0` and `BOT_HEALTH_PORT=3001`. Readiness checks both Discord and PostgreSQL. Change the port mapping if overriding the health port. Do not expose the internal jobs HTTP server publicly. Normal Docker startup automatically synchronizes changed slash commands. For local runs or manual checks, use:
 
 ```sh
 docker run --rm --env-file .env.bot discords-bot nub --cwd apps/bot run sync

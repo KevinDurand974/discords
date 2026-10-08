@@ -18,6 +18,9 @@ FROM base AS api
 CMD ["nub", "--cwd", "apps/api", "run", "start"]
 
 FROM base AS bot
+ENV BOT_HEALTH_HOST=0.0.0.0
+ENV BOT_HEALTH_PORT=3001
+ENTRYPOINT ["sh", "/app/apps/bot/docker-entrypoint.sh"]
 CMD ["nub", "--cwd", "apps/bot", "run", "start"]
 
 FROM base AS jobs
