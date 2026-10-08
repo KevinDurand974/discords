@@ -111,7 +111,7 @@ Restart/deploy the bot and run `nub --cwd apps/bot run sync` to register the com
 
 ## Strip a role
 
-`/strip-role role:@Role user:@Member` removes a role, with both options required. It has the same **Manage Roles**, server-only and role-hierarchy restrictions as `/give-role`; @everyone and managed roles cannot be removed. Roles with permissions are supported. If the member does not have the role, nothing changes. Private success replies suppress mentions and disappear after ten seconds.
+`/strip-role user:@Member role:RoleName` removes a role, with both options required. Select the member first, then search the autocomplete suggestions for their removable roles. Up to 25 matching roles are shown; search by name or ID. The role option stores a role ID rather than using Discord's unfiltered Role picker. Permissions, hierarchy and membership are checked again on execution. It has the same **Manage Roles**, server-only and role-hierarchy restrictions as `/give-role`; @everyone and managed roles cannot be removed. Roles with permissions are supported. If the member does not have the role, nothing changes. Private success replies suppress mentions and disappear after ten seconds.
 
 Restart the bot and run `nub --cwd apps/bot run sync` to register the command. No migration is needed.
 

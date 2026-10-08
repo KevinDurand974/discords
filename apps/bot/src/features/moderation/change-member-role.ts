@@ -11,7 +11,10 @@ export async function changeMemberRole(
 ) {
   if (!interaction.inGuild() || !interaction.guild)
     throw new Error("Use this command in a server.");
-  const roleId = interaction.options.getRole("role", true).id;
+  const roleId =
+    action === "strip"
+      ? interaction.options.getString("role", true)
+      : interaction.options.getRole("role", true).id;
   const userId = interaction.options.getUser("user", true).id;
   const verb = action === "give" ? "assign" : "remove";
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });

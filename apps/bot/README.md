@@ -85,7 +85,7 @@ Enable **Server Members Intent** in the Developer Portal, run `nub run db:migrat
 
 `/give-role role:@Role user:@Member` has two required options and is restricted to **Manage Roles** (authorized moderators and administrators). The bot also needs Manage Roles. Roles may have permissions but must be unmanaged, not @everyone, and below the bot/caller's highest roles (server owner exempt from caller hierarchy). Already assigned roles are unchanged; private success replies disappear after ten seconds. Restart the bot and run `nub --cwd apps/bot run sync` to register it.
 
-`/strip-role role:@Role user:@Member` is the inverse of `/give-role`: both options are required, with the same Manage Roles and hierarchy checks. It removes the role, or does nothing if the member does not have it. Confirmation is private and disappears after ten seconds. Register it with the same sync command.
+`/strip-role user:@Member role:RoleName` is the inverse of `/give-role`: select the member first, then use role autocomplete to search their removable roles. Both options are required, with the same Manage Roles and hierarchy checks. Suggestions are limited to 25 matches; type part of the role name or its ID to narrow them. Discord's native Role picker cannot be filtered by member, so this command uses a string option containing the selected role ID. Execution rechecks permissions, hierarchy and membership. It removes the role, or does nothing if the member does not have it. Confirmation is private and disappears after ten seconds. Register it with the same sync command.
 
 ## Reaction roles
 

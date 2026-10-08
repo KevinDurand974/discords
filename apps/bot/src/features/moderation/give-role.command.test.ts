@@ -5,6 +5,7 @@ import {
   MessageFlags,
   PermissionFlagsBits as P,
   type ChatInputCommandInteraction,
+  type AutocompleteInteraction,
 } from "discord.js";
 import { commands } from "@/core/command-registry.ts";
 import { giveRoleCommand } from "./give-role.command.ts";
@@ -14,6 +15,8 @@ import { stripRoleCommand } from "./strip-role.command.ts";
 function fixture() {
   const role = {
     id: "role",
+    name: "Gamers",
+    position: 1,
     managed: false,
     editable: true,
     permissions: { bitfield: P.Administrator },
@@ -49,7 +52,11 @@ function fixture() {
     guild,
     user: { id: actor.id },
     inGuild: vi.fn(() => true),
-    options: { getRole: vi.fn(() => ({ id: role.id })), getUser: vi.fn(() => ({ id: "target" })) },
+    options: {
+      getRole: vi.fn(() => ({ id: role.id })),
+      getString: vi.fn(() => role.id),
+      getUser: vi.fn(() => ({ id: "target" })),
+    },
     deferReply: vi.fn(async () => {}),
     editReply: vi.fn(async () => {}),
     deleteReply: vi.fn(async () => {}),
@@ -70,15 +77,20 @@ afterEach(() => {
 });
 
 describe("strip role command", () => {
-  it("registers required role/user options with the same moderator permissions", () => {
+  it("registers user first and an autocompleted role string with moderator permissions", () => {
     expect(commands).toContain(stripRoleCommand);
     expect(stripRoleCommand.data.toJSON()).toMatchObject({
       name: "strip-role",
       contexts: [0],
       default_member_permissions: String(P.ManageRoles),
       options: [
-        { name: "role", type: ApplicationCommandOptionType.Role, required: true },
         { name: "user", type: ApplicationCommandOptionType.User, required: true },
+        {
+          name: "role",
+          type: ApplicationCommandOptionType.String,
+          required: true,
+          autocomplete: true,
+        },
       ],
     });
   });
@@ -87,7 +99,8 @@ describe("strip role command", () => {
     const f = fixture();
     f.target.roles.cache.set(f.role.id, f.role);
     await stripRoleCommand.execute(f.submit);
-    expect(f.interaction.options.getRole).toHaveBeenCalledWith("role", true);
+    expect(f.interaction.options.getString).toHaveBeenCalledWith("role", true);
+    expect(f.interaction.options.getRole).not.toHaveBeenCalled();
     expect(f.interaction.options.getUser).toHaveBeenCalledWith("user", true);
     expect(f.interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
     expect(f.guild.members.fetch).toHaveBeenCalledWith({ user: "actor", force: true });
@@ -165,6 +178,94 @@ describe("strip role command", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(f.interaction.editReply).not.toHaveBeenCalled();
     expect(f.interaction.deleteReply).not.toHaveBeenCalled();
+  });
+});
+
+describe("strip-role autocomplete", () => {
+  function autocompleteFixture(user: string | undefined = "target", query = "") {
+    const f = fixture();
+    f.target.roles.cache.set(f.role.id, f.role);
+    const interaction = {
+      guild: f.guild,
+      user: f.interaction.user,
+      responded: false,
+      options: {
+        get: vi.fn(() => (user ? { value: user } : null)),
+        getFocused: vi.fn((full?: boolean) => (full ? { name: "role", value: query } : query)),
+      },
+      respond: vi.fn(async () => {}),
+    };
+    return {
+      ...f,
+      autocomplete: interaction,
+      request: interaction as unknown as AutocompleteInteraction,
+    };
+  }
+
+  it("fetches the selected member and returns role IDs matching the search", async () => {
+    const f = autocompleteFixture("target", "game");
+    await stripRoleCommand.autocomplete(f.request);
+    expect(f.guild.members.fetch).toHaveBeenCalledWith({ user: "target", force: true });
+    expect(f.autocomplete.respond).toHaveBeenCalledWith([{ name: "Gamers (role)", value: "role" }]);
+  });
+
+  it("returns no choices until a user is selected", async () => {
+    const f = autocompleteFixture();
+    f.autocomplete.options.get.mockReturnValue(null);
+    await stripRoleCommand.autocomplete(f.request);
+    expect(f.autocomplete.respond).toHaveBeenCalledWith([]);
+    expect(f.guild.members.fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(["actor", "bot"] as const)("returns no choices without %s permissions", async (who) => {
+    const f = autocompleteFixture();
+    f[who].permissions.has.mockReturnValue(false);
+    await stripRoleCommand.autocomplete(f.request);
+    expect(f.autocomplete.respond).toHaveBeenCalledWith([]);
+  });
+
+  it.each(["managed", "everyone", "uneditable", "bot-hierarchy", "actor-hierarchy", "search-miss"])(
+    "excludes %s roles",
+    async (kind) => {
+      const f = autocompleteFixture("target", kind === "search-miss" ? "other" : "");
+      if (kind === "managed") f.role.managed = true;
+      if (kind === "everyone") f.role.id = f.guild.id;
+      if (kind === "uneditable") f.role.editable = false;
+      if (kind === "bot-hierarchy") f.bot.roles.highest.comparePositionTo.mockReturnValue(0);
+      if (kind === "actor-hierarchy") f.actor.roles.highest.comparePositionTo.mockReturnValue(0);
+      await stripRoleCommand.autocomplete(f.request);
+      expect(f.autocomplete.respond).toHaveBeenCalledWith([]);
+    },
+  );
+
+  it("waives caller hierarchy for the server owner", async () => {
+    const f = autocompleteFixture();
+    f.guild.ownerId = f.actor.id;
+    f.actor.roles.highest.comparePositionTo.mockReturnValue(-1);
+    await stripRoleCommand.autocomplete(f.request);
+    expect(f.autocomplete.respond).toHaveBeenCalledWith([{ name: "Gamers (role)", value: "role" }]);
+  });
+
+  it("caps suggestions at 25 with bounded labels", async () => {
+    const f = autocompleteFixture();
+    Array.from({ length: 30 }, (_, index) => {
+      const role = { ...f.role, id: String(index), name: "x".repeat(150), position: index };
+      f.target.roles.cache.set(role.id, role);
+    });
+    await stripRoleCommand.autocomplete(f.request);
+    const choices = f.autocomplete.respond.mock.calls[0] as unknown as [
+      Array<{ name: string; value: string }>,
+    ];
+    expect(choices[0]).toHaveLength(25);
+    expect(choices[0].every((choice) => choice.name.length <= 100)).toBe(true);
+  });
+
+  it("returns no choices when member fetching fails", async () => {
+    const f = autocompleteFixture();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    f.guild.members.fetch.mockRejectedValue(new Error("Unknown Member"));
+    await stripRoleCommand.autocomplete(f.request);
+    expect(f.autocomplete.respond).toHaveBeenCalledWith([]);
   });
 });
 
