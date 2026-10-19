@@ -181,6 +181,136 @@ describe("interactive coupon creation", () => {
     expect(reply).not.toContain(`"type":${ComponentType.StringSelect}`);
     expect(target.send).not.toHaveBeenCalled();
   });
+  it("edits and clears optional UTC availability through a revision-bound modal", async () => {
+    const { token } = await start(["Gold"]);
+    const open = async () => {
+      const click = actor(id("availability", token));
+      await execute(click);
+      return click.showModal.mock.calls[0]![0].toJSON();
+    };
+    const old = await open();
+    const modal = await open();
+    expect(modal.components).toHaveLength(2);
+    expect(JSON.stringify(modal)).toContain("UTC+0");
+    expect(JSON.stringify(modal)).toContain('"required":false');
+    await expect(execute(actor(old.custom_id, true))).rejects.toThrow("unavailable");
+    const save = actor(modal.custom_id, true);
+    save.fields.getTextInputValue.mockImplementation((name?: string) =>
+      name === "starts-at" ? "25/12/2030 18:30" : "25/12/2030 19:30",
+    );
+    await execute(save);
+    expect(JSON.stringify(save.editReply.mock.calls)).toContain("2030-12-25 18:30:00 UTC+0");
+    await expect(execute(save)).rejects.toThrow("unavailable");
+    const prefilled = await open();
+    expect(JSON.stringify(prefilled)).toContain('"value":"2030-12-25 18:30:00"');
+    expect(JSON.stringify(prefilled)).toContain('"value":"2030-12-25 19:30:00"');
+    const clear = actor(prefilled.custom_id, true);
+    clear.fields.getTextInputValue.mockReturnValue("");
+    await execute(clear);
+    expect(JSON.stringify(clear.editReply.mock.calls)).toContain("Immediately");
+    expect(JSON.stringify(clear.editReply.mock.calls)).toContain("No expiry");
+    await execute(actor(id("publish", token)));
+    expect(JSON.stringify(target.send.mock.calls)).toContain('"custom_id":"sla:claim:TESTCODE"');
+  });
+  it("does not reactivate older availability forms when opens finish out of order", async () => {
+    const { token } = await start();
+    const first = actor(id("availability", token));
+    let resolve!: () => void;
+    first.showModal.mockImplementation(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
+    const opening = execute(first);
+    const second = actor(id("availability", token));
+    await execute(second);
+    resolve();
+    await opening;
+    const old = actor(first.showModal.mock.calls[0]![0].toJSON().custom_id, true);
+    old.fields.getTextInputValue.mockReturnValue("");
+    await expect(execute(old)).rejects.toThrow("unavailable");
+    const current = actor(second.showModal.mock.calls[0]![0].toJSON().custom_id, true);
+    current.fields.getTextInputValue.mockReturnValue("");
+    await expect(execute(current)).resolves.toBeUndefined();
+  });
+  it("accepts a submitted availability form before the open request finishes", async () => {
+    const { token } = await start();
+    const click = actor(id("availability", token));
+    let resolve!: () => void;
+    click.showModal.mockImplementation(
+      () =>
+        new Promise<void>((done) => {
+          resolve = done;
+        }),
+    );
+    const opening = execute(click);
+    const save = actor(click.showModal.mock.calls[0]![0].toJSON().custom_id, true);
+    save.fields.getTextInputValue.mockReturnValue("");
+    try {
+      await expect(execute(save)).resolves.toBeUndefined();
+    } finally {
+      resolve();
+      await opening;
+    }
+    await expect(execute(save)).rejects.toThrow("unavailable");
+  });
+  it("does not clear a newer form when an earlier modal open fails", async () => {
+    const { token } = await start();
+    const first = actor(id("availability", token));
+    let reject!: (error: Error) => void;
+    first.showModal.mockImplementation(
+      () =>
+        new Promise<void>((_, fail) => {
+          reject = fail;
+        }),
+    );
+    const opening = execute(first);
+    const failed = expect(opening).rejects.toThrow("network");
+    const second = actor(id("availability", token));
+    await execute(second);
+    reject(new Error("network"));
+    await failed;
+    const save = actor(second.showModal.mock.calls[0]![0].toJSON().custom_id, true);
+    save.fields.getTextInputValue.mockReturnValue("");
+    await expect(execute(save)).resolves.toBeUndefined();
+  });
+  it("publishes both availability dates in the card and persistent claim ID", async () => {
+    const { token } = await start();
+    const click = actor(id("availability", token));
+    await execute(click);
+    const modal = click.showModal.mock.calls[0]![0].toJSON();
+    const save = actor(modal.custom_id, true);
+    save.fields.getTextInputValue.mockImplementation((name?: string) =>
+      name === "starts-at" ? "25/12/2030 18:30" : "25/12/2030 19:30",
+    );
+    await execute(save);
+    await execute(actor(id("publish", token)));
+    const sent = JSON.stringify(target.send.mock.calls);
+    expect(sent).toContain("2030-12-25 18:30:00 UTC+0");
+    expect(sent).toContain("2030-12-25 19:30:00 UTC+0");
+    expect(sent).toContain('"custom_id":"sla:claim:TESTCODE?');
+  });
+  it("rejects reversed dates without changing the draft and prevents expired publication", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2030-12-25T18:00:00Z"));
+    const { token } = await start();
+    const click = actor(id("availability", token));
+    await execute(click);
+    const modal = click.showModal.mock.calls[0]![0].toJSON();
+    const save = actor(modal.custom_id, true);
+    save.fields.getTextInputValue.mockImplementation((name?: string) =>
+      name === "starts-at" ? "25/12/2030 18:30" : "25/12/2030 17:30",
+    );
+    await expect(execute(save)).rejects.toThrow("after the start");
+    expect(save.editReply).not.toHaveBeenCalled();
+    save.fields.getTextInputValue.mockImplementation((name?: string) =>
+      name === "starts-at" ? "" : "25/12/2030 17:30",
+    );
+    await execute(save);
+    await expect(execute(actor(id("publish", token)))).rejects.toThrow("expiry date has passed");
+    expect(target.send).not.toHaveBeenCalled();
+  });
   it("publishes a reward-free card with the existing Claim prefix and thumbnail", async () => {
     const { token } = await start();
     await execute(actor(id("publish", token)));
@@ -211,7 +341,7 @@ describe("interactive coupon creation", () => {
     expect(modal.custom_id.length).toBeLessThanOrEqual(100);
     expect(JSON.stringify(modal)).toContain('"required":true');
     expect(JSON.stringify(modal)).toContain('"description":"Gold"');
-    expect(JSON.stringify(modal)).toContain('\"value\":\"1\"');
+    expect(JSON.stringify(modal)).toContain('"value":"1"');
     const invalid = actor(modal.custom_id, true);
     invalid.fields.getTextInputValue.mockReturnValue("0");
     await expect(execute(invalid)).rejects.toThrow("positive whole-number");
@@ -311,8 +441,8 @@ describe("interactive coupon creation", () => {
     expect(preview).toContain("QuestionMark:1551725274725359766> New reward x1");
     expect(preview).not.toContain("undefined");
     const modal = await quantityModal(token);
-    expect(JSON.stringify(modal)).toContain('\"description\":\"New reward\"');
-    expect(JSON.stringify(modal)).toContain('\"value\":\"1\"');
+    expect(JSON.stringify(modal)).toContain('"description":"New reward"');
+    expect(JSON.stringify(modal)).toContain('"value":"1"');
     await execute(actor(id("publish", token)));
     const sent = JSON.stringify(target.send.mock.calls);
     expect(sent).toContain("QuestionMark:1551725274725359766> New reward x1");

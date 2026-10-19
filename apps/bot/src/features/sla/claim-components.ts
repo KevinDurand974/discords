@@ -11,27 +11,24 @@ import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { redeemCoupon } from "./coupon.client.ts";
 
-export const CLAIM_BUTTON_PREFIX = "sla:claim:";
-const CLAIM_MODAL_PREFIX = "sla:claim-modal:";
+import {
+  assertCouponAvailable,
+  claimCustomId,
+  parseClaimCustomId,
+  CLAIM_BUTTON_PREFIX,
+  CLAIM_MODAL_PREFIX,
+} from "./coupon-availability.ts";
+export { CLAIM_BUTTON_PREFIX } from "./coupon-availability.ts";
 const PID_INPUT_ID = "pid";
 
-const couponCodeFromCustomId = (customId: string, prefix: string) => {
-  if (!customId.startsWith(prefix)) return null;
-
-  try {
-    return decodeURIComponent(customId.slice(prefix.length));
-  } catch {
-    return null;
-  }
-};
-
 const showClaimModal = async (interaction: ButtonInteraction) => {
-  const couponCode = couponCodeFromCustomId(interaction.customId, CLAIM_BUTTON_PREFIX);
-  if (!couponCode) throw new UserFacingError("This coupon button is unavailable. Try /sla redeem.");
+  const claim = parseClaimCustomId(interaction.customId, CLAIM_BUTTON_PREFIX);
+  if (!claim) throw new UserFacingError("This coupon button is unavailable. Try /sla redeem.");
+  assertCouponAvailable(claim.availability);
 
   await interaction.showModal(
     new ModalBuilder()
-      .setCustomId(`${CLAIM_MODAL_PREFIX}${encodeURIComponent(couponCode)}`)
+      .setCustomId(claimCustomId(claim.code, claim.availability, true))
       .setTitle("Claim coupon")
       .addLabelComponents(
         new LabelBuilder()
@@ -50,13 +47,15 @@ const showClaimModal = async (interaction: ButtonInteraction) => {
 };
 
 const submitClaim = async (interaction: ModalSubmitInteraction) => {
-  const couponCode = couponCodeFromCustomId(interaction.customId, CLAIM_MODAL_PREFIX);
-  if (!couponCode) throw new UserFacingError("This coupon form is unavailable. Try /sla redeem.");
+  const claim = parseClaimCustomId(interaction.customId, CLAIM_MODAL_PREFIX);
+  if (!claim) throw new UserFacingError("This coupon form is unavailable. Try /sla redeem.");
+  assertCouponAvailable(claim.availability);
 
   const pid = interaction.fields.getTextInputValue(PID_INPUT_ID).trim();
   await interaction.deferReply({ ephemeral: true });
 
-  const result = await redeemCoupon(couponCode, pid);
+  assertCouponAvailable(claim.availability);
+  const result = await redeemCoupon(claim.code, pid);
   if (result.errorCode !== 200) {
     console.error("Coupon claim failed", { errorCode: result.errorCode });
     await interaction.editReply(

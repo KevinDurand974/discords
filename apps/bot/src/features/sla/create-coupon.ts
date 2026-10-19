@@ -25,14 +25,24 @@ import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import type { ComponentHandler } from "@/core/command.ts";
 import { couponItems, displayEmoji } from "@/shared/emojis/emoji-cache.ts";
-import { CLAIM_BUTTON_PREFIX } from "./claim-components.ts";
+import {
+  CLAIM_BUTTON_PREFIX,
+  claimCustomId,
+  formatCouponDate,
+  parseCouponAvailability,
+  type CouponAvailability,
+} from "./coupon-availability.ts";
 
 const itemEntries = Object.entries(couponItems).sort(([left], [right]) =>
   left.localeCompare(right, "en"),
 );
 export const COUPON_ITEMS = itemEntries.map(([, emojiName]) => emojiName);
-const itemLabels = new Map<string, string>(itemEntries.map(([label, emojiName]) => [emojiName, label]));
-const itemEmojis = new Map<string, EmojiName>(itemEntries.map(([, emojiName]) => [emojiName, emojiName]));
+const itemLabels = new Map<string, string>(
+  itemEntries.map(([label, emojiName]) => [emojiName, label]),
+);
+const itemEmojis = new Map<string, EmojiName>(
+  itemEntries.map(([, emojiName]) => [emojiName, emojiName]),
+);
 function validateItem(value: string) {
   const item = value.trim();
   if (!item || item.length > 100 || /[\r\n]/.test(item))
@@ -82,6 +92,8 @@ type Draft = {
   stage: "start" | "ready" | "publishing";
   revision: number;
   quantityForm: { index: number; revision: number } | null;
+  availability: CouponAvailability;
+  availabilityForm: number | null;
 };
 const drafts = new Map<string, Draft>();
 function assertGuild(interaction: Actor): asserts interaction is Actor & { guildId: string } {
@@ -99,19 +111,21 @@ function validateCode(value: string) {
 export function parseCouponReward(item: string | undefined, quantity: string): CouponReward | null {
   const value = quantity.trim();
   if (!item && !value) return null;
-  if (
-    !item ||
-    !/^\d+$/.test(value) ||
-    !Number.isSafeInteger(Number(value)) ||
-    Number(value) < 1
-  ) {
+  if (!item || !/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1) {
     throw new UserFacingError(
       "Choose an item and enter a positive whole-number quantity, or leave both fields empty.",
     );
   }
   return { item: validateItem(item), quantity: Number(value) };
 }
-export function renderCouponCard(code: string, rewards: readonly CouponReward[]) {
+function availabilityText({ startsAt, endsAt }: CouponAvailability) {
+  return `**Available from:** ${startsAt === undefined ? "Immediately" : `\`${formatCouponDate(startsAt)} UTC+0\``}\n**Expires at:** ${endsAt === undefined ? "No expiry" : `\`${formatCouponDate(endsAt)} UTC+0\``}`;
+}
+export function renderCouponCard(
+  code: string,
+  rewards: readonly CouponReward[],
+  availability: CouponAvailability = {},
+) {
   const validatedCode = validateCode(code);
   const card = new ContainerBuilder()
     .setAccentColor(0x411b4f)
@@ -140,10 +154,17 @@ export function renderCouponCard(code: string, rewards: readonly CouponReward[])
       )
       .addSeparatorComponents(new SeparatorBuilder().setDivider(true));
   }
+  if (availability.startsAt !== undefined || availability.endsAt !== undefined) {
+    card
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(`## Availability\n${availabilityText(availability)}`),
+      )
+      .addSeparatorComponents(new SeparatorBuilder());
+  }
   return card.addActionRowComponents(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        .setCustomId(`${CLAIM_BUTTON_PREFIX}${encodeURIComponent(validatedCode)}`)
+        .setCustomId(claimCustomId(validatedCode, availability))
         .setLabel("Claim")
         .setStyle(ButtonStyle.Primary),
     ),
@@ -162,6 +183,13 @@ function draftView(token: string, draft: Draft) {
     new TextDisplayBuilder().setContent(
       `# Create coupon\n\`\`\`\n${draft.code}\n\`\`\`\nPost in <#${draft.channelId}>. ${configured}/${draft.items.length} quantities configured.\nThis draft expires after 5 minutes.`,
     ),
+  );
+  card.addSectionComponents(
+    new SectionBuilder()
+      .addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(availabilityText(draft.availability)),
+      )
+      .setButtonAccessory(button(token, "availability", "Edit availability", ButtonStyle.Primary)),
   );
   if (draft.items.length) {
     card
@@ -254,6 +282,8 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
     stage: "start",
     revision: 0,
     quantityForm: null,
+    availability: {},
+    availabilityForm: null,
   });
   try {
     await interaction.showModal(
@@ -308,8 +338,10 @@ async function publish(interaction: ButtonInteraction, token: string, draft: Dra
         throw new UserFacingError("Set a quantity for every selected item before publishing.");
       return { item, quantity };
     });
+    if (draft.availability.endsAt !== undefined && draft.availability.endsAt <= Date.now() / 1000)
+      throw new UserFacingError("The expiry date has passed. Edit availability before publishing.");
     await channel.send({
-      components: [renderCouponCard(draft.code, rewards)],
+      components: [renderCouponCard(draft.code, rewards, draft.availability)],
       flags: MessageFlags.IsComponentsV2,
       allowedMentions: { parse: [] },
     });
@@ -353,6 +385,31 @@ export const createCouponComponentHandler: ComponentHandler = {
         });
         return;
       }
+      const availabilityMatch = /^availability-(\d+)$/.exec(action ?? "");
+      if (
+        availabilityMatch &&
+        draft.stage === "ready" &&
+        draft.availabilityForm === Number(availabilityMatch[1])
+      ) {
+        const revision = draft.availabilityForm;
+        const availability = parseCouponAvailability(
+          interaction.fields.getTextInputValue("starts-at"),
+          interaction.fields.getTextInputValue("ends-at"),
+        );
+        claimCustomId(draft.code, availability);
+        await interaction.deferUpdate();
+        if (
+          drafts.get(token!) !== draft ||
+          draft.expires <= Date.now() ||
+          draft.stage !== "ready" ||
+          draft.availabilityForm !== revision
+        )
+          throw new UserFacingError("This form is unavailable. Run /sla create-coupon again.");
+        draft.availability = availability;
+        draft.availabilityForm = null;
+        await interaction.editReply(draftView(token!, draft));
+        return;
+      }
       const match = /^quantity-([0-7])-(\d+)$/.exec(action ?? "");
       const form = draft.quantityForm;
       if (
@@ -394,6 +451,38 @@ export const createCouponComponentHandler: ComponentHandler = {
       if (action === "page" && draft.stage === "ready" && draft.items.length > 4) {
         draft.page = draft.page === 0 ? 1 : 0;
         await interaction.update(draftView(token!, draft));
+        return;
+      }
+      if (action === "availability" && draft.stage === "ready") {
+        const revision = ++draft.revision;
+        const field = (customId: string, label: string, value: number | undefined) => {
+          const input = new TextInputBuilder()
+            .setCustomId(customId)
+            .setStyle(TextInputStyle.Short)
+            .setRequired(false)
+            .setMaxLength(200)
+            .setPlaceholder("dd/MM/YYYY HH:mm or YYYY/MM/dd HH:mm");
+          if (value !== undefined) input.setValue(formatCouponDate(value));
+          return new LabelBuilder()
+            .setLabel(label)
+            .setDescription("UTC+0. Leave empty to remove this limit. Missing time means midnight.")
+            .setTextInputComponent(input);
+        };
+        draft.availabilityForm = revision;
+        try {
+          await interaction.showModal(
+            new ModalBuilder()
+              .setCustomId(`${PREFIX}availability-${revision}:${token}`)
+              .setTitle("Coupon availability (UTC+0)")
+              .addLabelComponents(
+                field("starts-at", "Available from", draft.availability.startsAt),
+                field("ends-at", "Expires at", draft.availability.endsAt),
+              ),
+          );
+        } catch (error) {
+          if (draft.availabilityForm === revision) draft.availabilityForm = null;
+          throw error;
+        }
         return;
       }
       const match = /^quantity-([0-7])$/.exec(action ?? "");
