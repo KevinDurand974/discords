@@ -6,6 +6,7 @@ import {
   ChannelSelectMenuBuilder,
   ChannelType,
   ContainerBuilder,
+  escapeMarkdown,
   LabelBuilder,
   MessageFlags,
   ModalBuilder,
@@ -30,7 +31,20 @@ const itemEntries = Object.entries(couponItems).sort(([left], [right]) =>
   left.localeCompare(right, "en"),
 );
 export const COUPON_ITEMS = itemEntries.map(([, emojiName]) => emojiName);
-const itemLabels = new Map(itemEntries.map(([label, emojiName]) => [emojiName, label]));
+const itemLabels = new Map<string, string>(itemEntries.map(([label, emojiName]) => [emojiName, label]));
+const itemEmojis = new Map<string, EmojiName>(itemEntries.map(([, emojiName]) => [emojiName, emojiName]));
+function validateItem(value: string) {
+  const item = value.trim();
+  if (!item || item.length > 100 || /[\r\n]/.test(item))
+    throw new UserFacingError("Enter an item name of 1–100 characters without line breaks.");
+  return item;
+}
+function rewardIcon(item: string) {
+  return displayEmoji(itemEmojis.get(item) ?? "QuestionMark");
+}
+function rewardLabel(item: string) {
+  return escapeMarkdown(itemLabels.get(item) ?? item);
+}
 export function autocompleteCouponItems(query: string, excludedItems: readonly string[] = []) {
   const search = query.trim().toLowerCase().replaceAll("_", " ");
   const excluded = new Set(excludedItems);
@@ -44,7 +58,7 @@ export function autocompleteCouponItems(query: string, excludedItems: readonly s
     .slice(0, 25)
     .map(([name, value]) => ({ name, value }));
 }
-type CouponItem = (typeof COUPON_ITEMS)[number];
+type CouponItem = string;
 export type CouponReward = { item: CouponItem; quantity: number };
 const PREFIX = "sla:create-coupon:";
 const DRAFT_TTL_MS = 300_000;
@@ -87,7 +101,6 @@ export function parseCouponReward(item: string | undefined, quantity: string): C
   if (!item && !value) return null;
   if (
     !item ||
-    !COUPON_ITEMS.some((allowed) => allowed === item) ||
     !/^\d+$/.test(value) ||
     !Number.isSafeInteger(Number(value)) ||
     Number(value) < 1
@@ -96,7 +109,7 @@ export function parseCouponReward(item: string | undefined, quantity: string): C
       "Choose an item and enter a positive whole-number quantity, or leave both fields empty.",
     );
   }
-  return { item: item as CouponItem, quantity: Number(value) };
+  return { item: validateItem(item), quantity: Number(value) };
 }
 export function renderCouponCard(code: string, rewards: readonly CouponReward[]) {
   const validatedCode = validateCode(code);
@@ -120,7 +133,7 @@ export function renderCouponCard(code: string, rewards: readonly CouponReward[])
           `## Rewards\n${rewards
             .map(
               ({ item, quantity }) =>
-                `**${displayEmoji(item)} x${Intl.NumberFormat("en-US").format(quantity)}**`,
+                `**${rewardIcon(item)}${itemLabels.has(item) ? "" : ` ${rewardLabel(item)}`} x${Intl.NumberFormat("en-US").format(quantity)}**`,
             )
             .join("\n")}`,
         ),
@@ -165,7 +178,7 @@ function draftView(token: string, draft: Draft) {
         new SectionBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              `**Item ${index + 1}** — ${displayEmoji(item)} ${itemLabels.get(item)}${quantity === null ? " — Quantity required" : ` x${Intl.NumberFormat("en-US").format(quantity)}`}`,
+              `**Item ${index + 1}** — ${rewardIcon(item)} ${rewardLabel(item)}${quantity === null ? " — Quantity required" : ` x${Intl.NumberFormat("en-US").format(quantity)}`}`,
             ),
           )
           .setButtonAccessory(
@@ -211,15 +224,12 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
   assertGuild(interaction);
   const items: Draft["items"] = [];
   for (let index = 0; index < 8; index++) {
-    const item = interaction.options.getString(`item_${index + 1}`);
-    if (item === null) continue;
-    if (!COUPON_ITEMS.some((allowed) => allowed === item))
-      throw new UserFacingError(
-        `Choose item_${index + 1} from the coupon autocomplete suggestions.`,
-      );
+    const value = interaction.options.getString(`item_${index + 1}`);
+    if (value === null) continue;
+    const item = validateItem(value);
     if (items.some((selected) => selected.item === item))
       throw new UserFacingError("Choose each coupon item only once.");
-    items.push({ index, item: item as CouponItem, quantity: null });
+    items.push({ index, item, quantity: 1 });
   }
   drafts.forEach((draft, token) => {
     if (draft.expires <= Date.now()) drafts.delete(token);
@@ -405,7 +415,7 @@ export const createCouponComponentHandler: ComponentHandler = {
             .addLabelComponents(
               new LabelBuilder()
                 .setLabel("Quantity")
-                .setDescription(itemLabels.get(item.item)!)
+                .setDescription(itemLabels.get(item.item) ?? item.item)
                 .setTextInputComponent(quantity),
             ),
         );

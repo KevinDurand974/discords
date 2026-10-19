@@ -183,6 +183,7 @@ declare type ApplicationEmoji =
   | { readonly name: "Point_Mileage"; readonly id: "1551721410223808574" }
   | { readonly name: "Powder_of_Blessing"; readonly id: "1551728079167295518" }
   | { readonly name: "Precision_Design"; readonly id: "1551725275832651876" }
+  | { readonly name: "QuestionMark"; readonly id: "1561790590952280184" }
   | { readonly name: "R_Rank"; readonly id: "1552034506582532278" }
   | { readonly name: "Raid_Hunter"; readonly id: "1552034507719188552" }
   | { readonly name: "Raid_Player"; readonly id: "1552034509111955526" }

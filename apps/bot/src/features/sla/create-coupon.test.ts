@@ -198,25 +198,25 @@ describe("interactive coupon creation", () => {
     );
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
   });
-  it("requires each selected quantity and opens a one-field modal for the correct item", async () => {
+  it("defaults quantities to 1 and opens an editable one-field modal for the correct item", async () => {
     const { token, submit } = await start(["Gold", "Design"]);
     const reply = JSON.stringify(submit.reply.mock.calls);
-    expect(reply).toContain("0/2 quantities configured");
+    expect(reply).toContain("2/2 quantities configured");
     expect(reply).toContain("quantity-0:");
     expect(reply).toContain("quantity-1:");
-    expect(reply).toContain('"disabled":true');
-    await expect(execute(actor(id("publish", token)))).rejects.toThrow("every selected item");
+    expect(reply).toContain('"disabled":false');
+    expect(reply).toContain(" x1");
     const modal = await quantityModal(token);
     expect(modal.components).toHaveLength(1);
     expect(modal.custom_id.length).toBeLessThanOrEqual(100);
     expect(JSON.stringify(modal)).toContain('"required":true');
     expect(JSON.stringify(modal)).toContain('"description":"Gold"');
+    expect(JSON.stringify(modal)).toContain('\"value\":\"1\"');
     const invalid = actor(modal.custom_id, true);
     invalid.fields.getTextInputValue.mockReturnValue("0");
     await expect(execute(invalid)).rejects.toThrow("positive whole-number");
     expect(invalid.editReply).not.toHaveBeenCalled();
     await saveQuantity(token, "1000");
-    await expect(execute(actor(id("publish", token)))).rejects.toThrow("every selected item");
     const completed = await saveQuantity(token, "2", 1);
     expect(JSON.stringify(completed.editReply.mock.calls)).toContain("2/2 quantities configured");
     expect(JSON.stringify(completed.editReply.mock.calls)).toContain('"disabled":false');
@@ -305,9 +305,25 @@ describe("interactive coupon creation", () => {
       expect(target.send).not.toHaveBeenCalled();
     },
   );
-  it("rejects invalid catalog values and duplicate selections", async () => {
-    await expect(start(["made-up-item"])).rejects.toThrow("autocomplete suggestions");
-    await expect(start(["Gold", null, "Gold"])).rejects.toThrow("only once");
+  it("publishes custom names with QuestionMark and all quantities defaulting to 1", async () => {
+    const { token, submit } = await start(["  New reward  ", "Gold"]);
+    const preview = JSON.stringify(submit.reply.mock.calls);
+    expect(preview).toContain("QuestionMark:1551725274725359766> New reward x1");
+    expect(preview).not.toContain("undefined");
+    const modal = await quantityModal(token);
+    expect(JSON.stringify(modal)).toContain('\"description\":\"New reward\"');
+    expect(JSON.stringify(modal)).toContain('\"value\":\"1\"');
+    await execute(actor(id("publish", token)));
+    const sent = JSON.stringify(target.send.mock.calls);
+    expect(sent).toContain("QuestionMark:1551725274725359766> New reward x1");
+    expect(sent).toContain("Gold:1551725274725359766> x1");
+  });
+  it("rejects empty, oversized, multiline and duplicate names", async () => {
+    await expect(start(["   "])).rejects.toThrow("item name");
+    await expect(start(["a".repeat(101)])).rejects.toThrow("item name");
+    await expect(start(["a\nb"])).rejects.toThrow("line breaks");
+    await expect(start(["Gold", null, " Gold "])).rejects.toThrow("only once");
+    await expect(start(["Custom", "Custom"])).rejects.toThrow("only once");
     expect(target.send).not.toHaveBeenCalled();
   });
   it.each(["0", "-1", "1.5", "NaN", "Infinity", "1e3", "9007199254740992", ""])(
@@ -316,7 +332,7 @@ describe("interactive coupon creation", () => {
       expect(() => parseCouponReward("Gold", quantity)).toThrow("positive whole-number");
     },
   );
-  it("requires a valid catalog item and a positive safe integer", () => {
+  it("accepts catalog and custom items with a positive safe integer", () => {
     expect(parseCouponReward(undefined, "")).toBeNull();
     expect(parseCouponReward("Precision_Design", " 42 ")).toEqual({
       item: "Precision_Design",
@@ -327,7 +343,14 @@ describe("interactive coupon creation", () => {
       quantity: 5,
     });
     expect(() => parseCouponReward(undefined, "1")).toThrow();
-    expect(() => parseCouponReward("unknown", "1")).toThrow();
+    expect(parseCouponReward("unknown", "1")).toEqual({ item: "unknown", quantity: 1 });
+    expect(() => parseCouponReward("  ", "1")).toThrow();
+  });
+  it("escapes Markdown in custom reward names", () => {
+    const card = renderCouponCard("TESTCODE", [{ item: "**Custom**", quantity: 1 }]).toJSON();
+    expect(card.components[2]).toMatchObject({
+      content: "## Rewards\n**<:QuestionMark:1551725274725359766> \\*\\*Custom\\*\\* x1**",
+    });
   });
   it("rejects unsafe coupon codes and oversized Claim IDs", () => {
     expect(() => renderCouponCard("```", [])).toThrow();

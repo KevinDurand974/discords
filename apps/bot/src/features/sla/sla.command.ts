@@ -9,7 +9,7 @@ import {
 
 export const slaHelpDescription = [
   "redeem: Opens a required coupon-code and Personal ID (Member code) modal, then redeems the coupon. Treat your Personal ID as sensitive.",
-  "create-coupon: Select up to eight optional rewards via autocomplete, then enter the coupon code and destination in a modal. Set a positive whole-number quantity for each selected reward before publishing. Duplicate/unrecognized rewards are rejected. Drafts expire after 5 minutes; both you and the bot need permission to post in the destination.",
+  "create-coupon: Select up to eight optional rewards via autocomplete or enter custom item names (QuestionMark icon), then enter the coupon code and destination in a modal. Quantities default to 1 and can be edited to a positive whole number. Duplicate rewards are rejected. Drafts expire after 5 minutes; both you and the bot need permission to post in the destination.",
   "news create: Creates/reactivates the news forum, with 0–10 backfilled articles (default 10). news backfill: Imports 1–50 historical articles (default 10). news status shows configuration; news disable stops future posts. News management needs Manage Channels; news clean permanently removes news resources after administrator confirmation.",
   "Examples: `/sla redeem` · `/sla news backfill count:10`",
 ] as const;
@@ -32,7 +32,8 @@ export const slaCommand = {
           builder.addStringOption((option) =>
             option
               .setName(`item_${position}`)
-              .setDescription(`Search for reward item ${position} (optional)`)
+              .setDescription(`Search for reward item ${position} or enter a custom name (optional)`)
+              .setMaxLength(100)
               .setAutocomplete(true),
           ),
         subcommand,
