@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ApplicationCommandOptionType,
+  ComponentType,
   MessageFlags,
   TimestampStyles,
   type ChatInputCommandInteraction,
@@ -38,7 +39,13 @@ describe("/discord-date", () => {
     const data = discordDateCommand.data.toJSON();
     expect(data.name).toBe("discord-date");
     expect(data.options).toMatchObject([
-      { name: "date", type: ApplicationCommandOptionType.String, required: true },
+      {
+        name: "date",
+        type: ApplicationCommandOptionType.String,
+        required: true,
+        description:
+          "Date: dd/MM (current year), dd/MM/YYYY or YYYY/MM/dd; optional HH:mm or h:mm AM/PM",
+      },
       { name: "utc", type: ApplicationCommandOptionType.Number, min_value: -12, max_value: 14 },
       { name: "format", type: ApplicationCommandOptionType.String },
     ]);
@@ -47,7 +54,21 @@ describe("/discord-date", () => {
     const format = data.options?.[2];
     if (format?.type !== ApplicationCommandOptionType.String)
       throw new Error("Expected format option");
-    expect(format.choices?.map(({ value }) => value)).toEqual(Object.values(TimestampStyles));
+    expect(format.choices?.map(({ value }) => value)).toEqual([
+      "F",
+      "f",
+      "s",
+      "S",
+      "D",
+      "d",
+      "t",
+      "T",
+      "R",
+    ]);
+    expect(format.choices?.map(({ value }) => value).sort()).toEqual(
+      [...new Set(Object.values(TimestampStyles))].sort(),
+    );
+    expect(format.choices?.[0]?.name).toContain("default");
     expect(data.default_member_permissions).toBeUndefined();
     expect(JSON.stringify(renderHelp(commands))).toContain("/discord-date");
   });
@@ -56,11 +77,19 @@ describe("/discord-date", () => {
     const request = fixture();
     await execute(request);
     expect(request.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
-    expect(request.editReply).toHaveBeenCalledWith({
-      content: "**Preview**\n<t:1798223400:F>\n\n**Copy/paste**\n```\n<t:1798223400:F>\n```",
-      allowedMentions: { parse: [] },
-    });
-    await vi.advanceTimersByTimeAsync(29_999);
+    const payload = JSON.parse(JSON.stringify(request.editReply.mock.calls[0]![0]));
+    expect(payload.flags).toBe(MessageFlags.IsComponentsV2);
+    expect(payload.content).toBeUndefined();
+    expect(payload.allowedMentions).toEqual({ parse: [] });
+    expect(payload.components).toHaveLength(1);
+    expect(payload.components[0].type).toBe(ComponentType.Container);
+    expect(payload.components[0].components).toMatchObject([
+      { type: ComponentType.TextDisplay, content: "**Preview**\n<t:1798223400:F>" },
+      { type: ComponentType.Separator, divider: true },
+      { type: ComponentType.TextDisplay, content: "**Copy/paste**\n```\n<t:1798223400:F>\n```" },
+    ]);
+    expect(payload.components[0].components).toHaveLength(3);
+    await vi.advanceTimersByTimeAsync(59_999);
     expect(request.deleteReply).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(request.deleteReply).toHaveBeenCalledOnce();
@@ -71,14 +100,16 @@ describe("/discord-date", () => {
       vi.useFakeTimers();
       const request = fixture("25/12/2026 18:30", 5.5, format);
       await execute(request);
-      expect(request.editReply).toHaveBeenCalledWith(
-        expect.objectContaining({
-          content: `**Preview**\n<t:1798203600:${format}>\n\n**Copy/paste**\n\`\`\`\n<t:1798203600:${format}>\n\`\`\``,
-        }),
+      const payload = JSON.parse(JSON.stringify(request.editReply.mock.calls[0]![0]));
+      expect(payload.components[0].components[0].content).toBe(
+        `**Preview**\n<t:1798203600:${format}>`,
+      );
+      expect(payload.components[0].components[2].content).toBe(
+        `**Copy/paste**\n\`\`\`\n<t:1798203600:${format}>\n\`\`\``,
       );
     },
   );
-  it("starts the 30-second timer only after the result has been displayed", async () => {
+  it("starts the 60-second timer only after the result has been displayed", async () => {
     vi.useFakeTimers();
     const request = fixture();
     let display!: () => void;
@@ -94,7 +125,7 @@ describe("/discord-date", () => {
     expect(vi.getTimerCount()).toBe(0);
     display();
     await pending;
-    await vi.advanceTimersByTimeAsync(29_999);
+    await vi.advanceTimersByTimeAsync(59_999);
     expect(request.deleteReply).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(request.deleteReply).toHaveBeenCalledOnce();
@@ -104,7 +135,7 @@ describe("/discord-date", () => {
     const request = fixture();
     request.deleteReply.mockRejectedValueOnce(new Error("Unknown Message"));
     await execute(request);
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(request.deleteReply).toHaveBeenCalledOnce();
   });
   it.each([

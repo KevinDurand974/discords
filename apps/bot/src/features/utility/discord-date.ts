@@ -48,7 +48,7 @@ export function parseDiscordDate(value: string, utc = 0, now = Temporal.Now.inst
       ["hier", -1],
     ]);
     const yearFirst = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?=$|[T\s])/.exec(input);
-    const dayFirst = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})(?=$|[T\s])/.exec(input);
+    const dayFirst = /^(\d{1,2})[-/.](\d{1,2})(?:[-/.](\d{4}))?(?=$|[T\s])/.exec(input);
     const dayNamed = /^(\d{1,2})\s+([\p{L}.]+)\s+(\d{4})(?=$|[T\s])/u.exec(input);
     const monthNamed = /^([\p{L}.]+)\s+(\d{1,2})(?:st|nd|rd|th)?[,]?\s+(\d{4})(?=$|[T\s])/u.exec(
       input,
@@ -58,22 +58,6 @@ export function parseDiscordDate(value: string, utc = 0, now = Temporal.Now.inst
     );
     const match = yearFirst ?? dayFirst ?? dayNamed ?? monthNamed ?? relativeMatch;
     if (!match) throw invalidDate();
-    const date = relativeMatch
-      ? now
-          .toZonedDateTimeISO(zone)
-          .toPlainDate()
-          .add({ days: relative.get(relativeMatch[1]!.toLowerCase())! })
-      : Temporal.PlainDate.from(
-          {
-            year: Number(yearFirst ? match[1] : match[3]),
-            month:
-              yearFirst || dayFirst
-                ? Number(match[2])
-                : months.get(normalizeWord(dayNamed ? match[2]! : match[1]!))!,
-            day: Number(yearFirst ? match[3] : monthNamed ? match[2] : match[1]),
-          },
-          { overflow: "reject" },
-        );
     const remainder = input
       .slice(match[0].length)
       .trim()
@@ -110,6 +94,24 @@ export function parseDiscordDate(value: string, utc = 0, now = Temporal.Now.inst
               `${sign}${hours.padStart(2, "0")}:${minutes ?? "00"}`,
           )
       : zone;
+    const date = relativeMatch
+      ? now
+          .toZonedDateTimeISO(selectedZone)
+          .toPlainDate()
+          .add({ days: relative.get(relativeMatch[1]!.toLowerCase())! })
+      : Temporal.PlainDate.from(
+          {
+            year: Number(
+              yearFirst ? match[1] : (match[3] ?? now.toZonedDateTimeISO(selectedZone).year),
+            ),
+            month:
+              yearFirst || dayFirst
+                ? Number(match[2])
+                : months.get(normalizeWord(dayNamed ? match[2]! : match[1]!))!,
+            day: Number(yearFirst ? match[3] : monthNamed ? match[2] : match[1]),
+          },
+          { overflow: "reject" },
+        );
     const instant = date.toPlainDateTime(time).toZonedDateTime(selectedZone).toInstant();
     return Math.floor(instant.epochMilliseconds / 1000);
   } catch {
