@@ -8,6 +8,8 @@
     "sync": "nub src/scripts/deploy-commands.ts",
     "logs:import": "nub src/scripts/import-log-channels.ts",
     "generate:emojis": "nub src/scripts/generate-emojis.ts",
+    "emojis:export": "nub src/scripts/export-emojis.ts",
+    "emojis:import": "nub src/scripts/import-emojis.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "rm": "nub src/scripts/delete-commands.ts",

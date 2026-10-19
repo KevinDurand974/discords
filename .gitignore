@@ -5,6 +5,7 @@ env.d.ts
 !.env.example
 *.log
 apps/bot/data/log-channels.json
+apps/bot/data/emojis/
 .DS_Store
 
 !.env.schema

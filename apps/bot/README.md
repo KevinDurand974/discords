@@ -40,6 +40,36 @@ Add the same `--network` option for command deployment when needed. `nub run doc
 
 `nub run test:docker:bot` builds the image, automatically migrates an isolated empty PostgreSQL database, verifies runtime imports and aliases, writable volume permissions, health routes and the Docker healthcheck, and removes its temporary containers, volume and network. It uses dummy credentials and simulated Discord readiness: it does **not** log into Discord or send messages. Live gateway login and command behavior require real deployment credentials. The `discords-bot:test` image is retained for inspection.
 
+## Export/import application emojis
+
+Copy application emojis from a production bot to a separate development bot without starting either gateway client. Configure both credential pairs in your local environment (never in the archive or command arguments):
+
+| Target | Token | Application ID |
+| --- | --- | --- |
+| `prod` | `DISCORD_TOKEN` | `DISCORD_CLIENT_ID` |
+| `dev` | `DISCORD_DEV_TOKEN` | `DISCORD_DEV_CLIENT_ID` |
+
+The DEV variables are optional for normal production startup, but **both are required** when selecting DEV; missing DEV credentials never fall back to production.
+
+1. Export names and **WebP images (static or animated)** from **production** (the export defaults):
+   ```sh
+   nub --cwd apps/bot run emojis:export
+   ```
+2. Preview, then import into **development** (the import default), without changing your configuration:
+   ```sh
+   nub --cwd apps/bot run emojis:import --dry-run
+   nub --cwd apps/bot run emojis:import
+   ```
+3. Restart the development bot to populate its emoji cache. Emoji IDs change; identical names keep `displayEmoji(name)` working. Hardcoded emoji IDs/URLs are not rewritten. `generate:emojis` regenerates the checked-in type file with the configured app's IDs, so do not replace production types with development IDs unless intended.
+
+Export defaults to **WebP**, requesting `animated=true` from Discord's CDN for animated emojis so animation is preserved. Use `--format png-gif` for PNG static images and GIF animations instead. Import accepts **PNG, GIF and WebP** archives and uploads their original bytes with the matching MIME type (no re-encoding).
+
+Both commands accept `--target prod|dev` to override their default application. For example, `nub --cwd apps/bot run emojis:export --target dev --directory data/dev-emojis` backs up DEV, and `nub --cwd apps/bot run emojis:import --target prod --directory data/dev-emojis --dry-run` previews the reverse transfer. No runtime bot token selection is changed by these scripts.
+
+The default archive directory is **`apps/bot/data/emojis/`** when using the commands above; it is gitignored. It contains `emojis.json` (`version`, source `applicationId`, and `{name, file}` entries) plus the `.webp`, `.png` or `.gif` images. Use `--directory <path>` to select another location (relative to the command's working directory). Export requires a **new directory** and never overwrites an existing archive; failed exports remove their incomplete output.
+
+Import validates the manifest and checks every image's size and format (PNG/GIF headers and end markers, or the WebP RIFF container and image/animation chunks) before any upload. Validated bytes are snapshotted in a private temporary directory (removed on success or failure), so changing the source archive cannot change subsequent uploads. This is not a full image decoder: Discord remains the final validator and can still reject an upload. Emojis are created sequentially via Discord's rate-limited REST client. **Existing names are skipped**, never replaced or deleted; reruns can resume partial imports. Animated GIFs and animated WebP files are preserved. Images must fit Discord's **256 KiB** limit; the destination must fit its **2,000 application emoji** limit. A dry-run validates local files and reads destination metadata but makes no uploads. Neither operation changes slash commands, generated types, or production emojis. The scripts verify that the selected token belongs to the selected application ID. Check the destination ID printed by import before using real credentials.
+
 ## Bot invitation permissions (without Administrator)
 
 Invite the bot with the **`bot`** and **`applications.commands`** OAuth2 scopes. To enable all current features, select the permissions below — **do not grant Administrator**. Feature-specific permissions can be omitted when you do not use the corresponding feature.
