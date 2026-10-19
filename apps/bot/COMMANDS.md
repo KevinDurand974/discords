@@ -9,6 +9,16 @@ Commandes slash enregistrées dans le code du bot. Les paramètres entre `[]` so
 | `/ping`           | Répond en privé avec « pong », le ping WebSocket et la latence. Aucun paramètre.                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `/help [command]` | Sends the full command list by DM, or detailed help for the optional selected command. Autocomplete lists registered commands excluding `/help`. Detailed help includes usage, option descriptions and limits, defaults, permissions, workflow and examples. Each command exports its own detailed description and exposes it as `helpDescription` on its definition; `/help` reads it from the registry. Uses Components V2; no special permissions are required, but DMs must be enabled. |
 
+## Discord date
+
+`/discord-date <date> [utc] [format]` converts a date into a Discord timestamp using Nub's native **Temporal API**, with no date-parser dependency. Discord has no native slash-command date picker, so `date` is a required string (up to 200 characters).
+
+Accepts ISO-style dates (`2026-12-25T18:30:45Z`), numeric dates with `/`, `-` or `.` separators (`25/12/2026 18:30`), English/French month names (`December 25, 2026 at 18:30`, `25 décembre 2026 à 18:30`), and `today`/`tomorrow`/`yesterday` or `aujourd'hui`/`demain`/`hier`. Ambiguous numeric dates use **day/month/year**. A missing time means **midnight**; invalid dates, trailing text and date ranges are rejected rather than guessed.
+
+`utc` is the entered date's offset in hours from UTC, default **0**, from **-12 to +14** in whole minutes. Fractional hours such as **5.5** and **5.75** are supported. For example, `date:25/12/2026 18:30 utc:1` means 17:30 UTC. An explicit timezone in the date (`Z`, `UTC`, `GMT`, `+02:00`) takes precedence. Discord renders the result in each viewer's own timezone.
+
+`format` offers all seven **discord.js TimestampStyles**: `t` short time, `T` long time, `d` short date, `D` long date, `f` short date/time, `F` long date/time (**default**), and `R` relative time. The **ephemeral** reply displays the rendered timestamp and the same markup in a **copyable code block**, and is deleted **30 seconds after display**, not the usual ten. No special permissions, migration or additional intent are required. Restart/deploy and run `nub --cwd apps/bot run sync` to register it.
+
 ## Create a post
 
 `/post` opens a modal with a required **title** (1–100 characters), **multiline post content**, and a **channel selector** below them. The current channel is selected by default when supported. Choose a server text or announcement channel, or an active unlocked thread; Forums are not destinations for this command. Closing the modal publishes nothing.

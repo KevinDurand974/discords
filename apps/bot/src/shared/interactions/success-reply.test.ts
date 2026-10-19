@@ -53,6 +53,18 @@ describe("successful deferred reply cleanup", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
   });
+  it("supports an explicit duration without changing the ten-second default", async () => {
+    const f = fixture();
+    await editSuccessReply(
+      f.interaction as unknown as Parameters<typeof editSuccessReply>[0],
+      "Copy this.",
+      30_000,
+    );
+    await vi.advanceTimersByTimeAsync(29_999);
+    expect(f.interaction.deleteReply).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(f.interaction.deleteReply).toHaveBeenCalledOnce();
+  });
   it("does not keep the process alive", async () => {
     const f = fixture();
     const timer = vi.spyOn(globalThis, "setTimeout");

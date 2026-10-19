@@ -23,6 +23,7 @@ import { untrapCommand } from "@/features/trap-bot/untrap.command.ts";
 import { slaCommand } from "@/features/sla/sla.command.ts";
 import { pingCommand } from "@/features/utility/ping.command.ts";
 import { coinflipCommand } from "@/features/utility/coinflip.command.ts";
+import { discordDateCommand } from "@/features/utility/discord-date.command.ts";
 import { pickCommand } from "@/features/utility/pick.command.ts";
 import { pickComponentHandler } from "@/features/utility/pick-components.ts";
 import { slowmodeCommand } from "@/features/utility/slowmode.command.ts";
@@ -54,6 +55,7 @@ export const commands: readonly CommandDefinition[] = [
   slaCommand,
   pingCommand,
   coinflipCommand,
+  discordDateCommand,
   pickCommand,
   slowmodeCommand,
   clearCommand,
