@@ -193,13 +193,20 @@ describe("interactive coupon creation", () => {
     expect(modal.components).toHaveLength(2);
     expect(JSON.stringify(modal)).toContain("UTC+0");
     expect(JSON.stringify(modal)).toContain('"required":false');
+    expect(JSON.stringify(modal)).toContain('"label":"Available from"');
+    expect(JSON.stringify(modal)).toContain('"label":"Available until"');
     await expect(execute(actor(old.custom_id, true))).rejects.toThrow("unavailable");
     const save = actor(modal.custom_id, true);
     save.fields.getTextInputValue.mockImplementation((name?: string) =>
       name === "starts-at" ? "25/12/2030 18:30" : "25/12/2030 19:30",
     );
     await execute(save);
-    expect(JSON.stringify(save.editReply.mock.calls)).toContain("2030-12-25 18:30:00 UTC+0");
+    expect(JSON.stringify(save.editReply.mock.calls)).toContain(
+      `**Available from:** <t:${Date.parse("2030-12-25T18:30:00Z") / 1000}:F>`,
+    );
+    expect(JSON.stringify(save.editReply.mock.calls)).toContain(
+      `**Available until:** <t:${Date.parse("2030-12-25T19:30:00Z") / 1000}:F>`,
+    );
     await expect(execute(save)).rejects.toThrow("unavailable");
     const prefilled = await open();
     expect(JSON.stringify(prefilled)).toContain('"value":"2030-12-25 18:30:00"');
@@ -207,8 +214,12 @@ describe("interactive coupon creation", () => {
     const clear = actor(prefilled.custom_id, true);
     clear.fields.getTextInputValue.mockReturnValue("");
     await execute(clear);
-    expect(JSON.stringify(clear.editReply.mock.calls)).toContain("Immediately");
-    expect(JSON.stringify(clear.editReply.mock.calls)).toContain("No expiry");
+    const cleared = JSON.stringify(clear.editReply.mock.calls);
+    expect(cleared).not.toContain("**Available from:**");
+    expect(cleared).not.toContain("**Available until:**");
+    expect(cleared).not.toContain("Immediately");
+    expect(cleared).not.toContain("No expiry");
+    expect(cleared).toContain("Edit availability");
     await execute(actor(id("publish", token)));
     expect(JSON.stringify(target.send.mock.calls)).toContain('"custom_id":"sla:claim:TESTCODE"');
   });
@@ -275,6 +286,16 @@ describe("interactive coupon creation", () => {
     save.fields.getTextInputValue.mockReturnValue("");
     await expect(execute(save)).resolves.toBeUndefined();
   });
+  it.each([{ startsAt: 0 }, { endsAt: 3600 }, { startsAt: 0, endsAt: 3600 }, {}])(
+    "only displays configured availability dates: %j",
+    (availability) => {
+      const card = JSON.stringify(renderCouponCard("TESTCODE", [], availability).toJSON());
+      expect(card.includes("🕒 **Available from:**")).toBe("startsAt" in availability);
+      expect(card.includes("🕒 **Available until:**")).toBe("endsAt" in availability);
+      expect(card).not.toContain("Immediately");
+      expect(card).not.toContain("No expiry");
+    },
+  );
   it("publishes both availability dates in the card and persistent claim ID", async () => {
     const { token } = await start();
     const click = actor(id("availability", token));
@@ -287,8 +308,15 @@ describe("interactive coupon creation", () => {
     await execute(save);
     await execute(actor(id("publish", token)));
     const sent = JSON.stringify(target.send.mock.calls);
-    expect(sent).toContain("2030-12-25 18:30:00 UTC+0");
-    expect(sent).toContain("2030-12-25 19:30:00 UTC+0");
+    expect(sent).toContain(
+      `**Available from:** <t:${Date.parse("2030-12-25T18:30:00Z") / 1000}:F>`,
+    );
+    expect(sent).toContain(
+      `**Available until:** <t:${Date.parse("2030-12-25T19:30:00Z") / 1000}:F>`,
+    );
+    expect(sent).not.toContain("Availability");
+    expect(sent).not.toContain("UTC+0");
+    expect(sent).not.toContain("`<t:");
     expect(sent).toContain('"custom_id":"sla:claim:TESTCODE?');
   });
   it("rejects reversed dates without changing the draft and prevents expired publication", async () => {
@@ -302,7 +330,9 @@ describe("interactive coupon creation", () => {
     save.fields.getTextInputValue.mockImplementation((name?: string) =>
       name === "starts-at" ? "25/12/2030 18:30" : "25/12/2030 17:30",
     );
-    await expect(execute(save)).rejects.toThrow("after the start");
+    await expect(execute(save)).rejects.toThrow(
+      "**Available until** must be after **Available from**.",
+    );
     expect(save.editReply).not.toHaveBeenCalled();
     save.fields.getTextInputValue.mockImplementation((name?: string) =>
       name === "starts-at" ? "" : "25/12/2030 17:30",

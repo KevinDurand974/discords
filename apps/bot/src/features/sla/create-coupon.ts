@@ -17,6 +17,8 @@ import {
   TextInputBuilder,
   TextInputStyle,
   ThumbnailBuilder,
+  time,
+  TimestampStyles,
   type ChatInputCommandInteraction,
   type ButtonInteraction,
   type ModalSubmitInteraction,
@@ -119,7 +121,16 @@ export function parseCouponReward(item: string | undefined, quantity: string): C
   return { item: validateItem(item), quantity: Number(value) };
 }
 function availabilityText({ startsAt, endsAt }: CouponAvailability) {
-  return `**Available from:** ${startsAt === undefined ? "Immediately" : `\`${formatCouponDate(startsAt)} UTC+0\``}\n**Expires at:** ${endsAt === undefined ? "No expiry" : `\`${formatCouponDate(endsAt)} UTC+0\``}`;
+  return [
+    startsAt === undefined
+      ? ""
+      : `🕒 **Available from:** ${time(startsAt, TimestampStyles.LongDateTime)}`,
+    endsAt === undefined
+      ? ""
+      : `🕒 **Available until:** ${time(endsAt, TimestampStyles.LongDateTime)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 export function renderCouponCard(
   code: string,
@@ -156,9 +167,7 @@ export function renderCouponCard(
   }
   if (availability.startsAt !== undefined || availability.endsAt !== undefined) {
     card
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(`## Availability\n${availabilityText(availability)}`),
-      )
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(availabilityText(availability)))
       .addSeparatorComponents(new SeparatorBuilder());
   }
   return card.addActionRowComponents(
@@ -184,13 +193,19 @@ function draftView(token: string, draft: Draft) {
       `# Create coupon\n\`\`\`\n${draft.code}\n\`\`\`\nPost in <#${draft.channelId}>. ${configured}/${draft.items.length} quantities configured.\nThis draft expires after 5 minutes.`,
     ),
   );
-  card.addSectionComponents(
-    new SectionBuilder()
-      .addTextDisplayComponents(
-        new TextDisplayBuilder().setContent(availabilityText(draft.availability)),
-      )
-      .setButtonAccessory(button(token, "availability", "Edit availability", ButtonStyle.Primary)),
-  );
+  const dates = availabilityText(draft.availability);
+  const editAvailability = button(token, "availability", "Edit availability", ButtonStyle.Primary);
+  if (dates) {
+    card.addSectionComponents(
+      new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(dates))
+        .setButtonAccessory(editAvailability),
+    );
+  } else {
+    card.addActionRowComponents(
+      new ActionRowBuilder<ButtonBuilder>().addComponents(editAvailability),
+    );
+  }
   if (draft.items.length) {
     card
       .addSeparatorComponents(new SeparatorBuilder())
@@ -476,7 +491,7 @@ export const createCouponComponentHandler: ComponentHandler = {
               .setTitle("Coupon availability (UTC+0)")
               .addLabelComponents(
                 field("starts-at", "Available from", draft.availability.startsAt),
-                field("ends-at", "Expires at", draft.availability.endsAt),
+                field("ends-at", "Available until", draft.availability.endsAt),
               ),
           );
         } catch (error) {

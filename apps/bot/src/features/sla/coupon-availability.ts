@@ -14,23 +14,33 @@ export function formatCouponDate(timestamp: number) {
 }
 
 export function parseCouponAvailability(starts: string, ends: string): CouponAvailability {
-  const parse = (value: string) => {
+  const parse = (value: string, field: "Available from" | "Available until") => {
     const input = value.trim();
     if (!input) return undefined;
     if (
       /(?:Z|UTC|GMT)(?:[+-]\d{1,2}(?::?\d{2})?)?$/i.test(input) ||
       /(?:\d[:h]\d{2}.*|\s)[+-]\d{1,2}(?::?\d{2})?$/i.test(input)
     )
-      throw new UserFacingError("Enter availability dates in UTC+0 without a timezone suffix.");
-    return parseDiscordDate(input, 0);
+      throw new UserFacingError(`**${field}:** enter a date in UTC+0 without a timezone suffix.`);
+    try {
+      return parseDiscordDate(input, 0);
+    } catch (error) {
+      if (!(error instanceof UserFacingError)) throw error;
+      throw new UserFacingError(
+        `**${field}:** invalid date. Use dd/MM/YYYY or YYYY/MM/dd, optionally followed by HH:mm (UTC+0). Leave empty for no limit.`,
+      );
+    }
   };
-  const availability = { startsAt: parse(starts), endsAt: parse(ends) };
+  const availability = {
+    startsAt: parse(starts, "Available from"),
+    endsAt: parse(ends, "Available until"),
+  };
   if (
     availability.startsAt !== undefined &&
     availability.endsAt !== undefined &&
     availability.startsAt >= availability.endsAt
   )
-    throw new UserFacingError("The expiry date must be after the start date.");
+    throw new UserFacingError("**Available until** must be after **Available from**.");
   return availability;
 }
 
@@ -87,6 +97,6 @@ export function assertCouponAvailable(
   now = Date.now() / 1000,
 ) {
   if (startsAt !== undefined && now < startsAt)
-    throw new UserFacingError(`This coupon is available from ${formatCouponDate(startsAt)} UTC+0.`);
+    throw new UserFacingError("This coupon is not available yet.");
   if (endsAt !== undefined && now >= endsAt) throw new UserFacingError("This coupon has expired.");
 }

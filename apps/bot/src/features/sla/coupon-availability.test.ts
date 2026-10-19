@@ -54,6 +54,33 @@ describe("coupon availability", () => {
   ])("rejects invalid or non-UTC inputs %s %s", (from, until) => {
     expect(() => parseCouponAvailability(from, until)).toThrow();
   });
+  it.each(["Available from", "Available until"] as const)(
+    "identifies invalid %s dates and explains the expected formats",
+    (field) => {
+      const from = field === "Available from" ? "31/02/2030" : "";
+      const to = field === "Available until" ? "31/02/2030" : "";
+      expect(() => parseCouponAvailability(from, to)).toThrow(
+        `**${field}:** invalid date. Use dd/MM/YYYY or YYYY/MM/dd, optionally followed by HH:mm (UTC+0). Leave empty for no limit.`,
+      );
+    },
+  );
+  it.each(["Available from", "Available until"] as const)(
+    "identifies timezone suffixes in %s",
+    (field) => {
+      const value = "25/12/2030 18:30+02:00";
+      expect(() =>
+        parseCouponAvailability(
+          field === "Available from" ? value : "",
+          field === "Available until" ? value : "",
+        ),
+      ).toThrow(`**${field}:** enter a date in UTC+0 without a timezone suffix.`);
+    },
+  );
+  it("names both fields when To is not after From", () => {
+    expect(() => parseCouponAvailability("25/12/2030 18:30", "25/12/2030 17:30")).toThrow(
+      "**Available until** must be after **Available from**.",
+    );
+  });
   it.each([{}, { startsAt: start }, { endsAt: end }, availability])(
     "roundtrips dates in persistent component IDs: %j",
     (window) => {
@@ -85,10 +112,14 @@ describe("coupon availability", () => {
     expect(parseClaimCustomId(id, CLAIM_BUTTON_PREFIX)).toBeNull();
   });
   it("allows the start boundary and rejects the expiry boundary", () => {
-    expect(() => assertCouponAvailable(availability, start - 1)).toThrow("available from");
+    expect(() => assertCouponAvailable(availability, start - 1)).toThrow(
+      new Error("This coupon is not available yet."),
+    );
     expect(() => assertCouponAvailable(availability, start)).not.toThrow();
     expect(() => assertCouponAvailable(availability, end - 0.001)).not.toThrow();
-    expect(() => assertCouponAvailable(availability, end)).toThrow("expired");
+    expect(() => assertCouponAvailable(availability, end)).toThrow(
+      new Error("This coupon has expired."),
+    );
     expect(() => assertCouponAvailable({ endsAt: end }, start - 1)).not.toThrow();
     expect(() => assertCouponAvailable({ startsAt: start }, end + 1)).not.toThrow();
   });
@@ -96,7 +127,9 @@ describe("coupon availability", () => {
     vi.useFakeTimers();
     vi.setSystemTime((start - 1) * 1000);
     const interaction = request(claimCustomId("TESTCODE", availability));
-    await expect(execute(interaction)).rejects.toThrow("available from");
+    await expect(execute(interaction)).rejects.toThrow(
+      new Error("This coupon is not available yet."),
+    );
     expect(interaction.showModal).not.toHaveBeenCalled();
     vi.setSystemTime(start * 1000);
     await execute(interaction);
