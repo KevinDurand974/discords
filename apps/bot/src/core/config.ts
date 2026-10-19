@@ -1,7 +1,10 @@
 import "varlock/auto-load";
 import { ENV } from "varlock/env";
+import { resolveDiscordCredentials } from "./discord-credentials.ts";
 
 export { ENV };
+
+export const getDiscordCredentials = () => resolveDiscordCredentials(ENV);
 
 export const getGuildId = () => {
   if (!ENV.DISCORD_GUILD_ID) {

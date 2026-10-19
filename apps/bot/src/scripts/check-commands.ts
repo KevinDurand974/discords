@@ -1,8 +1,9 @@
 import { REST, Routes, type RESTGetAPIApplicationCommandsResult } from "discord.js";
 import { commands } from "@/core/command-registry.ts";
-import { ENV } from "@/core/config.ts";
+import { ENV, getDiscordCredentials } from "@/core/config.ts";
 
-const rest = new REST().setToken(ENV.DISCORD_TOKEN);
+const credentials = getDiscordCredentials();
+const rest = new REST().setToken(credentials.token);
 const summarize = (registered: RESTGetAPIApplicationCommandsResult) =>
   registered.map((command) => ({
     name: command.name,
@@ -15,7 +16,7 @@ const summarize = (registered: RESTGetAPIApplicationCommandsResult) =>
 
 try {
   const registered = (await rest.get(
-    Routes.applicationCommands(ENV.DISCORD_CLIENT_ID),
+    Routes.applicationCommands(credentials.applicationId),
   )) as RESTGetAPIApplicationCommandsResult;
   console.log("Global commands:", JSON.stringify(summarize(registered), null, 2));
   const missing = commands
@@ -25,7 +26,7 @@ try {
   if (missing.length) process.exitCode = 1;
   if (ENV.DISCORD_GUILD_ID) {
     const guildCommands = (await rest.get(
-      Routes.applicationGuildCommands(ENV.DISCORD_CLIENT_ID, ENV.DISCORD_GUILD_ID),
+      Routes.applicationGuildCommands(credentials.applicationId, ENV.DISCORD_GUILD_ID),
     )) as RESTGetAPIApplicationCommandsResult;
     console.log("Guild commands:", JSON.stringify(summarize(guildCommands), null, 2));
     const application = await rest.get(Routes.oauth2CurrentApplication());

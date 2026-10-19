@@ -2,6 +2,12 @@
 
 On Windows, `nub run start` / `nub run dev` may launch a nested `cmd.exe` batch script even from Warp Bash. If Ctrl+C shows `Terminate batch job (Y/N)?`, type `Y` and Enter, or bypass the script shell from `apps/bot` with `nub src/index.ts` (start) or `nub watch src/index.ts` (dev). You can also use `nub run --script-shell bash start` / `nub run --script-shell bash dev` to keep the package scripts while selecting Bash explicitly.
 
+## Discord application selection
+
+`start` / `dev` prefer **`DISCORD_DEV_TOKEN` + `DISCORD_DEV_CLIENT_ID`** whenever either DEV variable is populated. Both DEV values must then be valid: a missing counterpart fails startup rather than mixing DEV and PROD or silently falling back. If neither DEV value is set (empty values count as unset), the bot uses **`DISCORD_TOKEN` + `DISCORD_CLIENT_ID`**. PROD credentials are not required in a DEV-only environment.
+
+Command synchronization (`sync`), command inspection/deletion, and emoji type generation (`generate:emojis`) use the **same selection**. Unset both DEV variables in the running process to select production. The explicit `--target` behavior of emoji import/export is unchanged: export defaults to PROD, import to DEV.
+
 ## Docker image
 
 Build from the **repository root**, like the API image:
@@ -64,7 +70,7 @@ The DEV variables are optional for normal production startup, but **both are req
 
 Export defaults to **WebP**, requesting `animated=true` from Discord's CDN for animated emojis so animation is preserved. Use `--format png-gif` for PNG static images and GIF animations instead. Import accepts **PNG, GIF and WebP** archives and uploads their original bytes with the matching MIME type (no re-encoding).
 
-Both commands accept `--target prod|dev` to override their default application. For example, `nub --cwd apps/bot run emojis:export --target dev --directory data/dev-emojis` backs up DEV, and `nub --cwd apps/bot run emojis:import --target prod --directory data/dev-emojis --dry-run` previews the reverse transfer. No runtime bot token selection is changed by these scripts.
+Both commands accept `--target prod|dev` to override their default application. For example, `nub --cwd apps/bot run emojis:export --target dev --directory data/dev-emojis` backs up DEV, and `nub --cwd apps/bot run emojis:import --target prod --directory data/dev-emojis --dry-run` previews the reverse transfer. These explicit targets do not inherit or change the runtime's automatic DEV preference.
 
 The default archive directory is **`apps/bot/data/emojis/`** when using the commands above; it is gitignored. It contains `emojis.json` (`version`, source `applicationId`, and `{name, file}` entries) plus the `.webp`, `.png` or `.gif` images. Use `--directory <path>` to select another location (relative to the command's working directory). Export requires a **new directory** and never overwrites an existing archive; failed exports remove their incomplete output.
 

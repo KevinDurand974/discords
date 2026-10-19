@@ -1,16 +1,17 @@
 import { REST, Routes } from "discord.js";
-import { ENV } from "@/core/config.ts";
+import { ENV, getDiscordCredentials } from "@/core/config.ts";
 
-const rest = new REST().setToken(ENV.DISCORD_TOKEN);
+const credentials = getDiscordCredentials();
+const rest = new REST().setToken(credentials.token);
 
 try {
-  await rest.put(Routes.applicationCommands(ENV.DISCORD_CLIENT_ID), {
+  await rest.put(Routes.applicationCommands(credentials.applicationId), {
     body: [],
   });
 
   if (ENV.DISCORD_GUILD_ID) {
     await rest.put(
-      Routes.applicationGuildCommands(ENV.DISCORD_CLIENT_ID, ENV.DISCORD_GUILD_ID),
+      Routes.applicationGuildCommands(credentials.applicationId, ENV.DISCORD_GUILD_ID),
       { body: [] },
     );
   }

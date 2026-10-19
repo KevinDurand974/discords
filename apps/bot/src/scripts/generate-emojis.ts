@@ -1,10 +1,11 @@
 import { writeFile } from "node:fs/promises";
 import { Events } from "discord.js";
 import { createDiscordClient } from "@/core/client.ts";
-import { ENV } from "@/core/config.ts";
+import { getDiscordCredentials } from "@/core/config.ts";
 
 const outputPath = new URL("../shared/emojis/emojis.generated.d.ts", import.meta.url);
 const toTypeLiteral = (value: string) => JSON.stringify(value);
+const credentials = getDiscordCredentials();
 const client = createDiscordClient();
 
 client.once(Events.ClientReady, async () => {
@@ -32,4 +33,4 @@ client.once(Events.ClientReady, async () => {
   }
 });
 
-await client.login(ENV.DISCORD_TOKEN);
+await client.login(credentials.token);

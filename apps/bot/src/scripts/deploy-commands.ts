@@ -1,14 +1,15 @@
 import { REST } from "discord.js";
 import { commands } from "@/core/command-registry.ts";
-import { ENV } from "@/core/config.ts";
+import { ENV, getDiscordCredentials } from "@/core/config.ts";
 import { syncCommands } from "@/core/command-sync.ts";
 
-const rest = new REST().setToken(ENV.DISCORD_TOKEN);
+const credentials = getDiscordCredentials();
+const rest = new REST().setToken(credentials.token);
 
 try {
   await syncCommands(
     rest,
-    ENV.DISCORD_CLIENT_ID,
+    credentials.applicationId,
     commands.map((command) => command.data.toJSON()),
     ENV.DISCORD_GUILD_ID,
   );

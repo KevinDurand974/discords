@@ -5,7 +5,7 @@ import { createDiscordClient } from "@/core/client.ts";
 import { createCommandLogger } from "@/core/command-logger.ts";
 import type { CommandDefinition } from "@/core/command.ts";
 import { commands, componentHandlers } from "@/core/command-registry.ts";
-import { ENV } from "@/core/config.ts";
+import { ENV, getDiscordCredentials } from "@/core/config.ts";
 import { createBotHealthServer } from "@/core/health.ts";
 import { registerInteractionRouter } from "@/core/interaction-router.ts";
 import { synchronizeNews } from "@/features/netmarble-news/news-runtime.ts";
@@ -24,6 +24,8 @@ import {
   registerReactionRoleCleanup,
 } from "@/features/reaction-roles/reaction-role-cleanup.ts";
 
+const credentials = getDiscordCredentials();
+console.info(`[Discord] Starting ${credentials.target.toUpperCase()} bot.`);
 const client = createDiscordClient();
 const healthPort = Number(process.env.BOT_HEALTH_PORT ?? "3001");
 const healthHost = process.env.BOT_HEALTH_HOST ?? "127.0.0.1";
@@ -63,4 +65,4 @@ client.once(Events.ClientReady, async (readyClient) => {
   });
 });
 
-await client.login(ENV.DISCORD_TOKEN);
+await client.login(credentials.token);
