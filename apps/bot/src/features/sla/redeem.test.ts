@@ -8,11 +8,17 @@ import {
 import type { CommandExecutionContext, ComponentInteraction } from "@/core/command.ts";
 import { slaCommand } from "./sla.command.ts";
 import { handleRedeem, redeemComponentHandler } from "./redeem.ts";
-import { redeemCoupon } from "./coupon.client.ts";
+import { getCouponProduct, redeemCoupon } from "./coupon.client.ts";
 
-vi.mock("./coupon.client.ts", () => ({ redeemCoupon: vi.fn() }));
+vi.mock("./coupon.client.ts", () => ({
+  redeemCoupon: vi.fn(),
+  getCouponProduct: vi.fn(async () => ({
+    productName: "Reward",
+    productImageUrl: "https://example.com/reward.webp",
+  })),
+}));
 const context = {} as CommandExecutionContext;
-afterEach(() => vi.resetAllMocks());
+afterEach(() => vi.clearAllMocks());
 
 describe("simplified /sla redeem", () => {
   it("registers no slash options", () => {
@@ -59,15 +65,8 @@ describe("simplified /sla redeem", () => {
     vi.mocked(redeemCoupon).mockResolvedValue({
       errorCode: 200,
       errorMessage: "SUCCESS",
-      rewardType: "coupon",
       success: true,
-      resultData: [
-        {
-          productName: "Reward",
-          productImageUrl: "https://example.com/reward.webp",
-          userSelectionRate: 0,
-        },
-      ],
+      resultData: [{ quantity: 1 }],
     });
     const interaction = {
       isModalSubmit: () => true,
@@ -80,11 +79,31 @@ describe("simplified /sla redeem", () => {
     await redeemComponentHandler.execute(interaction as unknown as ComponentInteraction, context);
     expect(redeemCoupon).toHaveBeenCalledExactlyOnceWith("CODE", "PID");
     expect(interaction.deferReply).toHaveBeenCalledWith({ flags: MessageFlags.Ephemeral });
-    expect(interaction.editReply).toHaveBeenCalledWith(
-      expect.objectContaining({
-        embeds: [expect.objectContaining({ title: "Coupon redeemed.", description: "Reward" })],
-      }),
+    expect(getCouponProduct).toHaveBeenCalledExactlyOnceWith("CODE", "PID");
+    expect(vi.mocked(getCouponProduct).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(redeemCoupon).mock.invocationCallOrder[0]!,
     );
+    expect(interaction.editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ flags: MessageFlags.IsComponentsV2 }),
+    );
+    const reply = JSON.stringify(interaction.editReply.mock.calls);
+    expect(reply).toContain("# Coupon redeemed.\\n## Reward");
+    expect(reply).toContain("https://example.com/reward.webp");
+    expect(reply).not.toContain("embeds");
+  });
+  it("does not redeem when coupon metadata cannot be loaded", async () => {
+    vi.mocked(getCouponProduct).mockRejectedValueOnce(new Error("Metadata unavailable"));
+    const interaction = {
+      isModalSubmit: () => true,
+      fields: { getTextInputValue: () => "VALUE" },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+    };
+    await expect(
+      redeemComponentHandler.execute(interaction as unknown as ComponentInteraction, context),
+    ).rejects.toThrow("Metadata unavailable");
+    expect(redeemCoupon).not.toHaveBeenCalled();
+    expect(interaction.editReply).not.toHaveBeenCalled();
   });
   it.each([24004, 400])("preserves redemption errors for API code %s", async (errorCode) => {
     vi.mocked(redeemCoupon).mockResolvedValue({ errorCode });

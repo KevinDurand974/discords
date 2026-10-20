@@ -1,5 +1,9 @@
 import {
-  EmbedType,
+  ContainerBuilder,
+  escapeMarkdown,
+  SectionBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
   LabelBuilder,
   MessageFlags,
   ModalBuilder,
@@ -11,7 +15,7 @@ import {
 import type { ComponentHandler } from "@/core/command.ts";
 import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
-import { redeemCoupon, type CouponSuccess } from "./coupon.client.ts";
+import { getCouponProduct, redeemCoupon } from "./coupon.client.ts";
 
 const REDEEM_MODAL_ID = "sla:redeem";
 const COUPON_INPUT_ID = "coupon";
@@ -45,6 +49,7 @@ const createRedeemModal = () => {
 
 const redeem = async (interaction: ModalSubmitInteraction, couponCode: string, pid: string) => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const product = await getCouponProduct(couponCode, pid);
   const data = await redeemCoupon(couponCode, pid);
 
   if (data.errorCode === 24004) {
@@ -56,21 +61,19 @@ const redeem = async (interaction: ModalSubmitInteraction, couponCode: string, p
     );
   }
 
-  const successData = (data as CouponSuccess).resultData[0];
-  if (!successData) {
-    throw new UserFacingError(
-      "Coupon redeemed, but reward details are unavailable. Check your in-game mailbox.",
-    );
-  }
-
   await editSuccessReply(interaction, {
-    embeds: [
-      {
-        title: "Coupon redeemed.",
-        description: successData.productName,
-        thumbnail: { url: successData.productImageUrl },
-        type: EmbedType.Rich,
-      },
+    flags: MessageFlags.IsComponentsV2,
+    allowedMentions: { parse: [] },
+    components: [
+      new ContainerBuilder().addSectionComponents(
+        new SectionBuilder()
+          .addTextDisplayComponents(
+            new TextDisplayBuilder().setContent(
+              `# Coupon redeemed.\n## ${escapeMarkdown(product.productName)}`,
+            ),
+          )
+          .setThumbnailAccessory(new ThumbnailBuilder().setURL(product.productImageUrl)),
+      ),
     ],
   });
 };

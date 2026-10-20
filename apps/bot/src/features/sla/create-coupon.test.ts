@@ -13,6 +13,7 @@ import { commands, componentHandlers } from "@/core/command-registry.ts";
 import { claimComponentHandler, CLAIM_BUTTON_PREFIX } from "./claim-components.ts";
 import { slaCommand } from "./sla.command.ts";
 import { couponItems } from "@/shared/emojis/emoji-cache.ts";
+import { getCouponProduct, redeemCoupon } from "./coupon.client.ts";
 import {
   autocompleteCouponItems,
   createCouponComponentHandler,
@@ -25,6 +26,13 @@ vi.mock("@/shared/emojis/emoji-cache.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/emojis/emoji-cache.ts")>()),
   getEmojiByName: (name: string) => ({ name, id: "1551725274725359766", animated: false }),
   displayEmoji: (name: string) => `<:${name}:1551725274725359766>`,
+}));
+vi.mock("./coupon.client.ts", () => ({
+  redeemCoupon: vi.fn(),
+  getCouponProduct: vi.fn(async () => ({
+    productName: "Hunter reward",
+    productImageUrl: "https://example.com/coupon.webp",
+  })),
 }));
 const context = {} as CommandExecutionContext;
 const user = { id: "user" };
@@ -56,7 +64,7 @@ function actor(customId: string, modal = false) {
     deferUpdate: vi.fn(async () => {}),
     deleteReply: vi.fn(async () => {}),
     fields: {
-      getTextInputValue: vi.fn(() => "TESTCODE"),
+      getTextInputValue: vi.fn((name?: string): string => (name === "pid" ? " PID " : "TESTCODE")),
       getSelectedChannels: vi.fn(() => ({ first: () => target })),
     },
   };
@@ -167,7 +175,8 @@ describe("interactive coupon creation", () => {
   });
   it("opens code/channel entry with the current channel selected and allows publication without items", async () => {
     const { modal, submit } = await start();
-    expect(modal.components).toHaveLength(2);
+    expect(modal.components).toHaveLength(3);
+    expect(JSON.stringify(modal)).toContain('"custom_id":"pid"');
     expect(JSON.stringify(modal)).toContain(
       `"default_values":[{"id":"${target.id}","type":"channel"}]`,
     );
@@ -348,7 +357,10 @@ describe("interactive coupon creation", () => {
     const sent = JSON.stringify(target.send.mock.calls);
     expect(sent).toContain("Claim coupon");
     expect(sent).toContain(`${CLAIM_BUTTON_PREFIX}TESTCODE`);
-    expect(sent).toContain("https://cdn.discordapp.com/emojis/1556396384461262899.webp");
+    expect(sent).toContain("# Claim coupon\\n## Hunter reward");
+    expect(sent).toContain("https://example.com/coupon.webp");
+    expect(getCouponProduct).toHaveBeenCalledExactlyOnceWith("TESTCODE", "PID");
+    expect(sent).not.toContain("PID");
     expect(sent).not.toContain("Gold");
     expect(target.send).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -609,6 +621,16 @@ describe("interactive coupon creation", () => {
     expect(cancel.deleteReply).toHaveBeenCalledOnce();
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
     expect(target.send).not.toHaveBeenCalled();
+  });
+  it("does not publish or redeem when metadata fails and keeps the draft retryable", async () => {
+    const { token } = await start();
+    vi.mocked(getCouponProduct).mockRejectedValueOnce(new Error("Metadata unavailable"));
+    await expect(execute(actor(id("publish", token)))).rejects.toThrow("Metadata unavailable");
+    expect(target.send).not.toHaveBeenCalled();
+    expect(redeemCoupon).not.toHaveBeenCalled();
+    await execute(actor(id("publish", token)));
+    expect(getCouponProduct).toHaveBeenCalledWith("TESTCODE", "PID");
+    expect(target.send).toHaveBeenCalledOnce();
   });
   it("checks channel permissions and keeps failed drafts retryable", async () => {
     const { token } = await start();
