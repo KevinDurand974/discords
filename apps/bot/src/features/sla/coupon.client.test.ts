@@ -34,10 +34,14 @@ it("gives the coupon with POST and JSON body instead of query parameters", async
 });
 
 it.each([
+  null,
+  undefined,
+  { errorCode: 200 },
+  { errorCode: 200, resultData: null },
   { errorCode: 400 },
   { errorCode: 200, resultData: [] },
   { errorCode: 200, resultData: [{ quantity: 1 }] },
-])("rejects unavailable coupon metadata: %j", async (response) => {
+])("allows missing coupon metadata: %j", async (response) => {
   vi.mocked(ofetch).mockResolvedValue(response);
-  await expect(getCouponProduct("CODE", "PID")).rejects.toThrow("Couldn't load coupon details");
+  await expect(getCouponProduct("CODE", "PID")).resolves.toBeUndefined();
 });

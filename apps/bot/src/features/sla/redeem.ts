@@ -69,10 +69,15 @@ const redeem = async (interaction: ModalSubmitInteraction, couponCode: string, p
         new SectionBuilder()
           .addTextDisplayComponents(
             new TextDisplayBuilder().setContent(
-              `# Coupon redeemed.\n## ${escapeMarkdown(product.productName)}`,
+              `# Coupon redeemed.${product ? `\n## ${escapeMarkdown(product.productName)}` : ""}`,
             ),
           )
-          .setThumbnailAccessory(new ThumbnailBuilder().setURL(product.productImageUrl)),
+          .setThumbnailAccessory(
+            new ThumbnailBuilder().setURL(
+              product?.productImageUrl ??
+                "https://cdn.discordapp.com/emojis/1556396384461262899.webp",
+            ),
+          ),
       ),
     ],
   });

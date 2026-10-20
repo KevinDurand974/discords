@@ -1,5 +1,4 @@
 import { ofetch } from "ofetch";
-import { UserFacingError } from "@/core/errors.ts";
 
 const COUPON_API_URL = "https://coupon.netmarble.com/api/coupon";
 
@@ -28,14 +27,17 @@ export type CouponSuccess = {
 
 export type CouponResponse = CouponError | CouponSuccess;
 
-export async function getCouponProduct(couponCode: string, pid: string): Promise<CouponProduct> {
-  const data = await ofetch<CouponResponse>(`${COUPON_API_URL}/reward`, {
+export async function getCouponProduct(
+  couponCode: string,
+  pid: string,
+): Promise<CouponProduct | undefined> {
+  const data = await ofetch<CouponResponse | null | undefined>(`${COUPON_API_URL}/reward`, {
     query: { gameCode: "sololv", couponCode, langCd: "EN_US", pid },
     retry: 0,
   });
-  const product = "resultData" in data ? data.resultData[0] : undefined;
-  if (data.errorCode !== 200 || !product?.productName || !product.productImageUrl)
-    throw new UserFacingError("Couldn't load coupon details. Check the coupon code and try again.");
+  const product = data && "resultData" in data ? data.resultData?.[0] : undefined;
+  if (data?.errorCode !== 200 || !product?.productName || !product.productImageUrl)
+    return undefined;
   return { productName: product.productName, productImageUrl: product.productImageUrl };
 }
 

@@ -622,6 +622,18 @@ describe("interactive coupon creation", () => {
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
     expect(target.send).not.toHaveBeenCalled();
   });
+  it("publishes with the default image and no subtitle when metadata is missing", async () => {
+    const { token } = await start(["Gold"]);
+    vi.mocked(getCouponProduct).mockResolvedValueOnce(undefined);
+    await execute(actor(id("publish", token)));
+    const sent = JSON.stringify(target.send.mock.calls);
+    expect(sent).toContain("https://cdn.discordapp.com/emojis/1556396384461262899.webp");
+    expect(sent).toContain('"content":"# Claim coupon"');
+    expect(sent).not.toContain("Hunter reward");
+    expect(sent).toContain("Gold:1551725274725359766> x1");
+    expect(sent).toContain(`${CLAIM_BUTTON_PREFIX}TESTCODE`);
+    expect(redeemCoupon).not.toHaveBeenCalled();
+  });
   it("does not publish or redeem when metadata fails and keeps the draft retryable", async () => {
     const { token } = await start();
     vi.mocked(getCouponProduct).mockRejectedValueOnce(new Error("Metadata unavailable"));

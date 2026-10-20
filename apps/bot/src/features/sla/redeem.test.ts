@@ -91,6 +91,28 @@ describe("simplified /sla redeem", () => {
     expect(reply).toContain("https://example.com/reward.webp");
     expect(reply).not.toContain("embeds");
   });
+  it("still redeems with the default image and no subtitle when metadata is missing", async () => {
+    vi.mocked(getCouponProduct).mockResolvedValueOnce(undefined);
+    vi.mocked(redeemCoupon).mockResolvedValue({
+      errorCode: 200,
+      errorMessage: "SUCCESS",
+      resultData: [{ quantity: 1 }],
+      success: true,
+    });
+    const interaction = {
+      isModalSubmit: () => true,
+      fields: { getTextInputValue: (name: string) => (name === "coupon" ? "CODE" : "PID") },
+      deferReply: vi.fn(),
+      editReply: vi.fn(),
+      deleteReply: vi.fn(),
+    };
+    await redeemComponentHandler.execute(interaction as unknown as ComponentInteraction, context);
+    expect(redeemCoupon).toHaveBeenCalledExactlyOnceWith("CODE", "PID");
+    const reply = JSON.stringify(interaction.editReply.mock.calls);
+    expect(reply).toContain('"content":"# Coupon redeemed."');
+    expect(reply).toContain("https://cdn.discordapp.com/emojis/1556396384461262899.webp");
+    expect(reply).not.toContain("##");
+  });
   it("does not redeem when coupon metadata cannot be loaded", async () => {
     vi.mocked(getCouponProduct).mockRejectedValueOnce(new Error("Metadata unavailable"));
     const interaction = {
