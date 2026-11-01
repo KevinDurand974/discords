@@ -64,7 +64,10 @@ function actor(customId: string, modal = false) {
     deferUpdate: vi.fn(async () => {}),
     deleteReply: vi.fn(async () => {}),
     fields: {
-      getTextInputValue: vi.fn((name?: string): string => (name === "pid" ? " PID " : "TESTCODE")),
+      getTextInputValue: vi.fn((name?: string): string => {
+        if (name !== "code") throw new Error(`Unexpected creation field: ${name}`);
+        return "TESTCODE";
+      }),
       getSelectedChannels: vi.fn(() => ({ first: () => target })),
     },
   };
@@ -175,8 +178,9 @@ describe("interactive coupon creation", () => {
   });
   it("opens code/channel entry with the current channel selected and allows publication without items", async () => {
     const { modal, submit } = await start();
-    expect(modal.components).toHaveLength(3);
-    expect(JSON.stringify(modal)).toContain('"custom_id":"pid"');
+    expect(modal.components).toHaveLength(2);
+    expect(JSON.stringify(modal)).not.toContain('"custom_id":"pid"');
+    expect(submit.fields.getTextInputValue).toHaveBeenCalledExactlyOnceWith("code");
     expect(JSON.stringify(modal)).toContain(
       `"default_values":[{"id":"${target.id}","type":"channel"}]`,
     );
@@ -359,7 +363,11 @@ describe("interactive coupon creation", () => {
     expect(sent).toContain(`${CLAIM_BUTTON_PREFIX}TESTCODE`);
     expect(sent).toContain("# Claim coupon\\n## Hunter reward");
     expect(sent).toContain("https://example.com/coupon.webp");
-    expect(getCouponProduct).toHaveBeenCalledExactlyOnceWith("TESTCODE", "PID");
+    expect(getCouponProduct).toHaveBeenCalledExactlyOnceWith(
+      "TESTCODE",
+      "B28D7AC7B5E34A6CA8B06ED800653165",
+    );
+    expect(sent).not.toContain("B28D7AC7B5E34A6CA8B06ED800653165");
     expect(sent).not.toContain("PID");
     expect(sent).not.toContain("Gold");
     expect(target.send).toHaveBeenCalledWith(
@@ -641,7 +649,7 @@ describe("interactive coupon creation", () => {
     expect(target.send).not.toHaveBeenCalled();
     expect(redeemCoupon).not.toHaveBeenCalled();
     await execute(actor(id("publish", token)));
-    expect(getCouponProduct).toHaveBeenCalledWith("TESTCODE", "PID");
+    expect(getCouponProduct).toHaveBeenCalledWith("TESTCODE", "B28D7AC7B5E34A6CA8B06ED800653165");
     expect(target.send).toHaveBeenCalledOnce();
   });
   it("checks channel permissions and keeps failed drafts retryable", async () => {

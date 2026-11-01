@@ -76,6 +76,7 @@ type CouponItem = string;
 export type CouponReward = { item: CouponItem; quantity: number };
 const PREFIX = "sla:create-coupon:";
 const DRAFT_TTL_MS = 300_000;
+const COUPON_LOOKUP_PID = "B28D7AC7B5E34A6CA8B06ED800653165";
 const CHANNEL_TYPES = [
   ChannelType.GuildText,
   ChannelType.GuildAnnouncement,
@@ -89,7 +90,6 @@ type Draft = {
   guildId: string;
   expires: number;
   code: string;
-  pid: string;
   channelId: string;
   items: { index: number; item: CouponItem; quantity: number | null }[];
   page: number;
@@ -301,7 +301,6 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
     guildId: interaction.guildId,
     expires: Date.now() + DRAFT_TTL_MS,
     code: "",
-    pid: "",
     channelId: "",
     items,
     page: 0,
@@ -322,16 +321,6 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
             .setTextInputComponent(
               new TextInputBuilder()
                 .setCustomId("code")
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true)
-                .setMaxLength(80),
-            ),
-          new LabelBuilder()
-            .setLabel("PID")
-            .setDescription("Your player ID, used only to look up coupon details")
-            .setTextInputComponent(
-              new TextInputBuilder()
-                .setCustomId("pid")
                 .setStyle(TextInputStyle.Short)
                 .setRequired(true)
                 .setMaxLength(80),
@@ -376,7 +365,7 @@ async function publish(interaction: ButtonInteraction, token: string, draft: Dra
     });
     if (draft.availability.endsAt !== undefined && draft.availability.endsAt <= Date.now() / 1000)
       throw new UserFacingError("The expiry date has passed. Edit availability before publishing.");
-    const product = await getCouponProduct(draft.code, draft.pid);
+    const product = await getCouponProduct(draft.code, COUPON_LOOKUP_PID);
     await channel.send({
       components: [renderCouponCard(draft.code, rewards, draft.availability, product)],
       flags: MessageFlags.IsComponentsV2,
@@ -409,14 +398,11 @@ export const createCouponComponentHandler: ComponentHandler = {
     if (interaction.isModalSubmit()) {
       if (action === "start" && draft.stage === "start") {
         const code = validateCode(interaction.fields.getTextInputValue("code"));
-        const pid = interaction.fields.getTextInputValue("pid").trim();
-        if (!pid) throw new UserFacingError("Enter your player ID (Member code).");
         const channel = interaction.fields
           .getSelectedChannels("channel", true, CHANNEL_TYPES)
           .first();
         if (!channel) throw new UserFacingError("Select a channel for the coupon.");
         draft.code = code;
-        draft.pid = pid;
         draft.channelId = channel.id;
         draft.stage = "ready";
         await interaction.reply({

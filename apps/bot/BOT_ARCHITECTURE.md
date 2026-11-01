@@ -94,6 +94,8 @@ Each subcommand's options belong in its `addSubcommand` callback.
 
 A command may accept optional slash-command options while still requiring the information to execute. In that case, open one modal containing every missing value (or all required values prefilled with the options already supplied). Discord modals support up to five input fields, so `/sla redeem` collects both the coupon code and PID in one modal when either slash option is absent. The modal submit handler then performs the same redemption flow as the direct command path.
 
+Coupon creation is separate from redemption: `/sla create-coupon` collects only the coupon code and destination channel. `features/sla/create-coupon.ts` uses its fixed `COUPON_LOOKUP_PID` solely for the read-only product title/image lookup; it is not stored in drafts or published cards. Redemption and Claim continue to require the claiming player's own PID.
+
 ## Command interface
 
 The command interface remains deliberately small: callers only need a Discord command definition and its handler.
