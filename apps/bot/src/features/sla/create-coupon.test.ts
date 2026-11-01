@@ -254,7 +254,7 @@ describe("interactive coupon creation", () => {
       save.deferUpdate.mockImplementationOnce(async () => {
         if (reason === "cancelled") await execute(actor(id("cancel", token)));
         else if (reason === "removed") await execute(actor(id("remove-item-0", token)));
-        else vi.advanceTimersByTime(300_000);
+        else vi.advanceTimersByTime(600_000);
       });
       await expect(execute(save)).rejects.toThrow("unavailable");
       expect(save.editReply).not.toHaveBeenCalled();
@@ -284,7 +284,7 @@ describe("interactive coupon creation", () => {
     );
     const reply = JSON.stringify(submit.reply.mock.calls);
     expect(reply).toContain("Publish without items");
-    expect(reply).toContain("This draft expires after 5 minutes.");
+    expect(reply).toMatch(/This draft expires <t:\d+:R>\./);
     expect(reply).not.toContain("Add items");
     expect(reply).not.toContain(`"type":${ComponentType.StringSelect}`);
     expect(target.send).not.toHaveBeenCalled();
@@ -603,7 +603,7 @@ describe("interactive coupon creation", () => {
       save.fields.getTextInputValue.mockReturnValue("10");
       save.deferUpdate.mockImplementationOnce(async () => {
         if (reason === "cancelled") await execute(actor(id("cancel", token)));
-        else vi.advanceTimersByTime(300_000);
+        else vi.advanceTimersByTime(600_000);
       });
       await expect(execute(save)).rejects.toThrow("This form is unavailable");
       expect(save.editReply).not.toHaveBeenCalled();
@@ -664,7 +664,7 @@ describe("interactive coupon creation", () => {
     expect(card.type).toBe(ComponentType.Container);
     expect(JSON.stringify(card)).toContain(`${CLAIM_BUTTON_PREFIX}CODE-123`);
   });
-  it("rejects other users, other servers and the original five-minute deadline", async () => {
+  it("rejects other users, other servers and the original ten-minute deadline", async () => {
     vi.useFakeTimers();
     const { token } = await start(["Gold"]);
     const modal = await quantityModal(token);
@@ -674,8 +674,17 @@ describe("interactive coupon creation", () => {
     const otherGuild = actor(modal.custom_id, true);
     otherGuild.guildId = "other";
     await expect(execute(otherGuild)).rejects.toThrow("belongs to another user");
+    const deadline = Math.floor((Date.now() + 600_000) / 1000);
+    vi.advanceTimersByTime(300_000);
+    const halfway = await saveQuantity(token, "5");
+    expect(JSON.stringify(halfway.editReply.mock.calls)).toContain(
+      `This draft expires <t:${deadline}:R>.`,
+    );
     vi.advanceTimersByTime(299_999);
-    await saveQuantity(token, "10");
+    const lastEdit = await saveQuantity(token, "10");
+    expect(JSON.stringify(lastEdit.editReply.mock.calls)).toContain(
+      `This draft expires <t:${deadline}:R>.`,
+    );
     vi.advanceTimersByTime(1);
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
     expect(target.send).not.toHaveBeenCalled();

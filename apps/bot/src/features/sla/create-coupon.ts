@@ -69,7 +69,7 @@ export function normalizeCouponItem(value: string) {
 type CouponItem = string;
 export type CouponReward = { item: CouponItem; quantity: number };
 const PREFIX = "sla:create-coupon:";
-const DRAFT_TTL_MS = 300_000;
+const DRAFT_TTL_MS = 600_000;
 const COUPON_LOOKUP_PID = "B28D7AC7B5E34A6CA8B06ED800653165";
 const CHANNEL_TYPES = [
   ChannelType.GuildText,
@@ -196,7 +196,7 @@ function draftView(token: string, draft: Draft) {
   const missing = draft.items.length - configured;
   const card = new ContainerBuilder().addTextDisplayComponents(
     new TextDisplayBuilder().setContent(
-      `# Create coupon\n\`\`\`\n${draft.code}\n\`\`\`\nPost in <#${draft.channelId}>. ${configured}/${draft.items.length} quantities configured.\nThis draft expires after 5 minutes.`,
+      `# Create coupon\n\`\`\`\n${draft.code}\n\`\`\`\nPost in <#${draft.channelId}>. ${configured}/${draft.items.length} quantities configured.\nThis draft expires ${time(Math.floor(draft.expires / 1000), TimestampStyles.RelativeTime)}.`,
     ),
   );
   const dates = availabilityText(draft.availability);
