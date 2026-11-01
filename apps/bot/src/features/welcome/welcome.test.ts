@@ -408,6 +408,31 @@ describe("membership notifications", () => {
     f.guild.memberCount = 41;
     expect(renderWelcomeMessage("{memberCount} {user}", f.member, false)).toBe("41 User");
   });
+  it("uses the server display name for departures instead of the username", async () => {
+    const f = fixture();
+    Object.assign(f.member, { displayName: "Delima" });
+    Object.assign(f.member.user, { username: "delimaroyalty_", displayName: "Global name" });
+    await sendWelcomeMessage(f.member, false, f.store);
+    const payload = f.send.mock.calls[0]![0];
+    expect((payload.components![0] as ContainerBuilder).toJSON()).toMatchObject({
+      components: [{ type: 10, content: "Bye Delima from My server." }],
+    });
+    expect(payload.allowedMentions).toEqual({ parse: [], users: [] });
+    expect(renderWelcomeMessage("{user}", f.member, true)).toBe("<@member>");
+  });
+  it("falls back to the user's display name, username, then ID for partial departures", () => {
+    const f = fixture();
+    Object.assign(f.member.user, { displayName: "Delima" });
+    expect(renderWelcomeMessage("{user}", f.member, false)).toBe("Delima");
+    expect(renderWelcomeMessage("{user}", fixture().member, false)).toBe("User");
+    const partial = { id: "member", guild: f.guild } as unknown as GuildMember;
+    expect(renderWelcomeMessage("{user}", partial, false)).toBe("member");
+  });
+  it("escapes display names without expanding placeholders inside them", () => {
+    const f = fixture();
+    Object.assign(f.member, { displayName: "**{server}**" });
+    expect(renderWelcomeMessage("{user}", f.member, false)).toBe("\\*\\*{server}\\*\\*");
+  });
   it("does nothing for unconfigured servers or missing channels", async () => {
     const f = fixture();
     f.store.get.mockResolvedValueOnce(null as unknown as typeof settings);
