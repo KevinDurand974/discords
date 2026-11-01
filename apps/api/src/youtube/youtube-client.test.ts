@@ -1,11 +1,56 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseChannelInput } from "./channel-url.ts";
 import { createYoutubeClient } from "./youtube-client.ts";
 import { CHANNEL_ID, rssFixture } from "./fixtures.ts";
 
 const mockFetch = (body: string, status = 200) => vi.fn<typeof fetch>(async () => new Response(body, { status }));
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("YouTube source client", () => {
+  it.each(["google", "rss"] as const)("logs sanitized upstream HTTP failures for %s", async (source) => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = createYoutubeClient({ apiKey: "private-key", fetch: mockFetch("private response body", 502) });
+    const result = source === "google" ? client.resolve(parseChannelInput("@private-handle")) : client.feed(CHANNEL_ID);
+    await expect(result).rejects.toMatchObject({ code: "upstream_unavailable", status: 502 });
+    expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-upstream]", {
+      source,
+      upstream_status: 502,
+      error_code: "upstream_unavailable",
+      transport_code: null,
+      elapsed_ms: expect.any(Number),
+    });
+    const output = JSON.stringify(log.mock.calls);
+    for (const secret of ["private-key", "private response body", "@private-handle", CHANNEL_ID, "https://"])
+      expect(output).not.toContain(secret);
+  });
+  it.each(["ECONNRESET", "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "untrusted-private-value"])(
+    "logs only allowlisted transport codes: %s", async (code) => {
+      const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetcher = vi.fn<typeof fetch>(async () => {
+        throw new TypeError("secret URL key=private-key", { cause: Object.assign(new Error("secret"), { code }) });
+      });
+      const client = createYoutubeClient({ apiKey: "private-key", fetch: fetcher });
+      await expect(client.resolve(parseChannelInput("@creator"))).rejects.toMatchObject({ status: 502 });
+      expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-upstream]", expect.objectContaining({
+        source: "google", upstream_status: null, error_code: "upstream_unavailable",
+        transport_code: code === "untrusted-private-value" ? null : code,
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/secret|private-key|untrusted-private-value/);
+    },
+  );
+  it("logs timeouts with their sanitized error code and does not log successful requests", async () => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetcher = mockFetch(JSON.stringify({ items: [{ id: CHANNEL_ID }] }));
+    const client = createYoutubeClient({ apiKey: "private-key", fetch: fetcher });
+    await client.resolve(parseChannelInput("@creator"));
+    expect(log).not.toHaveBeenCalled();
+    fetcher.mockRejectedValueOnce(new DOMException("secret", "TimeoutError"));
+    await expect(client.resolve(parseChannelInput("@creator"))).rejects.toMatchObject({ code: "upstream_timeout" });
+    expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-upstream]", expect.objectContaining({
+      source: "google", upstream_status: null, error_code: "upstream_timeout", transport_code: null,
+    }));
+  });
   it("looks up handles using the Google contract and parses items[0].id", async () => {
     const fetcher = mockFetch(JSON.stringify({ items: [{ id: CHANNEL_ID }] }));
     const client = createYoutubeClient({ apiKey: "private-key", fetch: fetcher });

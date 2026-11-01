@@ -42,9 +42,11 @@ function parseEntry(value: unknown, channelId: string): YoutubeVideo {
   const href = text(link?.["@_href"]);
   if (!href) throw invalid();
   const url = new URL(href);
+  const matchesVideo = url.pathname === "/watch"
+    ? url.searchParams.get("v") === videoId
+    : url.pathname === `/shorts/${videoId}`;
   if (url.protocol !== "https:" || !["www.youtube.com", "youtube.com"].includes(url.hostname) ||
-      url.username || url.password || url.port || url.pathname !== "/watch" ||
-      url.searchParams.get("v") !== videoId) throw invalid();
+      url.username || url.password || url.port || !matchesVideo) throw invalid();
   const description = text(group["media:description"]);
   if (group["media:description"] !== undefined && description === undefined) throw invalid();
   return {

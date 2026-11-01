@@ -1,9 +1,10 @@
 import { createServer } from "node:http";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createVideosApi } from "./videos-api.ts";
 
 const servers: ReturnType<typeof createServer>[] = [];
 afterEach(async () => {
+  vi.restoreAllMocks();
   await Promise.all(
     servers.splice(0).map(
       (server) =>
@@ -26,6 +27,19 @@ async function failingApi(status: number, code?: string) {
   return createVideosApi(`http://127.0.0.1:${address.port}`, "private-token");
 }
 describe("YouTube API error reporting", () => {
+  it.each(["invalid_google_response", "invalid_feed", "private-api-key"])(
+    "logs a safe diagnostic for %s without exposing the response body",
+    async (code) => {
+      const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const api = await failingApi(502, code);
+      await expect(api.resolve("@creator")).rejects.toThrow();
+      expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-resolve-response]", {
+        status: 502,
+        error_code: code === "private-api-key" ? "unknown" : code,
+      });
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/private|credentials|@creator/);
+    },
+  );
   it("identifies service-token authentication failure without forwarding upstream text", async () => {
     const api = await failingApi(401);
     await expect(api.resolve("https://www.youtube.com/@heartfulharry2185")).rejects.toThrow(

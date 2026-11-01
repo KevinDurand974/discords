@@ -1,6 +1,24 @@
 import { UserFacingError } from "@/core/errors.ts";
 import { FetchError, ofetch } from "ofetch";
 
+const DIAGNOSTIC_CODES = new Set([
+  "invalid_feed",
+  "invalid_google_response",
+  "incomplete_feed",
+  "empty_response",
+  "response_too_large",
+  "upstream_unavailable",
+  "upstream_timeout",
+  "google_access_denied",
+  "missing_api_key",
+  "channel_not_found",
+  "invalid_channel_id",
+  "storage_unavailable",
+  "channel_busy",
+  "source_conflict",
+  "invalid_parameters",
+]);
+
 function resolutionError(error: unknown): string {
   if (error instanceof FetchError) {
     if (error.statusCode === 401)
@@ -50,6 +68,12 @@ export function createVideosApi(base: string, token: string | undefined) {
           throw new Error("Invalid response");
         return result;
       } catch (error) {
+        const code: unknown = error instanceof FetchError ? error.data?.code : undefined;
+        // TEMPORARY: log only known API codes, never raw response bodies or credentials.
+        console.warn("[DEBUG-youtube-resolve-response]", {
+          status: error instanceof FetchError ? (error.statusCode ?? null) : null,
+          error_code: typeof code === "string" && DIAGNOSTIC_CODES.has(code) ? code : "unknown",
+        });
         throw new UserFacingError(resolutionError(error), { cause: error });
       }
     },

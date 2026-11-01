@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Elysia } from "elysia";
 import { node } from "@elysiajs/node";
 import { createYoutubeApp } from "./youtube.ts";
@@ -27,7 +27,27 @@ const post = (token?: string, body?: unknown): RequestInit => ({
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 
+afterEach(() => vi.restoreAllMocks());
+
 describe("YouTube API contracts", () => {
+  it.each(["invalid_google_response", "invalid_feed"])("logs post-fetch resolution errors: %s", async (code) => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { ingestion, send } = setup();
+    vi.mocked(ingestion.resolve).mockRejectedValue(new YoutubeError(code, "private upstream body"));
+    const result = await send("/internal/youtube/channels/resolve", post("bot-token", { channelUrl: "@creator" }));
+    expect(result.status).toBe(502);
+    expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-resolve]", { error_code: code, status: 502 });
+    expect(JSON.stringify(log.mock.calls)).not.toMatch(/private|bot-token|@creator/);
+  });
+  it("logs unexpected resolution failures without exposing raw errors", async () => {
+    const log = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { ingestion, send } = setup();
+    vi.mocked(ingestion.resolve).mockRejectedValue(new Error("SQL password=secret"));
+    const result = await send("/internal/youtube/channels/resolve", post("bot-token", { channelUrl: "@creator" }));
+    expect(result.status).toBe(503);
+    expect(log).toHaveBeenCalledExactlyOnceWith("[DEBUG-youtube-resolve]", { error_code: "internal_error", status: 503 });
+    expect(JSON.stringify(log.mock.calls)).not.toContain("secret");
+  });
   it("exposes public source-only reads and validates bounded parameters", async () => {
     const { reader, send } = setup();
     const result = await send(`/v1/youtube/channels/${CHANNEL_ID}`);

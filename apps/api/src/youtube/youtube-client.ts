@@ -7,6 +7,22 @@ export type YoutubeClientOptions = {
   timeoutMs?: number;
 };
 
+const TRANSPORT_CODES = new Set([
+  "ECONNRESET", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ETIMEDOUT",
+  "CERT_HAS_EXPIRED", "DEPTH_ZERO_SELF_SIGNED_CERT", "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE", "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "ERR_TLS_CERT_ALTNAME_INVALID", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET",
+]);
+function transportCode(error: unknown): string | null {
+  for (let depth = 0; depth < 3; depth++) {
+    if (!error || typeof error !== "object") return null;
+    if ("code" in error && typeof error.code === "string" && TRANSPORT_CODES.has(error.code))
+      return error.code;
+    error = "cause" in error ? error.cause : undefined;
+  }
+  return null;
+}
+
 async function readBounded(response: Response, maxBytes: number): Promise<string> {
   const length = Number(response.headers.get("content-length"));
   if (Number.isFinite(length) && length > maxBytes) {
@@ -38,12 +54,15 @@ async function readBounded(response: Response, maxBytes: number): Promise<string
 export function createYoutubeClient(options: YoutubeClientOptions = {}): YoutubeClient {
   const fetcher = options.fetch ?? globalThis.fetch;
   async function request(url: URL, maxBytes: number, source: "google" | "rss") {
+    const startedAt = performance.now();
+    let upstreamStatus: number | null = null;
     try {
       const response = await fetcher(url, {
         signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
         redirect: "error",
         headers: { Accept: source === "rss" ? "application/atom+xml, application/xml" : "application/json" },
       });
+      upstreamStatus = response.status;
       if (!response.ok) await response.body?.cancel();
       if (response.status === 404 && source === "rss")
         throw new YoutubeError("channel_not_found", "YouTube channel feed not found.", 404);
@@ -53,11 +72,19 @@ export function createYoutubeClient(options: YoutubeClientOptions = {}): Youtube
         throw new YoutubeError("upstream_unavailable", "YouTube is temporarily unavailable.", 502);
       return await readBounded(response, maxBytes);
     } catch (error) {
-      if (error instanceof YoutubeError) throw error;
-      // Never forward errors/cause/request URLs: Google URLs contain the API key.
-      if (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name))
-        throw new YoutubeError("upstream_timeout", "YouTube request timed out.", 503);
-      throw new YoutubeError("upstream_unavailable", "YouTube request failed.", 502);
+      const failure = error instanceof YoutubeError ? error
+        : error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)
+          ? new YoutubeError("upstream_timeout", "YouTube request timed out.", 503)
+          : new YoutubeError("upstream_unavailable", "YouTube request failed.", 502);
+      // TEMPORARY: never log raw errors, URLs or bodies; upstream errors can contain the API key.
+      console.warn("[DEBUG-youtube-upstream]", {
+        source,
+        upstream_status: upstreamStatus,
+        error_code: failure.code,
+        transport_code: transportCode(error),
+        elapsed_ms: Math.round(performance.now() - startedAt),
+      });
+      throw failure;
     }
   }
   return {
