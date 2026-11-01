@@ -1,0 +1,2 @@
+ALTER TABLE "youtube_forum_settings" ADD COLUMN "creator_list_thread_id" varchar(20);--> statement-breakpoint
+ALTER TABLE "youtube_forum_settings" ADD COLUMN "creator_list_pinned" boolean DEFAULT false NOT NULL;

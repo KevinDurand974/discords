@@ -34,6 +34,7 @@ const runtime = vi.hoisted(() => ({
   add: vi.fn(),
   clean: vi.fn(),
   sync: vi.fn(),
+  list: vi.fn(),
   creatorTags: vi.fn(),
 }));
 vi.mock("./videos-runtime.ts", () => ({ createVideosRuntime: () => runtime }));
@@ -120,6 +121,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "setup",
       "clean",
       "add",
+      "list",
       "status",
       "sync",
     ]);
@@ -161,6 +163,30 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     expect(runtime.setup).toHaveBeenCalledWith("guild");
     expect(runtime.add).not.toHaveBeenCalled();
   });
+  it("registers an optional pin boolean for the creator list", () => {
+    expect(youtubeCommand.data.toJSON().options).toContainEqual(
+      expect.objectContaining({
+        name: "list",
+        options: [expect.objectContaining({ name: "pin", type: 5, required: false })],
+      }),
+    );
+  });
+  it.each([null, false, true])("publishes the creator list with pin=%s", async (pin) => {
+    runtime.list.mockResolvedValue({ id: "list-thread" });
+    const editReply = vi.fn();
+    const deferReply = vi.fn();
+    await youtubeCommand.execute({
+      ...actor([P.ManageMessages]),
+      options: { getSubcommand: () => "list", getBoolean: () => pin },
+      deferReply,
+      editReply,
+    } as unknown as ChatInputCommandInteraction);
+    expect(deferReply).toHaveBeenCalledWith({ flags: 64 });
+    expect(runtime.list).toHaveBeenCalledWith("guild", pin ?? false);
+    expect(editReply).toHaveBeenCalledWith(
+      expect.objectContaining({ content: "Creator list updated: <#list-thread>." }),
+    );
+  });
   it("requires Manage Channels for setup", async () => {
     await expect(
       youtubeCommand.execute({
@@ -176,6 +202,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     { action: "clean", permissions: [P.ManageMessages], error: "administrator" },
     { action: "add", permissions: [P.ManageChannels], error: "Manage Messages" },
     { action: "status", permissions: [], error: "Manage Messages" },
+    { action: "list", permissions: [], error: "Manage Messages" },
     { action: "sync", permissions: [], error: "Manage Messages" },
   ])(
     "rejects unauthorized /youtube $action before side effects",

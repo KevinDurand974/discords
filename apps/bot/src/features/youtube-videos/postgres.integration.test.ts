@@ -47,7 +47,7 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
       Array.from({ length: 10 }, (_, index) => id(index + 6)),
       1,
     );
-    expect(await second!.counts("yt-main")).toContain("excluded: 5");
+    expect(await second!.counts("yt-main")).toContain("Other videos: 5");
     const pending = await second!.pending("yt-main");
     expect(pending).toHaveLength(10);
     expect(pending[0]!.video.videoId).toBe(id(6));
@@ -61,7 +61,7 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
     });
     await store!.published(pending[0]!.intent, "yt-thread-6");
     await store!.published(pending[0]!.intent, "yt-thread-6");
-    expect(await store!.counts("yt-main")).toContain("published: 1");
+    expect(await store!.counts("yt-main")).toContain("Published: 1");
     await store!.enqueue("yt-main", 1);
     expect(await store!.pending("yt-main")).toHaveLength(9);
   });
@@ -86,7 +86,7 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
       (await second!.subscriptions("yt-main"))[0]!.subscription.initialImportCompletedAt,
     ).toBeInstanceOf(Date);
     expect(await second!.pending("yt-main")).toHaveLength(1);
-    expect(await second!.counts("yt-main")).toContain("excluded: 5");
+    expect(await second!.counts("yt-main")).toContain("Other videos: 5");
   });
   it("serializes setup/publication/cleanup across processes and releases locks on failure", async () => {
     await store!.withGuild("yt-main", async () => {
@@ -149,6 +149,17 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
     ]);
     await store!.remove("yt-clean");
   });
+  it("persists the creator list across connections with unpinned defaults", async () => {
+    expect(await second!.get("yt-main")).toMatchObject({
+      creatorListThreadId: null,
+      creatorListPinned: false,
+    });
+    await store!.setCreatorList("yt-main", "yt-list-thread", true);
+    expect(await second!.get("yt-main")).toMatchObject({
+      creatorListThreadId: "yt-list-thread",
+      creatorListPinned: true,
+    });
+  });
   it("recreates missing Forums with fresh mappings and cleans only the target guild", async () => {
     await store!.createSettings("yt-other");
     await store!.setForum("yt-other", "yt-other-forum", 1);
@@ -159,6 +170,8 @@ describe.skipIf(!url)("YouTube Discord persistence", () => {
       lifecycle: "disabled",
       forumChannelId: null,
       forumGeneration: 2,
+      creatorListThreadId: null,
+      creatorListPinned: false,
     });
     expect(await store!.pending("yt-main")).toEqual([]);
     await store!.setForum("yt-main", "yt-new-forum", 2);

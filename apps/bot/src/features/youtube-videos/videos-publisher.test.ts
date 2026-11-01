@@ -21,6 +21,8 @@ const setup: ForumSettings = {
   lifecycle: "active",
   ownsForum: true,
   lastPublishedAt: null,
+  creatorListThreadId: null,
+  creatorListPinned: false,
 };
 const intent: Intent = {
   guildId: "guild",

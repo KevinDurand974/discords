@@ -14,6 +14,8 @@ const discord = vi.hoisted(() => ({
   deleteVideoPosts: vi.fn(),
 }));
 vi.mock("./videos-discord.ts", () => discord);
+const lists = vi.hoisted(() => ({ updateCreatorList: vi.fn(), deleteCreatorList: vi.fn() }));
+vi.mock("./creator-list.ts", () => lists);
 beforeEach(() => {
   vi.resetAllMocks();
 });
@@ -29,6 +31,8 @@ function fixture(ownsForum = true) {
     ownsForum,
     lifecycle: "active",
     lastPublishedAt: null,
+    creatorListThreadId: null,
+    creatorListPinned: false,
   };
   const forum = {
     id: "forum",
@@ -42,7 +46,7 @@ function fixture(ownsForum = true) {
     setAvailableTags: vi.fn(),
   };
   const store = {
-    get: vi.fn(async () => setup),
+    get: vi.fn(async (_guildId?: string) => setup),
     withGuild: vi.fn(async (_id: string, work: () => Promise<unknown>) => work()),
     createSettings: vi.fn(async () => {
       setup ??= {
@@ -52,6 +56,8 @@ function fixture(ownsForum = true) {
         lifecycle: "disabled",
         ownsForum: true,
         lastPublishedAt: null,
+        creatorListThreadId: null,
+        creatorListPinned: false,
       };
     }),
     setForum: vi.fn(async (_id: string, id: string, generation: number, owned = true) => {
@@ -96,6 +102,10 @@ function fixture(ownsForum = true) {
   const runtime = buildVideosRuntime(client, store as unknown as VideosRepository, api);
   return {
     runtime,
+    enableList: () => {
+      setup!.creatorListThreadId = "list-thread";
+      setup!.creatorListPinned = true;
+    },
     store,
     forum,
     api,
@@ -205,6 +215,94 @@ describe("single-Forum setup and scoped YouTube cleanup", () => {
     expect(store.excludeVideos).not.toHaveBeenCalled();
     await runtime.clean("guild", "forum", 1, "videos", "tag-a");
     expect(store.excludeVideos).toHaveBeenCalledWith("guild", "creator-a");
+  });
+  it("creates a list only on request, with pinning disabled by default", async () => {
+    const { runtime, store, forum } = fixture();
+    await runtime.list("guild");
+    expect(lists.updateCreatorList).toHaveBeenCalledWith(
+      forum,
+      await store.get("guild"),
+      store,
+      false,
+    );
+    await runtime.list("guild", true);
+    expect(lists.updateCreatorList).toHaveBeenLastCalledWith(
+      forum,
+      await store.get("guild"),
+      store,
+      true,
+    );
+    expect(store.withGuild).toHaveBeenCalled();
+  });
+  it("does not create a creator list implicitly when adding", async () => {
+    const { runtime } = fixture();
+    await runtime.add("guild", "@creator", 0, "forum");
+    expect(lists.updateCreatorList).not.toHaveBeenCalled();
+  });
+  it("refreshes an existing list after adding a creator and on sync", async () => {
+    const { runtime, store, forum, enableList } = fixture();
+    enableList();
+    store.subscriptions.mockResolvedValue([]);
+    await runtime.add("guild", "@creator", 0, "forum");
+    expect(store.subscribe).toHaveBeenCalled();
+    expect(lists.updateCreatorList).toHaveBeenCalledWith(forum, await store.get("guild"), store);
+    expect(store.subscribe.mock.invocationCallOrder[0]).toBeLessThan(
+      lists.updateCreatorList.mock.invocationCallOrder[0]!,
+    );
+    await runtime.sync("guild");
+    expect(lists.updateCreatorList).toHaveBeenCalledTimes(2);
+  });
+  it("reports list failures without blocking video publication", async () => {
+    const { runtime, store, enableList } = fixture();
+    enableList();
+    lists.updateCreatorList.mockRejectedValueOnce(new Error("pin denied"));
+    const result = await runtime.sync("guild");
+    expect(store.completeInitial).toHaveBeenCalledWith("guild");
+    expect(result).toMatchObject({ listFailed: true });
+  });
+  it("refreshes the list after removing a creator but not after videos-only cleanup", async () => {
+    const { runtime, store, enableList } = fixture();
+    enableList();
+    await runtime.clean("guild", "forum", 1, "videos", "tag-a");
+    expect(lists.updateCreatorList).not.toHaveBeenCalled();
+    await runtime.clean("guild", "forum", 1, "resources", "tag-a");
+    expect(lists.updateCreatorList).toHaveBeenCalledOnce();
+    expect(store.removeCreator.mock.invocationCallOrder[0]).toBeLessThan(
+      lists.updateCreatorList.mock.invocationCallOrder[0]!,
+    );
+  });
+  it("removes the list during full cleanup of a user-owned Forum", async () => {
+    const { runtime, forum, store, enableList } = fixture(false);
+    enableList();
+    await runtime.clean("guild", "forum", 1, "resources");
+    expect(lists.deleteCreatorList).toHaveBeenCalledWith(
+      forum,
+      expect.objectContaining({ creatorListThreadId: "list-thread" }),
+    );
+    expect(store.remove).toHaveBeenCalledWith("guild");
+  });
+  it("reports a list update failure without rolling back a removed creator", async () => {
+    const { runtime, store, enableList } = fixture();
+    enableList();
+    lists.updateCreatorList.mockRejectedValueOnce(new Error("Discord offline"));
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await expect(runtime.clean("guild", "forum", 1, "resources", "tag-a")).rejects.toThrow(
+        "run /youtube list",
+      );
+      expect(store.removeCreator).toHaveBeenCalledWith("guild", "creator-a");
+      expect((await store.get())?.lifecycle).toBe("active");
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it("rejects list publication when setup is missing or cleanup is in progress", async () => {
+    const { runtime, clearSetup, store } = fixture();
+    await store.cleaning();
+    await expect(runtime.list("guild")).rejects.toThrow("finish /youtube clean");
+    clearSetup();
+    await expect(runtime.list("guild")).rejects.toThrow("/youtube setup");
+    expect(lists.updateCreatorList).not.toHaveBeenCalled();
   });
   it("offers saved creator tag IDs for recovery even after a tag is removed", async () => {
     const { runtime, forum } = fixture();

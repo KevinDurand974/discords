@@ -71,6 +71,8 @@ export const youtubeForumSettings = pgTable("youtube_forum_settings", {
   lifecycle: text("lifecycle").notNull().default("disabled"),
   ownsForum: boolean("owns_forum").notNull().default(true),
   lastPublishedAt: timestamp("last_published_at", { withTimezone: true }),
+  creatorListThreadId: varchar("creator_list_thread_id", { length: 20 }),
+  creatorListPinned: boolean("creator_list_pinned").notNull().default(false),
 }, (table) => [
   check("youtube_forum_settings_generation_check", sql`${table.forumGeneration} > 0`),
   check("youtube_forum_settings_lifecycle_check", sql`${table.lifecycle} IN ('active', 'disabled', 'cleaning')`),

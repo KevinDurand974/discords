@@ -66,6 +66,12 @@ export function createVideosRepository(url: string) {
         .set({ forumChannelId, forumGeneration: generation, ownsForum, lifecycle: "active" })
         .where(scope(guildId));
     },
+    async setCreatorList(guildId: string, threadId: string, pinned: boolean) {
+      await db
+        .update(settings)
+        .set({ creatorListThreadId: threadId, creatorListPinned: pinned })
+        .where(scope(guildId));
+    },
     async resetForum(guildId: string) {
       await db.transaction(async (tx) => {
         await tx.delete(publications).where(eq(publications.guildId, guildId));
@@ -78,6 +84,8 @@ export function createVideosRepository(url: string) {
           .update(settings)
           .set({
             forumChannelId: null,
+            creatorListThreadId: null,
+            creatorListPinned: false,
             lifecycle: "disabled",
             forumGeneration: sql`${settings.forumGeneration} + 1`,
           })
