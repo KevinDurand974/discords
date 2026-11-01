@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { afterAll, describe, expect, it } from "vitest";
 import { createDatabase } from "@discords/db";
+import { UserFacingError } from "@/core/errors.ts";
 import { createTicketClosureRepository } from "./ticket-closure-repository.ts";
 
 const url = process.env.TEST_DATABASE_URL;
@@ -37,11 +38,17 @@ describe.skipIf(!url)("PostgreSQL ticket closures", () => {
     expect((await reader!.due()).map((row) => row.channelId)).not.toContain(channelId);
   });
 
-  it("rejects a different owner rather than reassigning a pending ticket closure", async () => {
-    await expect(reader!.schedule({ ...request, ownerId: "456789012345678901" })).rejects.toThrow(
-      "closure record changed",
-    );
-  });
+  it.each([{ ownerId: "456789012345678901" }, { guildId: "456789012345678901" }])(
+    "rejects mismatched ticket identity without changing the pending closure: %j",
+    async (change) => {
+      const before = await writer!.get(channelId);
+      expect(before).not.toBeNull();
+      await expect(reader!.schedule({ ...request, ...change })).rejects.toThrow(
+        new UserFacingError("Couldn't schedule this ticket's closure. Run /close-ticket again."),
+      );
+      expect(await writer!.get(channelId)).toEqual(before);
+    },
+  );
 
   it("only processes deadlines that have elapsed and survives a new connection", async () => {
     await database!.pool.query(
