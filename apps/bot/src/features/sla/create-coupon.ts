@@ -40,7 +40,6 @@ import { getCouponProduct, type CouponProduct } from "./coupon.client.ts";
 const itemEntries = Object.entries(couponItems).sort(([left], [right]) =>
   left.localeCompare(right, "en"),
 );
-export const COUPON_ITEMS = itemEntries.map(([, emojiName]) => emojiName);
 const itemLabels = new Map<string, string>(
   itemEntries.map(([label, emojiName]) => [emojiName, label]),
 );
@@ -59,18 +58,13 @@ function rewardIcon(item: string) {
 function rewardLabel(item: string) {
   return escapeMarkdown(itemLabels.get(item) ?? item);
 }
-export function autocompleteCouponItems(query: string, excludedItems: readonly string[] = []) {
-  const search = query.trim().toLowerCase().replaceAll("_", " ");
-  const excluded = new Set(excludedItems);
-  return itemEntries
-    .filter(
-      ([label, emojiName]) =>
-        !excluded.has(emojiName) &&
-        (label.toLowerCase().includes(search) ||
-          emojiName.toLowerCase().replaceAll("_", " ").includes(search)),
-    )
-    .slice(0, 25)
-    .map(([name, value]) => ({ name, value }));
+export function normalizeCouponItem(value: string) {
+  const item = validateItem(value);
+  const key = (name: string) => name.toLowerCase().replaceAll("_", " ").replace(/\s+/g, " ");
+  return (
+    itemEntries.find(([label, name]) => key(label) === key(item) || key(name) === key(item))?.[1] ??
+    item
+  );
 }
 type CouponItem = string;
 export type CouponReward = { item: CouponItem; quantity: number };
@@ -96,6 +90,8 @@ type Draft = {
   stage: "start" | "ready" | "publishing";
   revision: number;
   quantityForm: { index: number; revision: number } | null;
+  itemForm: { index: number | null; revision: number } | null;
+  nextItemIndex: number;
   availability: CouponAvailability;
   availabilityForm: number | null;
 };
@@ -226,23 +222,22 @@ function draftView(token: string, draft: Draft) {
             : "All quantities are set. You can edit them or publish the coupon.",
         ),
       );
-    for (const { index, item, quantity } of draft.items.slice(draft.page * 4, draft.page * 4 + 4)) {
-      card.addSectionComponents(
-        new SectionBuilder()
-          .addTextDisplayComponents(
-            new TextDisplayBuilder().setContent(
-              `**Item ${index + 1}** — ${rewardIcon(item)} ${rewardLabel(item)}${quantity === null ? " — Quantity required" : ` x${Intl.NumberFormat("en-US").format(quantity)}`}`,
-            ),
-          )
-          .setButtonAccessory(
-            button(
-              token,
-              `quantity-${index}`,
-              quantity === null ? "Set quantity" : "Edit quantity",
-              ButtonStyle.Primary,
-            ),
+    for (const [offset, { index, item, quantity }] of draft.items
+      .slice(draft.page * 4, draft.page * 4 + 4)
+      .entries()) {
+      card
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `**Item ${draft.page * 4 + offset + 1}** — ${rewardIcon(item)} ${rewardLabel(item)}${quantity === null ? " — Quantity required" : ` x${Intl.NumberFormat("en-US").format(quantity)}`}`,
           ),
-      );
+        )
+        .addActionRowComponents(
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            button(token, `edit-item-${index}`, "Edit item", ButtonStyle.Primary),
+            button(token, `quantity-${index}`, "Quantity"),
+            button(token, `remove-item-${index}`, "Remove item", ButtonStyle.Danger),
+          ),
+        );
     }
   }
   const controls = new ActionRowBuilder<ButtonBuilder>();
@@ -251,6 +246,7 @@ function draftView(token: string, draft: Draft) {
       button(token, "page", draft.page === 0 ? "Next items" : "Previous items"),
     );
   controls.addComponents(
+    button(token, "add-item", "Add item", ButtonStyle.Primary).setDisabled(draft.items.length >= 8),
     button(
       token,
       "publish",
@@ -275,15 +271,6 @@ async function confirmCoupon(interaction: ButtonInteraction, content: string) {
 }
 export async function handleCreateCoupon(interaction: ChatInputCommandInteraction) {
   assertGuild(interaction);
-  const items: Draft["items"] = [];
-  for (let index = 0; index < 8; index++) {
-    const value = interaction.options.getString(`item_${index + 1}`);
-    if (value === null) continue;
-    const item = validateItem(value);
-    if (items.some((selected) => selected.item === item))
-      throw new UserFacingError("Choose each coupon item only once.");
-    items.push({ index, item, quantity: 1 });
-  }
   drafts.forEach((draft, token) => {
     if (draft.expires <= Date.now()) drafts.delete(token);
   });
@@ -302,11 +289,13 @@ export async function handleCreateCoupon(interaction: ChatInputCommandInteractio
     expires: Date.now() + DRAFT_TTL_MS,
     code: "",
     channelId: "",
-    items,
+    items: [],
     page: 0,
     stage: "start",
     revision: 0,
     quantityForm: null,
+    itemForm: null,
+    nextItemIndex: 0,
     availability: {},
     availabilityForm: null,
   });
@@ -436,7 +425,59 @@ export const createCouponComponentHandler: ComponentHandler = {
         await interaction.editReply(draftView(token!, draft));
         return;
       }
-      const match = /^quantity-([0-7])-(\d+)$/.exec(action ?? "");
+      const itemMatch = /^item-(add|\d+)-(\d+)$/.exec(action ?? "");
+      const itemForm = draft.itemForm;
+      if (
+        itemMatch &&
+        draft.stage === "ready" &&
+        itemForm &&
+        itemForm.index === (itemMatch[1] === "add" ? null : Number(itemMatch[1])) &&
+        itemForm.revision === Number(itemMatch[2])
+      ) {
+        const item = normalizeCouponItem(interaction.fields.getTextInputValue("item"));
+        const quantity = interaction.fields.getTextInputValue("quantity").trim() || "1";
+        const reward = parseCouponReward(item, quantity)!;
+        const validateChange = () => {
+          if (
+            draft.items.some(
+              (entry) =>
+                entry.index !== itemForm.index && entry.item.toLowerCase() === item.toLowerCase(),
+            )
+          )
+            throw new UserFacingError("Choose each coupon item only once.");
+          if (itemForm.index === null && draft.items.length >= 8)
+            throw new UserFacingError("A coupon can contain at most eight items.");
+          if (
+            itemForm.index !== null &&
+            !draft.items.some((entry) => entry.index === itemForm.index)
+          )
+            throw new UserFacingError("This item was removed. Open a new item form.");
+        };
+        validateChange();
+        await interaction.deferUpdate();
+        if (
+          drafts.get(token!) !== draft ||
+          draft.expires <= Date.now() ||
+          draft.stage !== "ready" ||
+          draft.itemForm !== itemForm
+        )
+          throw new UserFacingError("This form is unavailable. Run /sla create-coupon again.");
+        validateChange();
+        if (itemForm.index === null) {
+          draft.items.push({ index: draft.nextItemIndex++, ...reward });
+          draft.page = Math.floor((draft.items.length - 1) / 4);
+        } else {
+          Object.assign(
+            draft.items.find((entry) => entry.index === itemForm.index)!,
+            reward,
+          );
+        }
+        draft.itemForm = null;
+        draft.quantityForm = null;
+        await interaction.editReply(draftView(token!, draft));
+        return;
+      }
+      const match = /^quantity-(\d+)-(\d+)$/.exec(action ?? "");
       const form = draft.quantityForm;
       if (
         match &&
@@ -445,7 +486,8 @@ export const createCouponComponentHandler: ComponentHandler = {
         form.index === Number(match[1]) &&
         form.revision === Number(match[2])
       ) {
-        const item = draft.items.find(({ index }) => index === form.index)!;
+        const item = draft.items.find(({ index }) => index === form.index);
+        if (!item) throw new UserFacingError("This item was removed. Open a new quantity form.");
         const reward = parseCouponReward(
           item.item,
           interaction.fields.getTextInputValue("quantity"),
@@ -460,6 +502,7 @@ export const createCouponComponentHandler: ComponentHandler = {
           throw new UserFacingError("This form is unavailable. Run /sla create-coupon again.");
         item.quantity = reward.quantity;
         draft.quantityForm = null;
+        draft.itemForm = null;
         await interaction.editReply(draftView(token!, draft));
         return;
       }
@@ -511,7 +554,64 @@ export const createCouponComponentHandler: ComponentHandler = {
         }
         return;
       }
-      const match = /^quantity-([0-7])$/.exec(action ?? "");
+      const remove = /^remove-item-(\d+)$/.exec(action ?? "");
+      if (remove && draft.stage === "ready") {
+        const index = Number(remove[1]);
+        if (!draft.items.some((entry) => entry.index === index))
+          throw new UserFacingError("This item was already removed.");
+        await interaction.deferUpdate();
+        if (drafts.get(token!) !== draft || draft.expires <= Date.now() || draft.stage !== "ready")
+          throw new UserFacingError("This draft is unavailable. Run /sla create-coupon again.");
+        draft.items = draft.items.filter((entry) => entry.index !== index);
+        draft.page = Math.min(draft.page, Math.max(0, Math.ceil(draft.items.length / 4) - 1));
+        draft.itemForm = null;
+        draft.quantityForm = null;
+        await interaction.editReply(draftView(token!, draft));
+        return;
+      }
+      const editItem = /^edit-item-(\d+)$/.exec(action ?? "");
+      if ((action === "add-item" || editItem) && draft.stage === "ready") {
+        const item = editItem
+          ? draft.items.find((entry) => entry.index === Number(editItem[1]))
+          : undefined;
+        if (editItem && !item) throw new UserFacingError("This item was removed.");
+        if (!editItem && draft.items.length >= 8)
+          throw new UserFacingError("A coupon can contain at most eight items.");
+        const form = { index: item?.index ?? null, revision: ++draft.revision };
+        const nameInput = new TextInputBuilder()
+          .setCustomId("item")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(true)
+          .setMaxLength(100)
+          .setPlaceholder("Catalog name (e.g. Gold) or a custom item name");
+        if (item) nameInput.setValue(itemLabels.get(item.item) ?? item.item);
+        const quantityInput = new TextInputBuilder()
+          .setCustomId("quantity")
+          .setStyle(TextInputStyle.Short)
+          .setRequired(false)
+          .setMaxLength(16)
+          .setValue(String(item?.quantity ?? 1));
+        draft.itemForm = form;
+        try {
+          await interaction.showModal(
+            new ModalBuilder()
+              .setCustomId(`${PREFIX}item-${form.index ?? "add"}-${form.revision}:${token}`)
+              .setTitle(item ? "Edit coupon item" : "Add coupon item")
+              .addLabelComponents(
+                new LabelBuilder().setLabel("Item name").setTextInputComponent(nameInput),
+                new LabelBuilder()
+                  .setLabel("Quantity")
+                  .setDescription("Positive whole number; blank defaults to 1")
+                  .setTextInputComponent(quantityInput),
+              ),
+          );
+        } catch (error) {
+          if (draft.itemForm === form) draft.itemForm = null;
+          throw error;
+        }
+        return;
+      }
+      const match = /^quantity-(\d+)$/.exec(action ?? "");
       const item = match ? draft.items.find(({ index }) => index === Number(match[1])) : undefined;
       if (item && draft.stage === "ready") {
         const revision = ++draft.revision;
@@ -523,18 +623,24 @@ export const createCouponComponentHandler: ComponentHandler = {
           .setMaxLength(16)
           .setPlaceholder("Positive whole number, e.g. 1000");
         if (item.quantity !== null) quantity.setValue(String(item.quantity));
-        await interaction.showModal(
-          new ModalBuilder()
-            .setCustomId(`${PREFIX}quantity-${item.index}-${revision}:${token}`)
-            .setTitle(`Item ${item.index + 1} quantity`)
-            .addLabelComponents(
-              new LabelBuilder()
-                .setLabel("Quantity")
-                .setDescription(itemLabels.get(item.item) ?? item.item)
-                .setTextInputComponent(quantity),
-            ),
-        );
-        draft.quantityForm = { index: item.index, revision };
+        const form = { index: item.index, revision };
+        draft.quantityForm = form;
+        try {
+          await interaction.showModal(
+            new ModalBuilder()
+              .setCustomId(`${PREFIX}quantity-${item.index}-${revision}:${token}`)
+              .setTitle(`Item ${draft.items.indexOf(item) + 1} quantity`)
+              .addLabelComponents(
+                new LabelBuilder()
+                  .setLabel("Quantity")
+                  .setDescription(itemLabels.get(item.item) ?? item.item)
+                  .setTextInputComponent(quantity),
+              ),
+          );
+        } catch (error) {
+          if (draft.quantityForm === form) draft.quantityForm = null;
+          throw error;
+        }
         return;
       }
     }

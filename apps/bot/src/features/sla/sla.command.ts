@@ -1,7 +1,7 @@
 import { SlashCommandBuilder } from "discord.js";
 import type { CommandDefinition } from "@/core/command.ts";
 import { handleRedeem } from "./redeem.ts";
-import { autocompleteCouponItems, handleCreateCoupon } from "./create-coupon.ts";
+import { handleCreateCoupon } from "./create-coupon.ts";
 import {
   configureNewsGroup,
   handleNewsSetup,
@@ -9,9 +9,9 @@ import {
 
 export const slaHelpDescription = [
   "redeem: Opens a required coupon-code and Personal ID (Member code) modal, then redeems the coupon. Treat your Personal ID as sensitive.",
-  "create-coupon: Select up to eight optional rewards via autocomplete or enter custom item names (QuestionMark icon), then enter the coupon code and destination in a modal. Title and image lookup uses a fixed PID; no player ID is requested for creation. Claiming still requires your own Personal ID. Quantities default to 1 and can be edited to a positive whole number. Duplicate rewards are rejected. Edit availability sets optional Available from and Expires at dates in UTC+0; empty fields remove the limits. Claim is allowed from the start date until, but not including, the expiry. Drafts expire after 5 minutes; both you and the bot need permission to post in the destination.",
+  "create-coupon: Enter the coupon code and destination in a modal, then use Add item, Edit item, Quantity, and Remove item on the private draft to manage up to eight rewards. Enter a catalog item name or a custom name (QuestionMark icon). Quantities default to 1 and must be positive whole numbers. Duplicate rewards are rejected. Title and image lookup uses a fixed PID; no player ID is requested for creation. Claiming still requires your own Personal ID. Edit availability sets optional Available from and Expires at dates in UTC+0; empty fields remove the limits. Claim is allowed from the start date until, but not including, the expiry. Drafts expire after 5 minutes; both you and the bot need permission to post in the destination. Published coupons cannot be edited through the draft controls.",
   "news create: Creates/reactivates the news forum, with 0–10 backfilled articles (default 10). news backfill: Imports 1–50 historical articles (default 10). news status shows configuration; news disable stops future posts. News management needs Manage Channels; news clean permanently removes news resources after administrator confirmation.",
-  "Examples: `/sla redeem` · `/sla news backfill count:10`",
+  "Examples: `/sla redeem` · `/sla create-coupon` · `/sla news backfill count:10`",
 ] as const;
 
 export const slaCommand = {
@@ -23,68 +23,11 @@ export const slaCommand = {
     .addSubcommand((subcommand) =>
       subcommand.setName("redeem").setDescription("Redeem a coupon code"),
     )
-    .addSubcommand((subcommand) => {
+    .addSubcommand((subcommand) =>
       subcommand
         .setName("create-coupon")
-        .setDescription("Create a coupon with an interactive form and optional rewards");
-      return Array.from({ length: 8 }, (_, index) => index + 1).reduce(
-        (builder, position) =>
-          builder.addStringOption((option) =>
-            option
-              .setName(`item_${position}`)
-              .setDescription(
-                `Search for reward item ${position} or enter a custom name (optional)`,
-              )
-              .setMaxLength(100)
-              .setAutocomplete(true),
-          ),
-        subcommand,
-      );
-    }),
-
-  async autocomplete(interaction) {
-    const startedAt = performance.now();
-    // Approximate delivery age, based on the host's wall clock (requires clock synchronization).
-    const interactionAgeMs = Date.now() - interaction.createdTimestamp;
-    const focused = interaction.options.getFocused(true);
-    if (
-      interaction.options.getSubcommand() !== "create-coupon" ||
-      !/^item_[1-8]$/.test(focused.name)
-    ) {
-      await interaction.respond([]);
-      return;
-    }
-    const query = String(focused.value);
-    const lookupStartedAt = performance.now();
-    const excludedItems = Array.from({ length: 8 }, (_, index) => `item_${index + 1}`)
-      .filter((name) => name !== focused.name)
-      .flatMap((name) => {
-        const selected = interaction.options.getString(name);
-        return selected === null ? [] : [selected];
-      });
-    const choices = autocompleteCouponItems(query, excludedItems);
-    const responseStartedAt = performance.now();
-    let status: "success" | "error" = "error";
-    try {
-      await interaction.respond(choices);
-      status = "success";
-    } finally {
-      const finishedAt = performance.now();
-      const milliseconds = (value: number) => Math.round(value * 100) / 100;
-      // TEMPORARY: remove after diagnosing autocomplete latency. Never log query text or user IDs.
-      console.info("[DEBUG-coupon-autocomplete]", {
-        interaction_age_ms_at_handler: interactionAgeMs,
-        lookup_ms: milliseconds(responseStartedAt - lookupStartedAt),
-        respond_ms: milliseconds(finishedAt - responseStartedAt),
-        handler_ms: milliseconds(finishedAt - startedAt),
-        ws_ping_ms: interaction.client.ws.ping,
-        query_length: query.length,
-        matches: choices.length,
-        status,
-      });
-    }
-  },
-
+        .setDescription("Create a coupon with an interactive draft and optional rewards"),
+    ),
   async execute(interaction) {
     if (interaction.options.getSubcommandGroup(false) === "news") {
       await handleNewsSetup(interaction);

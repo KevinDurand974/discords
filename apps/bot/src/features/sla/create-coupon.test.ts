@@ -4,18 +4,16 @@ import {
   ChannelType,
   ComponentType,
   MessageFlags,
-  type AutocompleteInteraction,
   type ChatInputCommandInteraction,
   type ModalBuilder,
 } from "discord.js";
 import type { ComponentInteraction, CommandExecutionContext } from "@/core/command.ts";
 import { commands, componentHandlers } from "@/core/command-registry.ts";
 import { claimComponentHandler, CLAIM_BUTTON_PREFIX } from "./claim-components.ts";
-import { slaCommand } from "./sla.command.ts";
 import { couponItems } from "@/shared/emojis/emoji-cache.ts";
 import { getCouponProduct, redeemCoupon } from "./coupon.client.ts";
 import {
-  autocompleteCouponItems,
+  normalizeCouponItem,
   createCouponComponentHandler,
   handleCreateCoupon,
   parseCouponReward,
@@ -75,14 +73,13 @@ function actor(customId: string, modal = false) {
 async function execute(request: ReturnType<typeof actor>) {
   await createCouponComponentHandler.execute(request as unknown as ComponentInteraction, context);
 }
-async function start(items: readonly (string | null)[] = []) {
+async function start(items: readonly string[] = []) {
   const request = {
     guild,
     guildId: "guild",
     user,
     channel: target,
     channelId: target.id,
-    options: { getString: vi.fn((name: string) => items[Number(name.split("_")[1]) - 1] ?? null) },
     showModal: vi.fn<(modal: ModalBuilder) => Promise<void>>(async () => {}),
   };
   await handleCreateCoupon(request as unknown as ChatInputCommandInteraction);
@@ -90,9 +87,33 @@ async function start(items: readonly (string | null)[] = []) {
   const token = modal.custom_id.split(":").at(-1)!;
   const submit = actor(modal.custom_id, true);
   await execute(submit);
-  return { token, modal, submit };
+  let view = JSON.stringify(submit.reply.mock.calls);
+  for (const item of items) {
+    const saved = await saveItem(token, item);
+    view = JSON.stringify(saved.editReply.mock.calls);
+  }
+  if (items.length > 4) {
+    const page = actor(id("page", token));
+    await execute(page);
+    view = JSON.stringify(page.update.mock.calls);
+  }
+  return { token, modal, submit, view };
 }
 const id = (action: string, token: string) => `sla:create-coupon:${action}:${token}`;
+async function itemModal(token: string, index?: number) {
+  const request = actor(id(index === undefined ? "add-item" : `edit-item-${index}`, token));
+  await execute(request);
+  return request.showModal.mock.calls[0]![0].toJSON();
+}
+async function saveItem(token: string, item: string, quantity = "1", index?: number) {
+  const modal = await itemModal(token, index);
+  const request = actor(modal.custom_id, true);
+  request.fields.getTextInputValue.mockImplementation((name?: string) =>
+    name === "item" ? item : quantity,
+  );
+  await execute(request);
+  return request;
+}
 async function quantityModal(token: string, index = 0) {
   const request = actor(id(`quantity-${index}`, token));
   await execute(request);
@@ -112,69 +133,143 @@ afterEach(() => {
 });
 
 describe("interactive coupon creation", () => {
-  it("registers eight optional autocomplete items without the legacy create command", () => {
+  it("registers a parameter-free draft command without the legacy create command", () => {
     const sla = commands.find((command) => command.data.name === "sla")!.data.toJSON();
     expect(sla.options?.map((option) => option.name)).toContain("create-coupon");
     expect(sla.options?.map((option) => option.name)).not.toContain("create");
     const create = sla.options?.find((option) => option.name === "create-coupon");
     expect(create?.type).toBe(1);
     if (create?.type !== 1) throw new Error("Expected a subcommand");
-    expect(create.options).toHaveLength(8);
-    for (const [index, option] of create.options!.entries()) {
-      expect(option).toMatchObject({ name: `item_${index + 1}`, autocomplete: true });
-      expect(option.required ?? false).toBe(false);
-    }
+    expect(create.options ?? []).toHaveLength(0);
     expect(componentHandlers).toContain(createCouponComponentHandler);
     expect(claimComponentHandler.matches(`${CLAIM_BUTTON_PREFIX}TESTCODE`)).toBe(true);
   });
-  it("searches the complete catalog with at most 25 sorted autocomplete suggestions", () => {
-    const empty = autocompleteCouponItems("");
-    expect(empty).toHaveLength(25);
-    expect(empty.map((choice) => choice.name)).toEqual(
-      empty.map((choice) => choice.name).sort((a, b) => a.localeCompare(b, "en")),
+  it("recognizes catalog labels and identifiers without changing custom names", () => {
+    expect(normalizeCouponItem(" GOLD ")).toBe("Gold");
+    expect(normalizeCouponItem("precision design")).toBe("Precision_Design");
+    expect(normalizeCouponItem("New reward")).toBe("New reward");
+    for (const [label, name] of Object.entries(couponItems)) {
+      expect(normalizeCouponItem(label)).toBe(name);
+      expect(normalizeCouponItem(name)).toBe(name);
+    }
+  });
+  it("adds, renames, changes quantity and removes rewards only in the draft", async () => {
+    const { token, view } = await start();
+    expect(view).toContain("Add item");
+    await saveItem(token, "gold", "");
+    const edit = await itemModal(token, 0);
+    expect(JSON.stringify(edit)).toContain('"value":"Gold"');
+    expect(JSON.stringify(edit)).toContain('"value":"1"');
+    const changed = await saveItem(token, "precision design", "15", 0);
+    expect(JSON.stringify(changed.editReply.mock.calls)).toContain("Precision Design x15");
+    await saveItem(token, "New reward", "3");
+    const remove = actor(id("remove-item-0", token));
+    await execute(remove);
+    expect(JSON.stringify(remove.editReply.mock.calls)).not.toContain("Precision Design");
+    expect(JSON.stringify(remove.editReply.mock.calls)).toContain("Item 1");
+    expect(target.send).not.toHaveBeenCalled();
+    await execute(actor(id("publish", token)));
+    const sent = JSON.stringify(target.send.mock.calls);
+    expect(sent).toContain("New reward x3");
+    expect(sent).not.toContain("Precision");
+    expect(sent).not.toContain("Add item");
+    await expect(saveItem(token, "Gold")).rejects.toThrow("expired");
+  });
+  it("rejects duplicate edits and invalid quantities without changing existing rewards", async () => {
+    const { token } = await start(["Gold", "Precision_Design"]);
+    await expect(saveItem(token, " gold ", "1", 1)).rejects.toThrow("only once");
+    await expect(saveItem(token, "precision design")).rejects.toThrow("only once");
+    await expect(saveItem(token, "Design", "-2", 0)).rejects.toThrow("positive whole-number");
+    await saveItem(token, "Gold", "2", 0);
+    await execute(actor(id("publish", token)));
+    const sent = JSON.stringify(target.send.mock.calls);
+    expect(sent).toContain("Gold:1551725274725359766> x2");
+    expect(sent).toContain("Precision_Design:1551725274725359766> x1");
+  });
+  it("caps drafts at eight items and permits another addition after removal", async () => {
+    const { token, view } = await start(Array.from({ length: 8 }, (_, i) => `Reward ${i}`));
+    expect(view).toContain('"label":"Add item","style":1,"disabled":true');
+    await expect(itemModal(token)).rejects.toThrow("at most eight");
+    await execute(actor(id("remove-item-7", token)));
+    await saveItem(token, "Replacement");
+    const edit = await itemModal(token, 8);
+    expect(JSON.stringify(edit)).toContain("Replacement");
+    await execute(actor(id("publish", token)));
+    expect(JSON.stringify(target.send.mock.calls)).toContain("Replacement x1");
+    expect(JSON.stringify(target.send.mock.calls)).not.toContain("Reward 7");
+  });
+  it("clamps pagination after removal and supports deleting every reward", async () => {
+    const { token } = await start(["Gold", "Design", "A", "B", "C"]);
+    await execute(actor(id("page", token)));
+    const remove = actor(id("remove-item-4", token));
+    await execute(remove);
+    const view = JSON.stringify(remove.editReply.mock.calls);
+    expect(view).toContain("quantity-0:");
+    expect(view).not.toContain("Previous items");
+    for (let index = 0; index < 4; index++) await execute(actor(id(`remove-item-${index}`, token)));
+    await execute(actor(id("publish", token)));
+    expect(JSON.stringify(target.send.mock.calls)).not.toContain("Gold");
+  });
+  it("rejects stale item and quantity forms after removal without reusing item IDs", async () => {
+    const { token } = await start(["Gold"]);
+    const edit = await itemModal(token, 0);
+    const quantity = await quantityModal(token, 0);
+    await execute(actor(id("remove-item-0", token)));
+    await saveItem(token, "Design");
+    for (const modal of [edit, quantity]) {
+      const save = actor(modal.custom_id, true);
+      save.fields.getTextInputValue.mockReturnValue("9");
+      await expect(execute(save)).rejects.toThrow("unavailable");
+    }
+    await expect(execute(actor(id("remove-item-0", token)))).rejects.toThrow("already removed");
+    await expect(itemModal(token, 0)).rejects.toThrow("removed");
+    await execute(actor(id("publish", token)));
+    expect(JSON.stringify(target.send.mock.calls)).toContain("Design:1551725274725359766> x1");
+  });
+  it("rejects consumed and superseded item forms", async () => {
+    const { token } = await start();
+    const old = await itemModal(token);
+    await saveItem(token, "Gold");
+    const stale = actor(old.custom_id, true);
+    stale.fields.getTextInputValue.mockReturnValue("Design");
+    await expect(execute(stale)).rejects.toThrow("unavailable");
+    const current = await itemModal(token, 0);
+    const save = actor(current.custom_id, true);
+    save.fields.getTextInputValue.mockImplementation((name?: string) =>
+      name === "item" ? "Gold" : "5",
     );
-    expect(autocompleteCouponItems(" GOLD ")).toEqual([{ name: "Gold", value: "Gold" }]);
-    expect(autocompleteCouponItems("precision_design")).toEqual([
-      { name: "Precision Design", value: "Precision_Design" },
-    ]);
-    expect(autocompleteCouponItems("workshop")).toEqual([
-      { name: "Workshop of Brilliant Light Invitation", value: "Workshop_Of_Brillant_Light" },
-    ]);
-    expect(autocompleteCouponItems("not-a-reward")).toEqual([]);
-    for (const [name, value] of Object.entries(couponItems))
-      expect(autocompleteCouponItems(name)).toContainEqual({ name, value });
+    await execute(save);
+    await expect(execute(save)).rejects.toThrow("unavailable");
   });
-  it("filters selected items before the 25-result limit", () => {
-    const first = autocompleteCouponItems("");
-    const excluded = first.map(({ value }) => value);
-    const next = autocompleteCouponItems("", excluded);
-    expect(next).toHaveLength(25);
-    expect(next.every(({ value }) => !excluded.includes(value))).toBe(true);
-    expect(autocompleteCouponItems("gold", ["Gold"])).toEqual([]);
-  });
-  it("excludes choices in other options but retains the focused option's own choice", async () => {
-    const request = {
-      options: {
-        getSubcommand: () => "create-coupon",
-        getFocused: () => ({ name: "item_1", value: "gold" }),
-        getString: (name: string) =>
-          name === "item_1" ? "Gold" : name === "item_8" ? "Design" : null,
-      },
-      createdTimestamp: Date.now(),
-      client: { ws: { ping: 20 } },
-      respond: vi.fn(),
-    };
-    await slaCommand.autocomplete(request as unknown as AutocompleteInteraction);
-    expect(request.respond).toHaveBeenLastCalledWith([{ name: "Gold", value: "Gold" }]);
-    request.options.getFocused = () => ({ name: "item_8", value: "gold" });
-    await slaCommand.autocomplete(request as unknown as AutocompleteInteraction);
-    expect(request.respond).toHaveBeenLastCalledWith([]);
-    request.options.getFocused = () => ({ name: "item_9", value: "gold" });
-    await slaCommand.autocomplete(request as unknown as AutocompleteInteraction);
-    expect(request.respond).toHaveBeenLastCalledWith([]);
-    request.options.getSubcommand = () => "redeem";
-    await slaCommand.autocomplete(request as unknown as AutocompleteInteraction);
-    expect(request.respond).toHaveBeenLastCalledWith([]);
+  it.each(["cancelled", "expired", "removed"])(
+    "rejects item saves when the draft becomes %s during acknowledgement",
+    async (reason) => {
+      vi.useFakeTimers();
+      const { token } = await start(["Gold"]);
+      const modal = await itemModal(token, 0);
+      const save = actor(modal.custom_id, true);
+      save.fields.getTextInputValue.mockImplementation((name?: string) =>
+        name === "item" ? "Design" : "1",
+      );
+      save.deferUpdate.mockImplementationOnce(async () => {
+        if (reason === "cancelled") await execute(actor(id("cancel", token)));
+        else if (reason === "removed") await execute(actor(id("remove-item-0", token)));
+        else vi.advanceTimersByTime(300_000);
+      });
+      await expect(execute(save)).rejects.toThrow("unavailable");
+      expect(save.editReply).not.toHaveBeenCalled();
+    },
+  );
+  it("restricts draft item controls to their creator and server", async () => {
+    const { token } = await start(["Gold"]);
+    for (const action of ["add-item", "edit-item-0", "remove-item-0"]) {
+      const otherUser = actor(id(action, token));
+      otherUser.user = { id: "other" };
+      await expect(execute(otherUser)).rejects.toThrow();
+      const otherGuild = actor(id(action, token));
+      otherGuild.guildId = "other";
+      await expect(execute(otherGuild)).rejects.toThrow();
+    }
   });
   it("opens code/channel entry with the current channel selected and allows publication without items", async () => {
     const { modal, submit } = await start();
@@ -379,8 +474,7 @@ describe("interactive coupon creation", () => {
     await expect(execute(actor(id("publish", token)))).rejects.toThrow("expired");
   });
   it("defaults quantities to 1 and opens an editable one-field modal for the correct item", async () => {
-    const { token, submit } = await start(["Gold", "Design"]);
-    const reply = JSON.stringify(submit.reply.mock.calls);
+    const { token, view: reply } = await start(["Gold", "Design"]);
     expect(reply).toContain("2/2 quantities configured");
     expect(reply).toContain("quantity-0:");
     expect(reply).toContain("quantity-1:");
@@ -405,17 +499,13 @@ describe("interactive coupon creation", () => {
     expect(sent).toContain("Gold:1551725274725359766> x1,000");
     expect(sent).toContain("Design:1551725274725359766> x2");
   });
-  it("accepts sparse optional items and keeps their slash option positions", async () => {
-    const { token, submit } = await start([null, "Gold", null, null, null, null, null, "Design"]);
-    const reply = JSON.stringify(submit.reply.mock.calls);
-    expect(reply).toContain("Item 2");
-    expect(reply).toContain("Item 8");
-    expect(reply).not.toContain("Next items");
-    await expect(execute(actor(id("quantity-0", token)))).rejects.toThrow(
-      "This draft is unavailable",
-    );
-    await saveQuantity(token, "5", 1);
-    await saveQuantity(token, "6", 7);
+  it("numbers draft items consecutively", async () => {
+    const { token, view } = await start(["Gold", "Design"]);
+    expect(view).toContain("Item 1");
+    expect(view).toContain("Item 2");
+    expect(view).not.toContain("Next items");
+    await saveQuantity(token, "5", 0);
+    await saveQuantity(token, "6", 1);
     await execute(actor(id("publish", token)));
     expect(JSON.stringify(target.send.mock.calls)).toContain("x5");
     expect(JSON.stringify(target.send.mock.calls)).toContain("x6");
@@ -431,8 +521,7 @@ describe("interactive coupon creation", () => {
       "Time_Crystal",
       "Guild_Point",
     ];
-    const { token, submit } = await start(items);
-    const first = JSON.stringify(submit.reply.mock.calls);
+    const { token, view: first } = await start(items);
     expect(first).toContain("quantity-3:");
     expect(first).not.toContain("quantity-4:");
     const next = actor(id("page", token));
@@ -448,6 +537,42 @@ describe("interactive coupon creation", () => {
     const sent = JSON.stringify(target.send.mock.calls);
     for (const [index, item] of items.entries())
       expect(sent).toContain(`${item}:1551725274725359766> x${index + 1}`);
+  });
+  it.each(["removed", "superseded"])(
+    "does not revive a %s quantity form when its modal open finishes late",
+    async (reason) => {
+      const { token } = await start(["Gold"]);
+      let finish!: () => void;
+      const click = actor(id("quantity-0", token));
+      click.showModal.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const opening = execute(click);
+      const modal = click.showModal.mock.calls[0]![0].toJSON();
+      if (reason === "removed") await execute(actor(id("remove-item-0", token)));
+      else await quantityModal(token);
+      finish();
+      await opening;
+      const save = actor(modal.custom_id, true);
+      save.fields.getTextInputValue.mockReturnValue("10");
+      await expect(execute(save)).rejects.toThrow("unavailable");
+      expect(save.editReply).not.toHaveBeenCalled();
+    },
+  );
+  it("accepts quantity submission before the modal-open request completes", async () => {
+    const { token } = await start(["Gold"]);
+    const click = actor(id("quantity-0", token));
+    click.showModal.mockImplementationOnce(async (modal) => {
+      const save = actor(modal.toJSON().custom_id, true);
+      save.fields.getTextInputValue.mockReturnValue("12");
+      await execute(save);
+    });
+    await execute(click);
+    await execute(actor(id("publish", token)));
+    expect(JSON.stringify(target.send.mock.calls)).toContain("Gold:1551725274725359766> x12");
   });
   it("prefills saved quantities and rejects consumed or superseded forms", async () => {
     const { token } = await start(["Gold", "Design"]);
@@ -486,8 +611,7 @@ describe("interactive coupon creation", () => {
     },
   );
   it("publishes custom names with QuestionMark and all quantities defaulting to 1", async () => {
-    const { token, submit } = await start(["  New reward  ", "Gold"]);
-    const preview = JSON.stringify(submit.reply.mock.calls);
+    const { token, view: preview } = await start(["  New reward  ", "Gold"]);
     expect(preview).toContain("QuestionMark:1551725274725359766> New reward x1");
     expect(preview).not.toContain("undefined");
     const modal = await quantityModal(token);
@@ -502,7 +626,7 @@ describe("interactive coupon creation", () => {
     await expect(start(["   "])).rejects.toThrow("item name");
     await expect(start(["a".repeat(101)])).rejects.toThrow("item name");
     await expect(start(["a\nb"])).rejects.toThrow("line breaks");
-    await expect(start(["Gold", null, " Gold "])).rejects.toThrow("only once");
+    await expect(start(["Gold", " gold "])).rejects.toThrow("only once");
     await expect(start(["Custom", "Custom"])).rejects.toThrow("only once");
     expect(target.send).not.toHaveBeenCalled();
   });
