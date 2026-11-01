@@ -11,6 +11,7 @@
     }
   },
   "scripts": {
+    "dev:discord": "nub --cwd apps/bot run dev",
     "start": "nub run docker:up",
     "stop": "nub run docker:down",
     "docker:up": "nub exec varlock run --filter=#docker --inject vars -- node scripts/docker.mjs up -d --build --wait --wait-timeout 120",
