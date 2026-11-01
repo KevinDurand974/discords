@@ -35,7 +35,7 @@ function resolutionError(error: unknown): string {
 
 export type ResolvedCreator = {
   channel: { channelId: string; displayName: string };
-  videos: { videoId: string; publishedAt: string }[];
+  videos: { videoId: string; publishedAt: string; isShort: boolean | null }[];
 };
 export function createVideosApi(base: string, token: string | undefined) {
   const url = new URL(base);
@@ -62,7 +62,8 @@ export function createVideosApi(base: string, token: string | undefined) {
           result.videos.some(
             (video) =>
               !/^[A-Za-z0-9_-]{11}$/.test(video.videoId) ||
-              !Number.isFinite(Date.parse(video.publishedAt)),
+              !Number.isFinite(Date.parse(video.publishedAt)) ||
+              (video.isShort !== null && typeof video.isShort !== "boolean"),
           )
         )
           throw new Error("Invalid response");

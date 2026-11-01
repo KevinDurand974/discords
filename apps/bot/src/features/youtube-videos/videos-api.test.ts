@@ -26,7 +26,36 @@ async function failingApi(status: number, code?: string) {
   if (!address || typeof address === "string") throw new Error("Missing test server");
   return createVideosApi(`http://127.0.0.1:${address.port}`, "private-token");
 }
+async function classifiedApi(isShort: unknown) {
+  const server = createServer((_request, response) => {
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(
+      JSON.stringify({
+        channel: { channelId: `UC${"a".repeat(22)}`, displayName: "Creator" },
+        videos: [{ videoId: "video000001", publishedAt: "2026-10-01T00:00:00Z", isShort }],
+      }),
+    );
+  });
+  servers.push(server);
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  if (!address || typeof address === "string") throw new Error("Missing test server");
+  return createVideosApi(`http://127.0.0.1:${address.port}`, "private-token");
+}
 describe("YouTube API error reporting", () => {
+  it.each([true, false, null])("preserves content classification: %s", async (isShort) => {
+    const result = await (await classifiedApi(isShort)).resolve("@creator");
+    expect(result.videos[0]!.isShort).toBe(isShort);
+  });
+  it.each([undefined, "short", 1])(
+    "rejects invalid/missing classification: %s",
+    async (isShort) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      await expect((await classifiedApi(isShort)).resolve("@creator")).rejects.toThrow(
+        "Couldn't find this YouTube channel",
+      );
+    },
+  );
   it.each(["invalid_google_response", "invalid_feed", "private-api-key"])(
     "logs a safe diagnostic for %s without exposing the response body",
     async (code) => {

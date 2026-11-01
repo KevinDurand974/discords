@@ -52,7 +52,7 @@ function parseEntry(value: unknown, channelId: string): YoutubeVideo {
   return {
     videoId, channelId, sourceEntryId,
     url: `https://www.youtube.com/watch?v=${videoId}`,
-    title, description: description ?? "",
+    title, description: description ?? "", isShort: url.pathname.startsWith("/shorts/"),
     publishedAt: date(entry.published),
     sourceUpdatedAt: entry.updated === undefined ? null : date(entry.updated),
   };

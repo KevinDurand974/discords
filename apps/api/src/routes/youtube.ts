@@ -13,7 +13,7 @@ const channelSchema = t.Object({
 const videoSchema = t.Object({
   videoId: t.String(), channelId: t.String(), sourceEntryId: t.String(),
   url: t.String(), title: t.String(), description: t.String(),
-  publishedAt: t.String(), sourceUpdatedAt: t.Nullable(t.String()),
+  publishedAt: t.String(), sourceUpdatedAt: t.Nullable(t.String()), isShort: t.Nullable(t.Boolean()),
 });
 
 export type YoutubeAppOptions = {

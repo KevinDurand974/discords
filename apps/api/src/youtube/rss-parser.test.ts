@@ -12,7 +12,7 @@ describe("YouTube RSS normalization", () => {
       channelId: CHANNEL_ID, videoId: videoId(1), sourceEntryId: `yt:video:${videoId(1)}`,
       url: `https://www.youtube.com/watch?v=${videoId(1)}`,
       title: "Guide 1", description: "Stats & cores !", publishedAt: "2026-10-01T01:21:28.000Z",
-      sourceUpdatedAt: "2026-10-20T01:21:28.000Z",
+      sourceUpdatedAt: "2026-10-20T01:21:28.000Z", isShort: false,
     });
   });
   it("accepts YouTube's prefixless root channel ID while entries keep the canonical UC ID", () => {
@@ -45,7 +45,8 @@ describe("YouTube RSS normalization", () => {
     const feed = parseYoutubeFeed(wrapFeed(rssEntry(1) + short), CHANNEL_ID);
     expect(feed.rejectedEntries).toBe(0);
     expect(feed.videos).toHaveLength(2);
-    expect(feed.videos[1]).toMatchObject({ videoId: videoId(2), url: `https://www.youtube.com/watch?v=${videoId(2)}` });
+    expect(feed.videos[0]!.isShort).toBe(false);
+    expect(feed.videos[1]).toMatchObject({ videoId: videoId(2), url: `https://www.youtube.com/watch?v=${videoId(2)}`, isShort: true });
   });
   it.each([
     `https://www.youtube.com/shorts/${videoId(2)}`,

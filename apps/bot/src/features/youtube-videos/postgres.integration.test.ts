@@ -27,6 +27,125 @@ const makeVideo = (
 });
 
 describe.skipIf(!url)("YouTube Discord persistence", () => {
+  it("persists per-guild creator filters, filters repair/live work and changes prospectively without reposting", async () => {
+    const channel = `UC${"f".repeat(22)}`;
+    await database!.db
+      .insert(youtubeChannels)
+      .values({
+        channelId: channel,
+        displayName: "Filtered creator",
+        canonicalUrl: `https://www.youtube.com/channel/${channel}`,
+      });
+    const source = (index: number, isShort: boolean | null) => ({
+      ...makeVideo(1),
+      channelId: channel,
+      videoId: `F${String(index).padStart(10, "0")}`,
+      sourceEntryId: `yt:video:F${String(index).padStart(10, "0")}`,
+      url: `https://www.youtube.com/watch?v=F${String(index).padStart(10, "0")}`,
+      isShort,
+    });
+    await database!.db
+      .insert(youtubeVideos)
+      .values([source(1, false), source(2, true), source(3, null)]);
+    await Promise.all(
+      ["yt-filter-video", "yt-filter-short"].map(async (guild) => {
+        await store!.createSettings(guild);
+        await store!.setForum(guild, `${guild}-f`, 1);
+      }),
+    );
+    await store!.subscribe(
+      "yt-filter-video",
+      channel,
+      "tag",
+      true,
+      1,
+      [source(1, false).videoId],
+      1,
+      "videos",
+    );
+    await store!.subscribe(
+      "yt-filter-short",
+      channel,
+      "tag",
+      true,
+      1,
+      [source(2, true).videoId],
+      1,
+      "shorts",
+    );
+    expect((await second!.subscriptions("yt-filter-video"))[0]!.subscription.contentMode).toBe(
+      "videos",
+    );
+    expect((await second!.subscriptions("yt-filter-short"))[0]!.subscription.contentMode).toBe(
+      "shorts",
+    );
+    // Forum repair must choose matching items, not the newest item irrespective of type.
+    await store!.resetForum("yt-filter-video");
+    await store!.setForum("yt-filter-video", "repaired-forum", 2);
+    await store!.repairSubscription(
+      "yt-filter-video",
+      (await store!.subscriptions("yt-filter-video"))[0]!.subscription,
+      "tag",
+      true,
+      2,
+    );
+    expect((await store!.pending("yt-filter-video")).map(({ video }) => video.videoId)).toEqual([
+      source(1, false).videoId,
+    ]);
+    await database!.db
+      .insert(youtubeVideos)
+      .values([source(4, false), source(5, true), source(6, null)]);
+    await store!.enqueue("yt-filter-video", 2);
+    await store!.enqueue("yt-filter-short", 1);
+    expect((await second!.pending("yt-filter-video")).map(({ video }) => video.videoId)).toEqual([
+      source(1, false).videoId,
+      source(4, false).videoId,
+    ]);
+    expect((await second!.pending("yt-filter-short")).map(({ video }) => video.videoId)).toEqual([
+      source(2, true).videoId,
+      source(5, true).videoId,
+    ]);
+    const posted = (await store!.pending("yt-filter-video"))[0]!;
+    await store!.published(posted.intent, "filtered-thread");
+    await database!.db.insert(youtubeVideos).values(source(7, true));
+    await store!.setContentMode("yt-filter-video", channel, "shorts");
+    await store!.completeInitial("yt-filter-video");
+    await store!.enqueue("yt-filter-video", 2);
+    expect(await second!.pending("yt-filter-video")).toEqual([]);
+    expect(await second!.publicationThreads("yt-filter-video")).toContain(
+      "filtered-thread",
+    );
+    expect(
+      (await second!.subscriptions("yt-filter-video"))[0]!.subscription.initialImportCompletedAt,
+    ).toBeInstanceOf(Date);
+    await database!.db.insert(youtubeVideos).values([source(8, false), source(9, true)]);
+    await store!.enqueue("yt-filter-video", 2);
+    expect((await second!.pending("yt-filter-video")).map(({ video }) => video.videoId)).toEqual([
+      source(9, true).videoId,
+    ]);
+    await store!.setContentMode("yt-filter-video", channel, "all");
+    await store!.enqueue("yt-filter-video", 2);
+    expect((await second!.pending("yt-filter-video")).map(({ video }) => video.videoId)).toEqual([
+      source(9, true).videoId,
+    ]);
+    // The other guild's creator preference and queue are unaffected.
+    expect((await second!.subscriptions("yt-filter-short"))[0]!.subscription.contentMode).toBe(
+      "shorts",
+    );
+    // Narrowing also cancels interrupted initial work without losing its cleanup checkpoint.
+    const interrupted = (await store!.pending("yt-filter-short"))[0]!;
+    await store!.begin(interrupted.intent);
+    await store!.checkpoint(interrupted.intent, "filter-partial");
+    await store!.failed(interrupted.intent);
+    await store!.setContentMode("yt-filter-short", channel, "videos");
+    await store!.completeInitial("yt-filter-short");
+    expect(await second!.pending("yt-filter-short")).toEqual([]);
+    expect(await second!.publicationThreads("yt-filter-short")).toContain("filter-partial");
+    expect(
+      (await second!.subscriptions("yt-filter-short"))[0]!.subscription.initialImportCompletedAt,
+    ).toBeInstanceOf(Date);
+    await Promise.all([store!.remove("yt-filter-video"), store!.remove("yt-filter-short")]);
+  });
   it("snapshots all stored sources, imports ten, excludes the initial remainder and survives restart", async () => {
     await database!.db.insert(youtubeChannels).values({
       channelId,

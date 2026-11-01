@@ -7,11 +7,11 @@ type Tracked = Awaited<ReturnType<VideosRepository["subscriptions"]>>;
 const tracked = [
   {
     creator: { channelId: `UC${"b".repeat(22)}`, displayName: "Zed" },
-    subscription: { enabled: true },
+    subscription: { enabled: true, contentMode: "shorts" },
   },
   {
     creator: { channelId: `UC${"a".repeat(22)}`, displayName: "**Alice** {user}" },
-    subscription: { enabled: true },
+    subscription: { enabled: true, contentMode: "videos" },
   },
   {
     creator: { channelId: `UC${"c".repeat(22)}`, displayName: "Disabled" },
@@ -69,6 +69,8 @@ describe("YouTube creator list Forum post", () => {
     const json = JSON.stringify(payload.components[0]!.toJSON());
     expect(json).toContain("https://www.youtube.com/channel/UCaaaaaaaaaaaaaaaaaaaaaa");
     expect(json).not.toContain("Disabled");
+    expect(json).toContain("Videos only");
+    expect(json).toContain("Shorts only");
     expect(json.indexOf("Alice")).toBeLessThan(json.indexOf("Zed"));
     expect(json).toContain(JSON.stringify("\\*\\*Alice\\*\\* {user}").slice(1, -1));
     expect(payload.allowedMentions).toEqual({ parse: [] });

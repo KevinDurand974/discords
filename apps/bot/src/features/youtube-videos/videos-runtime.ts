@@ -17,6 +17,7 @@ import {
 } from "./videos-repository.ts";
 
 import { deleteCreatorList, updateCreatorList } from "./creator-list.ts";
+import { matchesContent, type ContentMode } from "./content-filter.ts";
 
 export type CleanupMode = "videos" | "resources";
 
@@ -179,7 +180,39 @@ export function buildVideosRuntime(
           : [],
       );
     },
-    async add(guildId: string, input: string, count: number, forumId: string) {
+    async content(guildId: string, tagId: string, mode: ContentMode) {
+      return store.withGuild(guildId, async () => {
+        const setup = await store.get(guildId);
+        if (!setup || setup.lifecycle !== "active")
+          throw new UserFacingError("Run /youtube setup or finish /youtube clean first.");
+        const tracked = await store.subscriptions(guildId);
+        const selected = tracked.find(({ subscription }) => subscription.tagId === tagId);
+        if (!selected)
+          throw new UserFacingError("Choose a current creator tag from the suggested list.");
+        if (selected.subscription.contentMode !== mode)
+          await store.setContentMode(guildId, selected.subscription.channelId, mode);
+        await store.completeInitial(guildId);
+        let listFailed = false;
+        if (setup.creatorListThreadId) {
+          try {
+            const guild = await client.guilds.fetch(guildId);
+            const forum = await getVideoForum(guild, setup.forumChannelId);
+            if (!forum) throw new Error("YouTube Forum is missing.");
+            await refreshCreatorList(setup, forum);
+          } catch {
+            listFailed = true;
+          }
+        }
+        return { listFailed };
+      });
+    },
+    async add(
+      guildId: string,
+      input: string,
+      count: number,
+      forumId: string,
+      contentMode: ContentMode = "all",
+    ) {
       if (!Number.isInteger(count) || count < 0 || count > 15)
         throw new UserFacingError("Backfill count must be between 0 and 15.");
       const resolved = await api.resolve(input);
@@ -218,11 +251,13 @@ export function buildVideosRuntime(
             null,
             tracked.map((row) => row.subscription.tagId).filter((id): id is string => id !== null),
           );
-          const newest = [...resolved.videos].sort(
-            (a, b) =>
-              Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
-              b.videoId.localeCompare(a.videoId),
-          );
+          const newest = resolved.videos
+            .filter((video) => matchesContent(contentMode, video.isShort))
+            .sort(
+              (a, b) =>
+                Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
+                b.videoId.localeCompare(a.videoId),
+            );
           await store.subscribe(
             guildId,
             resolved.channel.channelId,
@@ -231,6 +266,11 @@ export function buildVideosRuntime(
             count,
             newest.slice(0, count).map((video) => video.videoId),
             setup.forumGeneration,
+            contentMode,
+          );
+        } else if (existing.subscription.contentMode !== contentMode) {
+          throw new UserFacingError(
+            "This creator is already followed. Use /youtube content to change their content preference.",
           );
         }
         return { ...(await publish(setup)), forumId: forum.id, reused: Boolean(existing) };

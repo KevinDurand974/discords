@@ -7,6 +7,7 @@ import {
   type ForumChannel,
 } from "discord.js";
 import { UserFacingError } from "@/core/errors.ts";
+import { contentLabel } from "./content-filter.ts";
 import type { ForumSettings, VideosRepository } from "./videos-repository.ts";
 
 type TrackedCreator = Awaited<ReturnType<VideosRepository["subscriptions"]>>[number];
@@ -14,12 +15,16 @@ type TrackedCreator = Awaited<ReturnType<VideosRepository["subscriptions"]>>[num
 export function renderCreatorList(tracked: TrackedCreator[]) {
   const entries = tracked
     .filter(({ subscription }) => subscription.enabled)
-    .map(({ creator }) => ({
+    .map(({ creator, subscription }) => ({
+      content: contentLabel(subscription.contentMode),
       id: creator.channelId,
       name: creator.displayName.replace(/\s+/g, " ").slice(0, 80),
     }))
     .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
-    .map(({ id, name }) => `- [${escapeMarkdown(name)}](https://www.youtube.com/channel/${id})`);
+    .map(
+      ({ id, name, content }) =>
+        `- [${escapeMarkdown(name)}](https://www.youtube.com/channel/${id}) — ${content}`,
+    );
   const content = `## Followed YouTube creators\n\n${entries.join("\n") || "No creators are currently followed."}`;
   if (content.length > 4000)
     throw new UserFacingError("The creator list is too long to publish in one post.");

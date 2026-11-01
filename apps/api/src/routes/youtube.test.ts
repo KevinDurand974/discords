@@ -4,7 +4,8 @@ import { node } from "@elysiajs/node";
 import { createYoutubeApp } from "./youtube.ts";
 import type { YoutubeIngestion } from "../youtube/ingestion.ts";
 import { YoutubeError, type YoutubeReader } from "../youtube/types.ts";
-import { CHANNEL_ID, OTHER_CHANNEL_ID } from "../youtube/fixtures.ts";
+import { CHANNEL_ID, OTHER_CHANNEL_ID, rssEntry, videoId, wrapFeed } from "../youtube/fixtures.ts";
+import { parseYoutubeFeed } from "../youtube/rss-parser.ts";
 
 const channel = { channelId: CHANNEL_ID, displayName: "Heartful Harry", handle: "@creator",
   canonicalUrl: `https://www.youtube.com/channel/${CHANNEL_ID}`, lastSyncedAt: null };
@@ -30,6 +31,20 @@ const post = (token?: string, body?: unknown): RequestInit => ({
 afterEach(() => vi.restoreAllMocks());
 
 describe("YouTube API contracts", () => {
+  it("preserves content classification in resolve and paginated source responses", async () => {
+    const { ingestion, reader, send } = setup();
+    const videos = parseYoutubeFeed(wrapFeed(rssEntry(1) + rssEntry(2).replace(`/watch?v=${videoId(2)}`, `/shorts/${videoId(2)}`)), CHANNEL_ID).videos;
+    vi.mocked(ingestion.resolve).mockResolvedValue({ channel, videos });
+    vi.mocked(reader.videos).mockResolvedValue({ items: [...videos, { ...videos[0]!, isShort: null }], nextCursor: null });
+    const resolved = await send("/internal/youtube/channels/resolve", post("bot-token", { channelUrl: "@creator" }));
+    expect(resolved.status).toBe(200);
+    const resolvedBody = await resolved.json() as { videos: { isShort: boolean | null }[] };
+    expect(resolvedBody.videos.map((video) => video.isShort)).toEqual([false, true]);
+    const page = await send(`/v1/youtube/channels/${CHANNEL_ID}/videos`);
+    expect(page.status).toBe(200);
+    const pageBody = await page.json() as { items: { isShort: boolean | null }[] };
+    expect(pageBody.items.map((video) => video.isShort)).toEqual([false, true, null]);
+  });
   it.each(["invalid_google_response", "invalid_feed"])("logs post-fetch resolution errors: %s", async (code) => {
     const log = vi.spyOn(console, "warn").mockImplementation(() => {});
     const { ingestion, send } = setup();

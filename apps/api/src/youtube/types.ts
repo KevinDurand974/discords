@@ -25,6 +25,7 @@ export type YoutubeVideo = {
   description: string;
   publishedAt: string;
   sourceUpdatedAt: string | null;
+  isShort: boolean | null;
 };
 
 export type YoutubeFeed = {

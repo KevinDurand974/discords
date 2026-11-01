@@ -34,6 +34,7 @@ const runtime = vi.hoisted(() => ({
   add: vi.fn(),
   clean: vi.fn(),
   sync: vi.fn(),
+  content: vi.fn(),
   list: vi.fn(),
   creatorTags: vi.fn(),
 }));
@@ -59,11 +60,11 @@ beforeEach(() => {
   runtime.setup.mockResolvedValue({ forum: { id: forumId } });
   runtime.add.mockResolvedValue({ forumId, reused: false, published: 1, failures: [] });
 });
-async function addModal() {
+async function addModal(content: string | null = null) {
   const showModal = vi.fn<(modal: ModalBuilder) => Promise<void>>(async () => {});
   await youtubeCommand.execute({
     ...actor([P.ManageMessages]),
-    options: { getSubcommand: () => "add", getInteger: () => null },
+    options: { getSubcommand: () => "add", getInteger: () => null, getString: () => content },
     showModal,
   } as unknown as ChatInputCommandInteraction);
   return showModal.mock.calls[0]![0];
@@ -121,6 +122,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
       "setup",
       "clean",
       "add",
+      "content",
       "list",
       "status",
       "sync",
@@ -203,6 +205,7 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     { action: "add", permissions: [P.ManageChannels], error: "Manage Messages" },
     { action: "status", permissions: [], error: "Manage Messages" },
     { action: "list", permissions: [], error: "Manage Messages" },
+    { action: "content", permissions: [], error: "Manage Messages" },
     { action: "sync", permissions: [], error: "Manage Messages" },
   ])(
     "rejects unauthorized /youtube $action before side effects",
@@ -234,6 +237,29 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     if (action === "setup") expect(runtime.setup).toHaveBeenCalledWith("guild");
     else expect(editReply.mock.calls[0]![0].components).toHaveLength(1);
   });
+  it("warns that backfill uses the latest 15 uploads across all content types before filtering", async () => {
+    expect(youtubeCommand.data.toJSON().options).toContainEqual(
+      expect.objectContaining({
+        name: "add",
+        options: expect.arrayContaining([
+          expect.objectContaining({
+            name: "backfill-count",
+            description: expect.stringContaining(
+              "latest 15 uploads, all content types before filtering",
+            ),
+          }),
+        ]),
+      }),
+    );
+    for (const mode of [null, "videos", "shorts"]) {
+      expect((await addModal(mode)).toJSON().components).toContainEqual(
+        expect.objectContaining({
+          description:
+            "Warning: backfill only checks the latest 15 uploads across all content types, before filtering.",
+        }),
+      );
+    }
+  });
   it("opens a creator modal with a Forum selector defaulting to the configured channel", async () => {
     const modal = (await addModal()).toJSON();
     expect(modal.components).toContainEqual(
@@ -254,25 +280,63 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     const modal = (await addModal()).toJSON();
     expect(JSON.stringify(modal)).not.toContain("default_values");
   });
-  it("passes the selected Forum to add and never implicitly provisions a Forum", async () => {
-    const modal = await addModal();
-    await youtubeComponentHandler.execute(
-      {
+  it.each([null, "all", "videos", "shorts"])(
+    "passes the selected Forum and content=%s to add",
+    async (mode) => {
+      const modal = await addModal(mode);
+      await youtubeComponentHandler.execute(
+        {
+          ...actor([P.ManageMessages]),
+          customId: modal.data.custom_id,
+          isModalSubmit: () => true,
+          isButton: () => false,
+          deferReply: vi.fn(),
+          editReply: vi.fn(),
+          fields: {
+            getTextInputValue: () => "@creator",
+            getSelectedChannels: () => new Collection([[forumId, { id: forumId }]]),
+          },
+        } as unknown as ModalSubmitInteraction,
+        context,
+      );
+      expect(runtime.add).toHaveBeenCalledWith("guild", "@creator", 10, forumId, mode ?? "all");
+      expect(runtime.setup).not.toHaveBeenCalled();
+    },
+  );
+  it.each(["all", "videos", "shorts"])(
+    "edits content via a separate subcommand: %s",
+    async (mode) => {
+      runtime.content.mockResolvedValue({ listFailed: false });
+      const editReply = vi.fn();
+      await youtubeCommand.execute({
         ...actor([P.ManageMessages]),
-        customId: modal.data.custom_id,
-        isModalSubmit: () => true,
-        isButton: () => false,
-        deferReply: vi.fn(),
-        editReply: vi.fn(),
-        fields: {
-          getTextInputValue: () => "@creator",
-          getSelectedChannels: () => new Collection([[forumId, { id: forumId }]]),
+        options: {
+          getSubcommand: () => "content",
+          getString: (name: string) => (name === "content" ? mode : tagId),
         },
-      } as unknown as ModalSubmitInteraction,
-      context,
-    );
-    expect(runtime.add).toHaveBeenCalledWith("guild", "@creator", 10, forumId);
-    expect(runtime.setup).not.toHaveBeenCalled();
+        deferReply: vi.fn(),
+        editReply,
+      } as unknown as ChatInputCommandInteraction);
+      expect(runtime.content).toHaveBeenCalledWith("guild", tagId, mode);
+      expect(editReply).toHaveBeenCalledWith(expect.stringContaining("Content preference updated"));
+      expect(runtime.add).not.toHaveBeenCalled();
+    },
+  );
+  it("allows content tag autocomplete for Manage Messages but keeps cleanup administrator-only", async () => {
+    const respond = vi.fn();
+    await autocompleteYoutubeTag({
+      ...actor([P.ManageMessages]),
+      options: { getSubcommand: () => "content", getFocused: () => "cre" },
+      respond,
+    } as unknown as AutocompleteInteraction);
+    expect(respond).toHaveBeenCalledWith([{ name: "Creator", value: tagId }]);
+    respond.mockClear();
+    await autocompleteYoutubeTag({
+      ...actor([P.ManageMessages]),
+      options: { getSubcommand: () => "clean", getFocused: () => "cre" },
+      respond,
+    } as unknown as AutocompleteInteraction);
+    expect(respond).toHaveBeenCalledWith([]);
   });
   it("binds the modal to its actor/guild and rejects expired sessions", async () => {
     vi.useFakeTimers();
@@ -304,14 +368,18 @@ describe("YouTube commands, permissions and confirmation ownership", () => {
     const respond = vi.fn();
     await autocompleteYoutubeTag({
       ...actor([P.Administrator]),
-      options: { getFocused: () => "CRE" },
+      options: { getFocused: () => "CRE", getSubcommand: () => "clean" },
       respond,
     } as unknown as AutocompleteInteraction);
     expect(respond).toHaveBeenCalledWith([{ name: "Creator", value: tagId }]);
   });
   it("does not offer cleanup tags to ordinary members", async () => {
     const respond = vi.fn();
-    await autocompleteYoutubeTag({ ...actor([]), respond } as unknown as AutocompleteInteraction);
+    await autocompleteYoutubeTag({
+      ...actor([]),
+      options: { getSubcommand: () => "clean" },
+      respond,
+    } as unknown as AutocompleteInteraction);
     expect(respond).toHaveBeenCalledWith([]);
     expect(runtime.creatorTags).not.toHaveBeenCalled();
   });
