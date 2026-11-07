@@ -11,6 +11,7 @@ const video: Video = {
   url: "https://www.youtube.com/watch?v=abcdefghijk",
   publishedAt: new Date("2026-10-01"),
   sourceUpdatedAt: null,
+  isShort: false,
   firstSeenAt: new Date(),
   lastSeenAt: new Date(),
 };
@@ -21,6 +22,8 @@ const setup: ForumSettings = {
   lifecycle: "active",
   ownsForum: true,
   lastPublishedAt: null,
+  creatorListThreadId: null,
+  creatorListPinned: false,
 };
 const intent: Intent = {
   guildId: "guild",

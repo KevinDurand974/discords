@@ -56,6 +56,7 @@ export const youtubeVideos = pgTable("youtube_videos", {
   description: text("description").notNull(),
   publishedAt: timestamp("published_at", { withTimezone: true }).notNull(),
   sourceUpdatedAt: timestamp("source_updated_at", { withTimezone: true }),
+  isShort: boolean("is_short"),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -71,6 +72,8 @@ export const youtubeForumSettings = pgTable("youtube_forum_settings", {
   lifecycle: text("lifecycle").notNull().default("disabled"),
   ownsForum: boolean("owns_forum").notNull().default(true),
   lastPublishedAt: timestamp("last_published_at", { withTimezone: true }),
+  creatorListThreadId: varchar("creator_list_thread_id", { length: 20 }),
+  creatorListPinned: boolean("creator_list_pinned").notNull().default(false),
 }, (table) => [
   check("youtube_forum_settings_generation_check", sql`${table.forumGeneration} > 0`),
   check("youtube_forum_settings_lifecycle_check", sql`${table.lifecycle} IN ('active', 'disabled', 'cleaning')`),
@@ -85,7 +88,9 @@ export const youtubeSubscriptions = pgTable("youtube_subscriptions", {
   enabled: boolean("enabled").notNull().default(true),
   initialBackfillCount: integer("initial_backfill_count").notNull().default(10),
   initialImportCompletedAt: timestamp("initial_import_completed_at", { withTimezone: true }),
+  contentMode: text("content_mode").$type<"all" | "videos" | "shorts">().notNull().default("all"),
 }, (table) => [
+  check("youtube_subscriptions_content_mode_check", sql`${table.contentMode} IN ('all', 'videos', 'shorts')`),
   primaryKey({ columns: [table.guildId, table.channelId] }),
   unique("youtube_subscriptions_guild_tag_unique").on(table.guildId, table.tagId),
   index("youtube_subscriptions_channel_enabled_idx").on(table.channelId, table.enabled),

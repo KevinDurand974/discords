@@ -24,10 +24,16 @@ import type { CommandDefinition, ComponentHandler } from "@/core/command.ts";
 import { UserFacingError } from "@/core/errors.ts";
 import { editSuccessReply } from "@/shared/interactions/success-reply.ts";
 import { createVideosRuntime } from "./videos-runtime.ts";
+import {
+  contentChoices,
+  contentLabel,
+  parseContentMode,
+  type ContentMode,
+} from "./content-filter.ts";
 
 type Actor = ChatInputCommandInteraction | ModalSubmitInteraction | ButtonInteraction;
 type Session = { guildId: string; userId: string; expires: number } & (
-  | { kind: "add"; count: number }
+  | { kind: "add"; count: number; contentMode: ContentMode }
   | { kind: "clean"; forumId: string | null; generation: number; tagId?: string }
 );
 const sessions = new Map<string, Session>();
@@ -87,9 +93,14 @@ export const configureYoutubeClean = (sub: SlashCommandSubcommandBuilder) =>
         .setAutocomplete(true),
     );
 export async function autocompleteYoutubeTag(interaction: AutocompleteInteraction) {
+  const permission =
+    interaction.options.getSubcommand() === "clean"
+      ? PermissionFlagsBits.Administrator
+      : PermissionFlagsBits.ManageMessages;
   if (
     !interaction.guildId ||
-    !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
+    (interaction.user.id !== interaction.guild?.ownerId &&
+      !interaction.memberPermissions?.has(permission))
   ) {
     await interaction.respond([]);
     return;
@@ -173,7 +184,9 @@ export async function handleYoutubeSetup(interaction: ChatInputCommandInteractio
 export const youtubeHelpDescription = [
   "setup: Create or repair the default YouTube forum without adding a creator. Requires Manage Channels or server ownership.",
   "clean: Administrator/server-owner cleanup with a user-bound confirmation lasting 5 minutes. With tag, scopes cleanup to that creator; without tag, affects all tracked creators. Choose Videos only or Everything in scope. Deletion is permanent; user-owned forums and unrelated content are preserved.",
-  "add: Opens a creator (URL, handle or channel ID) and forum-selection modal. Backfill count is 0–15, default 10; 0 follows only future videos. No forum is created implicitly.",
+  "add: Opens a creator (URL, handle or channel ID) and forum-selection modal. Optional content: Videos + Shorts (default), Videos only, or Shorts only. Backfill count is 0–15 matching items, default 10; 0 follows only future content. Warning: backfill only checks the latest 15 uploads across all content types before filtering, not the latest 15 of the selected type. No forum is created implicitly.",
+  "content: Change a followed creator's content preference by tag. Applies to future content and cancels nonmatching pending posts; existing posts are kept and old excluded content is never reposted. Unknown legacy video types are skipped by single-type filters until refreshed from RSS.",
+  "list: Creates or updates a Forum post linking all actively followed creators. Optional pin defaults to false. The post updates when creators are added or removed; rerun list to repair it.",
   "status: Shows the configured forum, followed creators and publication status. sync: Publishes already-collected pending videos; does not trigger fresh RSS collection.",
   "Requires Manage Messages, administrator access or server ownership. One forum is used per server; changing it while creators are followed requires removing that tracking first with /youtube clean. User-owned forum permissions are not rewritten.",
   "Example: `/youtube add backfill-count:10`",
@@ -194,9 +207,44 @@ export const youtubeCommand = {
         .addIntegerOption((option) =>
           option
             .setName("backfill-count")
-            .setDescription("Initial videos to publish (0–15, default 10)")
+            .setDescription(
+              "Backfill from latest 15 uploads, all content types before filtering (0–15, default 10)",
+            )
             .setMinValue(0)
             .setMaxValue(15),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("content")
+            .setDescription("Content to follow (default: Videos + Shorts)")
+            .addChoices(...contentChoices),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("content")
+        .setDescription("Change a followed creator's content preference")
+        .addStringOption((option) =>
+          option
+            .setName("tag")
+            .setDescription("Followed creator tag")
+            .setRequired(true)
+            .setAutocomplete(true),
+        )
+        .addStringOption((option) =>
+          option
+            .setName("content")
+            .setDescription("Content to follow")
+            .setRequired(true)
+            .addChoices(...contentChoices),
+        ),
+    )
+    .addSubcommand((sub) =>
+      sub
+        .setName("list")
+        .setDescription("Post or update the list of followed YouTube creators")
+        .addBooleanOption((option) =>
+          option.setName("pin").setDescription("Pin the Forum post (default: false)"),
         ),
     )
     .addSubcommand((sub) =>
@@ -221,6 +269,7 @@ export const youtubeCommand = {
         guildId: interaction.guildId,
         userId: interaction.user.id,
         count: interaction.options.getInteger("backfill-count") ?? 10,
+        contentMode: parseContentMode(interaction.options.getString("content") ?? "all"),
       });
       const select = new ChannelSelectMenuBuilder()
         .setCustomId("forum-channel")
@@ -237,6 +286,9 @@ export const youtubeCommand = {
           .addLabelComponents(
             new LabelBuilder()
               .setLabel("YouTube channel URL, @handle or UC… ID")
+              .setDescription(
+                "Warning: backfill only checks the latest 15 uploads across all content types, before filtering.",
+              )
               .setTextInputComponent(
                 new TextInputBuilder()
                   .setCustomId("channel-url")
@@ -253,10 +305,33 @@ export const youtubeCommand = {
       return;
     }
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    if (action === "content") {
+      const mode = parseContentMode(interaction.options.getString("content", true));
+      const result = await runtime.content(
+        interaction.guildId,
+        interaction.options.getString("tag", true),
+        mode,
+      );
+      const response = `Content preference updated: ${contentLabel(mode)}.${result.listFailed ? " Creator list update failed. Run /youtube list to repair it." : ""}`;
+      if (result.listFailed) await interaction.editReply(response);
+      else await editSuccessReply(interaction, response);
+      return;
+    }
+    if (action === "list") {
+      const thread = await runtime.list(
+        interaction.guildId,
+        interaction.options.getBoolean("pin") ?? false,
+      );
+      await editSuccessReply(interaction, {
+        content: `Creator list updated: <#${thread.id}>.`,
+        allowedMentions: { parse: [] },
+      });
+      return;
+    }
     if (action === "sync") {
       const result = await runtime.sync(interaction.guildId);
-      const content = `Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}`;
-      if (result.failures.length) {
+      const content = `Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}${result.listFailed ? " Creator list update failed. Run /youtube list to repair it." : ""}`;
+      if (result.failures.length || result.listFailed) {
         console.error("YouTube sync incomplete", result.failures);
         await interaction.editReply(content);
       } else await editSuccessReply(interaction, content);
@@ -272,8 +347,8 @@ export const youtubeCommand = {
     const tracked = await runtime.store.subscriptions(interaction.guildId);
     const creators = tracked
       .map(
-        ({ creator }) =>
-          `${creator.displayName.slice(0, 40)} — ${creator.lastError ? "Update failed; try /youtube sync." : creator.lastSyncedAt ? "Up to date" : "Waiting for videos"}`,
+        ({ creator, subscription }) =>
+          `${creator.displayName.slice(0, 40)} — ${contentLabel(subscription.contentMode)} — ${creator.lastError ? "Update failed; try /youtube sync." : creator.lastSyncedAt ? "Up to date" : "Waiting for videos"}`,
       )
       .join("\n");
     const response = {
@@ -312,12 +387,13 @@ export const youtubeComponentHandler: ComponentHandler = {
         interaction.fields.getTextInputValue("channel-url"),
         pending.count,
         forumId,
+        pending.contentMode,
       );
       const response = {
-        content: `Creator followed in <#${result.forumId}>. Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}`,
+        content: `Creator followed in <#${result.forumId}> (${contentLabel(pending.contentMode)}). Published ${result.published} videos.${result.failures.length ? ` ${result.failures.length} couldn't be published. Check bot permissions, then run /youtube sync again.` : ""}${result.listFailed ? " Creator list update failed. Run /youtube list to repair it." : ""}`,
         allowedMentions: { parse: [] as const },
       };
-      if (result.failures.length) {
+      if (result.failures.length || result.listFailed) {
         console.error("YouTube creator publication incomplete", result.failures);
         await interaction.editReply(response);
       } else await editSuccessReply(interaction, response);
@@ -350,7 +426,10 @@ export const youtubeComponentHandler: ComponentHandler = {
       } catch (error) {
         console.error("YouTube cleanup incomplete", error);
         await interaction.editReply({
-          content: "Cleanup incomplete. Check bot permissions, then run /youtube clean again.",
+          content:
+            error instanceof UserFacingError
+              ? error.message
+              : "Cleanup incomplete. Check bot permissions, then run /youtube clean again.",
           components: [],
         });
       }

@@ -12,7 +12,7 @@ describe("YouTube RSS normalization", () => {
       channelId: CHANNEL_ID, videoId: videoId(1), sourceEntryId: `yt:video:${videoId(1)}`,
       url: `https://www.youtube.com/watch?v=${videoId(1)}`,
       title: "Guide 1", description: "Stats & cores !", publishedAt: "2026-10-01T01:21:28.000Z",
-      sourceUpdatedAt: "2026-10-20T01:21:28.000Z",
+      sourceUpdatedAt: "2026-10-20T01:21:28.000Z", isShort: false,
     });
   });
   it("accepts YouTube's prefixless root channel ID while entries keep the canonical UC ID", () => {
@@ -39,6 +39,28 @@ describe("YouTube RSS normalization", () => {
     expect(parseYoutubeFeed(wrapFeed(entry), CHANNEL_ID).videos[0]).toMatchObject({
       title: "Fallback 1", videoId: videoId(1), sourceUpdatedAt: null, description: "",
     });
+  });
+  it("accepts Shorts alternate links and normalizes them to canonical watch URLs", () => {
+    const short = rssEntry(2).replace(`/watch?v=${videoId(2)}`, `/shorts/${videoId(2)}`);
+    const feed = parseYoutubeFeed(wrapFeed(rssEntry(1) + short), CHANNEL_ID);
+    expect(feed.rejectedEntries).toBe(0);
+    expect(feed.videos).toHaveLength(2);
+    expect(feed.videos[0]!.isShort).toBe(false);
+    expect(feed.videos[1]).toMatchObject({ videoId: videoId(2), url: `https://www.youtube.com/watch?v=${videoId(2)}`, isShort: true });
+  });
+  it.each([
+    `https://www.youtube.com/shorts/${videoId(2)}`,
+    `https://www.youtube.com/shorts/${videoId(1)}/extra`,
+    `https://www.youtube.com/shorts/${videoId(1)}/`,
+    `https://evil.test/shorts/${videoId(1)}`,
+    `http://www.youtube.com/shorts/${videoId(1)}`,
+    `https://user:password@www.youtube.com/shorts/${videoId(1)}`,
+    `https://www.youtube.com:444/shorts/${videoId(1)}`,
+  ])("rejects mismatched or unsafe Shorts links: %s", (url) => {
+    const entry = rssEntry(1).replace(`https://www.youtube.com/watch?v=${videoId(1)}`, url);
+    const feed = parseYoutubeFeed(wrapFeed(entry), CHANNEL_ID);
+    expect(feed.videos).toEqual([]);
+    expect(feed.rejectedEntries).toBe(1);
   });
   it("rejects bad entries independently, without losing valid entries", () => {
     const feed = parseYoutubeFeed(wrapFeed(rssEntry(1) + rssEntry(2, { published: "not a date" }) +

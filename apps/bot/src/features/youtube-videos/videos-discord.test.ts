@@ -28,6 +28,7 @@ const video: Video = {
   url: "https://www.youtube.com/watch?v=abcdefghijk",
   publishedAt: new Date("2026-10-01"),
   sourceUpdatedAt: null,
+  isShort: false,
   firstSeenAt: new Date(),
   lastSeenAt: new Date(),
 };

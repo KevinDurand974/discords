@@ -1,5 +1,6 @@
 node_modules
 .pi/tasks/
+.pi/delegate/
 .env*
 env.d.ts
 !.env.example

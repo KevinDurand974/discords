@@ -16,6 +16,8 @@ describe("YouTube schema boundaries", () => {
     expect(columns(youtubeSubscriptions).some((name) => /role/i.test(name))).toBe(false);
     expect(youtubeSubscriptions.initialBackfillCount.default).toBe(10);
     expect(youtubeForumSettings.lifecycle.default).toBe("disabled");
+    expect(youtubeForumSettings.creatorListThreadId.notNull).toBe(false);
+    expect(youtubeForumSettings.creatorListPinned.default).toBe(false);
   });
   it("uses subscription/publication uniqueness and cross-source ownership constraints", () => {
     expect(getTableConfig(youtubeSubscriptions).primaryKeys[0]?.columns.map(({ name }) => name)).toEqual(["guild_id", "channel_id"]);

@@ -16,6 +16,9 @@ import {
   type VideosRepository,
 } from "./videos-repository.ts";
 
+import { deleteCreatorList, updateCreatorList } from "./creator-list.ts";
+import { matchesContent, type ContentMode } from "./content-filter.ts";
+
 export type CleanupMode = "videos" | "resources";
 
 const runtimes = new WeakMap<Client, ReturnType<typeof buildRuntime>>();
@@ -89,6 +92,17 @@ export function buildVideosRuntime(
     await repairTags(setup, forum);
     return { setup, forum };
   }
+  async function refreshCreatorList(setup: ForumSettings, forum: ForumChannel) {
+    if (!setup.creatorListThreadId) return;
+    try {
+      await updateCreatorList(forum, setup, store);
+    } catch (error) {
+      console.error("YouTube creator list update failed", error);
+      throw new UserFacingError(
+        "The creator list couldn't be updated. Check bot permissions, then run /youtube list.",
+      );
+    }
+  }
   async function publish(setup: ForumSettings) {
     const guild = await client.guilds.fetch(setup.guildId);
     const forum = await getVideoForum(guild, setup.forumChannelId);
@@ -121,12 +135,30 @@ export function buildVideosRuntime(
       }
     }, Promise.resolve());
     await store.completeInitial(setup.guildId);
-    return { published, failures };
+    let listFailed = false;
+    try {
+      await refreshCreatorList(setup, forum);
+    } catch {
+      listFailed = true;
+    }
+    return { published, failures, listFailed };
   }
   return {
     store,
     async setup(guildId: string) {
       return store.withGuild(guildId, () => provision(guildId));
+    },
+    async list(guildId: string, pinned = false) {
+      return store.withGuild(guildId, async () => {
+        const setup = await store.get(guildId);
+        if (!setup || setup.lifecycle !== "active")
+          throw new UserFacingError("Run /youtube setup or finish /youtube clean first.");
+        const guild = await client.guilds.fetch(guildId);
+        const forum = await getVideoForum(guild, setup.forumChannelId);
+        if (!forum) throw new UserFacingError("The YouTube Forum is missing. Run /youtube setup.");
+        await checkVideoPermissions(forum);
+        return updateCreatorList(forum, setup, store, pinned);
+      });
     },
     async creatorTags(guildId: string) {
       const setup = await store.get(guildId);
@@ -148,7 +180,39 @@ export function buildVideosRuntime(
           : [],
       );
     },
-    async add(guildId: string, input: string, count: number, forumId: string) {
+    async content(guildId: string, tagId: string, mode: ContentMode) {
+      return store.withGuild(guildId, async () => {
+        const setup = await store.get(guildId);
+        if (!setup || setup.lifecycle !== "active")
+          throw new UserFacingError("Run /youtube setup or finish /youtube clean first.");
+        const tracked = await store.subscriptions(guildId);
+        const selected = tracked.find(({ subscription }) => subscription.tagId === tagId);
+        if (!selected)
+          throw new UserFacingError("Choose a current creator tag from the suggested list.");
+        if (selected.subscription.contentMode !== mode)
+          await store.setContentMode(guildId, selected.subscription.channelId, mode);
+        await store.completeInitial(guildId);
+        let listFailed = false;
+        if (setup.creatorListThreadId) {
+          try {
+            const guild = await client.guilds.fetch(guildId);
+            const forum = await getVideoForum(guild, setup.forumChannelId);
+            if (!forum) throw new Error("YouTube Forum is missing.");
+            await refreshCreatorList(setup, forum);
+          } catch {
+            listFailed = true;
+          }
+        }
+        return { listFailed };
+      });
+    },
+    async add(
+      guildId: string,
+      input: string,
+      count: number,
+      forumId: string,
+      contentMode: ContentMode = "all",
+    ) {
       if (!Number.isInteger(count) || count < 0 || count > 15)
         throw new UserFacingError("Backfill count must be between 0 and 15.");
       const resolved = await api.resolve(input);
@@ -187,11 +251,13 @@ export function buildVideosRuntime(
             null,
             tracked.map((row) => row.subscription.tagId).filter((id): id is string => id !== null),
           );
-          const newest = [...resolved.videos].sort(
-            (a, b) =>
-              Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
-              b.videoId.localeCompare(a.videoId),
-          );
+          const newest = resolved.videos
+            .filter((video) => matchesContent(contentMode, video.isShort))
+            .sort(
+              (a, b) =>
+                Date.parse(b.publishedAt) - Date.parse(a.publishedAt) ||
+                b.videoId.localeCompare(a.videoId),
+            );
           await store.subscribe(
             guildId,
             resolved.channel.channelId,
@@ -200,6 +266,11 @@ export function buildVideosRuntime(
             count,
             newest.slice(0, count).map((video) => video.videoId),
             setup.forumGeneration,
+            contentMode,
+          );
+        } else if (existing.subscription.contentMode !== contentMode) {
+          throw new UserFacingError(
+            "This creator is already followed. Use /youtube content to change their content preference.",
           );
         }
         return { ...(await publish(setup)), forumId: forum.id, reused: Boolean(existing) };
@@ -260,14 +331,17 @@ export function buildVideosRuntime(
           }
           if (selected) await store.removeCreator(guildId, selected.subscription.channelId);
           else {
+            if (forum) await deleteCreatorList(forum, setup);
             await store.remove(guildId);
             return;
           }
         } else {
           await store.excludeVideos(guildId, selected?.subscription.channelId);
         }
-        if (forum) await store.setForum(guildId, forum.id, setup.forumGeneration, setup.ownsForum);
-        else await store.resetForum(guildId);
+        if (forum) {
+          await store.setForum(guildId, forum.id, setup.forumGeneration, setup.ownsForum);
+          if (mode === "resources") await refreshCreatorList(setup, forum);
+        } else await store.resetForum(guildId);
       });
     },
   };
@@ -288,8 +362,8 @@ export async function synchronizeVideos(client: Client) {
   const results = await Promise.allSettled(
     guildIds.map(async (guildId) => {
       const result = await runtime.sync(guildId);
-      if (result.failures.length)
-        throw new Error(`${result.failures.length} video publications failed in ${guildId}.`);
+      if (result.failures.length || result.listFailed)
+        throw new Error(`YouTube publication or creator list update failed in ${guildId}.`);
     }),
   );
   if (results.some((result) => result.status === "rejected"))

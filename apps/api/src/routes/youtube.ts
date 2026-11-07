@@ -13,7 +13,7 @@ const channelSchema = t.Object({
 const videoSchema = t.Object({
   videoId: t.String(), channelId: t.String(), sourceEntryId: t.String(),
   url: t.String(), title: t.String(), description: t.String(),
-  publishedAt: t.String(), sourceUpdatedAt: t.Nullable(t.String()),
+  publishedAt: t.String(), sourceUpdatedAt: t.Nullable(t.String()), isShort: t.Nullable(t.Boolean()),
 });
 
 export type YoutubeAppOptions = {
@@ -51,7 +51,15 @@ export function createYoutubeApp(reader: YoutubeReader, ingestion: YoutubeIngest
         });
       }
     })
-    .onError(({ error, code }) => {
+    .onError(({ error, code, request }) => {
+      if (new URL(request.url).pathname === "/internal/youtube/channels/resolve" &&
+          code !== "VALIDATION" && code !== "NOT_FOUND" && code !== "PARSE") {
+        // TEMPORARY: include parsing failures without logging input, credentials or raw errors.
+        console.warn("[DEBUG-youtube-resolve]", {
+          error_code: error instanceof YoutubeError ? error.code : "internal_error",
+          status: error instanceof YoutubeError ? error.status : 503,
+        });
+      }
       if (error instanceof YoutubeError)
         return new Response(JSON.stringify({ error: error.message, code: error.code }), {
           status: error.status, headers: { "Content-Type": "application/json" },

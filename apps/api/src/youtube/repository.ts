@@ -28,7 +28,7 @@ function decodeCursor(cursor: string, channelId: string): { at: Date; id: string
 function toVideo(row: typeof youtubeVideos.$inferSelect): YoutubeVideo {
   return {
     videoId: row.videoId, channelId: row.channelId, sourceEntryId: row.sourceEntryId,
-    url: row.url, title: row.title, description: row.description,
+    url: row.url, title: row.title, description: row.description, isShort: row.isShort,
     publishedAt: row.publishedAt.toISOString(), sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
   };
 }
@@ -107,7 +107,7 @@ export function createYoutubeStore(db: Database): YoutubeStore {
           const updated = await tx.insert(youtubeVideos).values(values).onConflictDoUpdate({
             target: youtubeVideos.videoId,
             set: {
-              title: values.title, description: values.description, url: values.url,
+              title: values.title, description: values.description, url: values.url, isShort: values.isShort,
               publishedAt: values.publishedAt, sourceUpdatedAt: values.sourceUpdatedAt, lastSeenAt: syncedAt,
             },
             setWhere: eq(youtubeVideos.channelId, channelId),

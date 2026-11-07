@@ -1,6 +1,24 @@
 import { UserFacingError } from "@/core/errors.ts";
 import { FetchError, ofetch } from "ofetch";
 
+const DIAGNOSTIC_CODES = new Set([
+  "invalid_feed",
+  "invalid_google_response",
+  "incomplete_feed",
+  "empty_response",
+  "response_too_large",
+  "upstream_unavailable",
+  "upstream_timeout",
+  "google_access_denied",
+  "missing_api_key",
+  "channel_not_found",
+  "invalid_channel_id",
+  "storage_unavailable",
+  "channel_busy",
+  "source_conflict",
+  "invalid_parameters",
+]);
+
 function resolutionError(error: unknown): string {
   if (error instanceof FetchError) {
     if (error.statusCode === 401)
@@ -17,7 +35,7 @@ function resolutionError(error: unknown): string {
 
 export type ResolvedCreator = {
   channel: { channelId: string; displayName: string };
-  videos: { videoId: string; publishedAt: string }[];
+  videos: { videoId: string; publishedAt: string; isShort: boolean | null }[];
 };
 export function createVideosApi(base: string, token: string | undefined) {
   const url = new URL(base);
@@ -44,12 +62,19 @@ export function createVideosApi(base: string, token: string | undefined) {
           result.videos.some(
             (video) =>
               !/^[A-Za-z0-9_-]{11}$/.test(video.videoId) ||
-              !Number.isFinite(Date.parse(video.publishedAt)),
+              !Number.isFinite(Date.parse(video.publishedAt)) ||
+              (video.isShort !== null && typeof video.isShort !== "boolean"),
           )
         )
           throw new Error("Invalid response");
         return result;
       } catch (error) {
+        const code: unknown = error instanceof FetchError ? error.data?.code : undefined;
+        // TEMPORARY: log only known API codes, never raw response bodies or credentials.
+        console.warn("[DEBUG-youtube-resolve-response]", {
+          status: error instanceof FetchError ? (error.statusCode ?? null) : null,
+          error_code: typeof code === "string" && DIAGNOSTIC_CODES.has(code) ? code : "unknown",
+        });
         throw new UserFacingError(resolutionError(error), { cause: error });
       }
     },

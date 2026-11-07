@@ -66,6 +66,12 @@ export function createVideosRepository(url: string) {
         .set({ forumChannelId, forumGeneration: generation, ownsForum, lifecycle: "active" })
         .where(scope(guildId));
     },
+    async setCreatorList(guildId: string, threadId: string, pinned: boolean) {
+      await db
+        .update(settings)
+        .set({ creatorListThreadId: threadId, creatorListPinned: pinned })
+        .where(scope(guildId));
+    },
     async resetForum(guildId: string) {
       await db.transaction(async (tx) => {
         await tx.delete(publications).where(eq(publications.guildId, guildId));
@@ -78,6 +84,8 @@ export function createVideosRepository(url: string) {
           .update(settings)
           .set({
             forumChannelId: null,
+            creatorListThreadId: null,
+            creatorListPinned: false,
             lifecycle: "disabled",
             forumGeneration: sql`${settings.forumGeneration} + 1`,
           })
@@ -92,12 +100,38 @@ export function createVideosRepository(url: string) {
       count: number,
       selectedIds: string[],
       generation: number,
+      contentMode: Subscription["contentMode"] = "all",
     ) {
       await db.transaction(async (tx) => {
         await tx
           .insert(subscriptions)
-          .values({ guildId, channelId, tagId, ownsTag, initialBackfillCount: count });
+          .values({ guildId, channelId, tagId, ownsTag, initialBackfillCount: count, contentMode });
         await initialize(tx, guildId, channelId, selectedIds, generation);
+      });
+    },
+    async setContentMode(
+      guildId: string,
+      channelId: string,
+      contentMode: Subscription["contentMode"],
+    ) {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(subscriptions)
+          .set({ contentMode })
+          .where(and(eq(subscriptions.guildId, guildId), eq(subscriptions.channelId, channelId)));
+        // Preference changes apply prospectively, never backfill previously unqueued history.
+        await tx.execute(sql`INSERT INTO youtube_publication_intents (guild_id, channel_id, video_id, forum_generation, state, mode)
+          SELECT s.guild_id, v.channel_id, v.video_id, f.forum_generation, 'excluded', 'live'
+          FROM youtube_subscriptions s JOIN youtube_videos v ON v.channel_id = s.channel_id
+          JOIN youtube_forum_settings f ON f.guild_id = s.guild_id
+          WHERE s.guild_id = ${guildId} AND s.channel_id = ${channelId}
+          ON CONFLICT DO NOTHING`);
+        if (contentMode !== "all")
+          await tx.execute(sql`UPDATE youtube_publication_intents i
+          SET state = 'excluded', updated_at = now()
+          FROM youtube_videos v WHERE i.guild_id = ${guildId} AND i.channel_id = ${channelId}
+          AND i.video_id = v.video_id AND i.state IN ('pending', 'in_progress', 'needs_reconciliation')
+          AND v.is_short IS DISTINCT FROM ${contentMode === "shorts"}`);
       });
     },
     async repairSubscription(
@@ -126,7 +160,14 @@ export function createVideosRepository(url: string) {
           const newest = await tx
             .select({ id: videos.videoId })
             .from(videos)
-            .where(eq(videos.channelId, subscription.channelId))
+            .where(
+              and(
+                eq(videos.channelId, subscription.channelId),
+                subscription.contentMode === "all"
+                  ? undefined
+                  : eq(videos.isShort, subscription.contentMode === "shorts"),
+              ),
+            )
             .orderBy(desc(videos.publishedAt), desc(videos.videoId))
             .limit(subscription.initialBackfillCount);
           await initialize(
@@ -142,7 +183,9 @@ export function createVideosRepository(url: string) {
     async enqueue(guildId: string, generation: number) {
       // Every stored source not in the persisted initial baseline is eligible, regardless of its publication date.
       await db.execute(sql`INSERT INTO youtube_publication_intents (guild_id, channel_id, video_id, forum_generation, state, mode)
-        SELECT s.guild_id, v.channel_id, v.video_id, ${generation}, 'pending', 'live'
+        SELECT s.guild_id, v.channel_id, v.video_id, ${generation},
+          CASE WHEN s.content_mode = 'all' OR (s.content_mode = 'shorts' AND v.is_short = true)
+            OR (s.content_mode = 'videos' AND v.is_short = false) THEN 'pending' ELSE 'excluded' END, 'live'
         FROM youtube_subscriptions s JOIN youtube_videos v ON v.channel_id = s.channel_id
         WHERE s.guild_id = ${guildId} AND s.enabled = true ON CONFLICT DO NOTHING`);
     },
@@ -162,6 +205,8 @@ export function createVideosRepository(url: string) {
           and(
             eq(intents.guildId, guildId),
             eq(subscriptions.enabled, true),
+            sql`(${subscriptions.contentMode} = 'all' OR (${subscriptions.contentMode} = 'shorts' AND ${videos.isShort} = true)
+              OR (${subscriptions.contentMode} = 'videos' AND ${videos.isShort} = false))`,
             inArray(intents.state, ["pending", "in_progress", "needs_reconciliation"]),
           ),
         )
@@ -223,7 +268,7 @@ export function createVideosRepository(url: string) {
     async completeInitial(guildId: string) {
       await db.execute(sql`UPDATE youtube_subscriptions s SET initial_import_completed_at = now()
         WHERE s.guild_id = ${guildId} AND s.initial_import_completed_at IS NULL
-        AND NOT EXISTS (SELECT 1 FROM youtube_publication_intents i WHERE i.guild_id = s.guild_id AND i.channel_id = s.channel_id AND i.mode = 'initial' AND i.state <> 'published')`);
+        AND NOT EXISTS (SELECT 1 FROM youtube_publication_intents i WHERE i.guild_id = s.guild_id AND i.channel_id = s.channel_id AND i.mode = 'initial' AND i.state NOT IN ('published', 'excluded'))`);
     },
     async counts(guildId: string) {
       const result = await db

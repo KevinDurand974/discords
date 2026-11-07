@@ -15,7 +15,11 @@ export function renderWelcomeMessage(
   member: GuildMember | PartialGuildMember,
   arrival: boolean,
 ) {
-  const user = arrival ? `<@${member.id}>` : escapeMarkdown(member.user?.username ?? member.id);
+  const user = arrival
+    ? `<@${member.id}>`
+    : escapeMarkdown(
+        member.displayName ?? member.user?.displayName ?? member.user?.username ?? member.id,
+      );
   return template
     .replace(/\{user\}|\{server\}|\{memberCount\}/g, (placeholder) => {
       if (placeholder === "{user}") return user;

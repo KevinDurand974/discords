@@ -35,18 +35,19 @@ describe.skipIf(!database)("YouTube PostgreSQL ingestion and subscription founda
     const first = await reader.videos(CHANNEL_ID, 10);
     expect(first.items).toHaveLength(10);
     expect(first.items[0]?.videoId).toBe(videoId(15));
+    expect(first.items.every((video) => video.isShort === false)).toBe(true);
     expect((await reader.videos(CHANNEL_ID, 10, first.nextCursor!)).items).toHaveLength(5);
     await expect(reader.videos(OTHER_CHANNEL_ID, 10, first.nextCursor!)).rejects.toMatchObject({ code: "invalid_cursor" });
     await expect(reader.videos(CHANNEL_ID, 10, "invalid")).rejects.toMatchObject({ code: "invalid_cursor" });
     const tied = parseYoutubeFeed(wrapFeed(rssEntry(1, { published: "2026-10-30T00:00:00Z" }) +
-      rssEntry(2, { published: "2026-10-30T00:00:00Z", description: "Updated" })), CHANNEL_ID);
+      rssEntry(2, { published: "2026-10-30T00:00:00Z", description: "Updated" }).replace(`/watch?v=${videoId(2)}`, `/shorts/${videoId(2)}`)), CHANNEL_ID);
     tied.displayName = "Renamed creator";
     await store.ingest(CHANNEL_ID, undefined, async () => tied);
     expect((await reader.channel(CHANNEL_ID))?.handle).toBe("@heartfulharry2185");
     expect((await reader.channel(CHANNEL_ID))?.displayName).toBe("Renamed creator");
     expect((await reader.videos(CHANNEL_ID, 50)).items).toHaveLength(15);
     const tiedFirst = await reader.videos(CHANNEL_ID, 1);
-    expect(tiedFirst.items[0]).toMatchObject({ videoId: videoId(2), description: "Updated" });
+    expect(tiedFirst.items[0]).toMatchObject({ videoId: videoId(2), description: "Updated", isShort: true, url: `https://www.youtube.com/watch?v=${videoId(2)}` });
     expect((await reader.videos(CHANNEL_ID, 1, tiedFirst.nextCursor!)).items[0]?.videoId).toBe(videoId(1));
     const recovered = createDatabase(url!);
     try { expect((await createYoutubeReader(recovered.db).videos(CHANNEL_ID, 50)).items).toHaveLength(15); }
