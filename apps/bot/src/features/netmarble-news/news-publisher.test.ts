@@ -96,6 +96,48 @@ const mockImageFetch = () =>
     );
 
 describe("Forum publishing", () => {
+  it.each([
+    '<img src="GIF_URL">',
+    '<p>Before</p><img src="GIF_URL">',
+    '<table><tr><td>Reward</td><td><img src="GIF_URL"></td></tr></table>',
+    '<table><tr><td>Reward</td><td><img src="https://forum.netmarble.com/first.png"><img src="GIF_URL"></td></tr></table>',
+  ])("attaches the Netmarble GIF within the 10 MiB limit: %s", async (html) => {
+    const f = fixture();
+    const gifUrl =
+      "https://hedwig-cf.netmarble.com/forum-common/sololv/slv_en/d84a8151a6f0487690b77f9b9d72e0cf_1794446735649.gif";
+    const gif = Buffer.alloc(10_039_643);
+    gif.write("GIF89a");
+    const fetcher = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const isGif = String(input) === gifUrl;
+      const bytes = isGif ? gif : png;
+      return new Response(bytes, {
+        headers: {
+          "content-type": isGif ? "image/gif" : "image/png",
+          "content-length": String(bytes.length),
+        },
+      });
+    });
+    try {
+      await f.publisher.publish(
+        setup,
+        { ...article, id: 110809, bodyHtml: html.replace("GIF_URL", gifUrl) },
+        false,
+      );
+      const messages = [
+        f.create.mock.calls[0]![0].message,
+        ...f.send.mock.calls.map(([options]) => options),
+      ];
+      expect(messages.flatMap((message) => message.files ?? [])).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: expect.stringMatching(/\.gif$/) }),
+        ]),
+      );
+      expect(JSON.stringify(messages.map(({ components }) => components))).not.toContain(gifUrl);
+    } finally {
+      fetcher.mockRestore();
+    }
+  });
+
   it.each(["text", "image", "table"])(
     "mentions the matching tag role last for a %s starter",
     async (kind) => {

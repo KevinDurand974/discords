@@ -20,6 +20,8 @@ import { type NewsSetup } from "./news-setup.ts";
 import { importMedia } from "./media-importer.ts";
 import type { NewsArticle } from "./news-api.ts";
 
+const MAX_MEDIA_BYTES = 10 * 1024 * 1024;
+
 function tableHeading(value: string): string {
   return value
     .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
@@ -127,7 +129,11 @@ export function createNewsPublisher(client: Client): NewsPublisher {
       const prepareRow = async (part: Extract<ArticlePart, { type: "tableRow" }>) => {
         rowNumber += 1;
         const imported = part.images[0]
-          ? await importMedia(part.images[0], `media-${article.id}-row-${rowNumber}`, 10_000_000)
+          ? await importMedia(
+              part.images[0],
+              `media-${article.id}-row-${rowNumber}`,
+              MAX_MEDIA_BYTES,
+            )
           : null;
         return imported;
       };
@@ -139,7 +145,7 @@ export function createNewsPublisher(client: Client): NewsPublisher {
         // Keep the source link in the starter; table rows follow in reading order.
         thread = await create([]);
       } else {
-        const imported = await importMedia(first.url, `media-${article.id}-1`, 10_000_000);
+        const imported = await importMedia(first.url, `media-${article.id}-1`, MAX_MEDIA_BYTES);
         if (imported.attachment) {
           try {
             thread = await create([], [imported.attachment], false);
@@ -207,7 +213,7 @@ export function createNewsPublisher(client: Client): NewsPublisher {
                 const extra = await importMedia(
                   imageUrl,
                   `media-${article.id}-row-${rowNumber}-${imageIndex + 2}`,
-                  10_000_000,
+                  MAX_MEDIA_BYTES,
                 );
                 if (extra.attachment) {
                   try {
@@ -232,7 +238,7 @@ export function createNewsPublisher(client: Client): NewsPublisher {
           const imported = await importMedia(
             part.url,
             `media-${article.id}-${index + (first.type === "tableRow" ? 1 : 2)}`,
-            10_000_000,
+            MAX_MEDIA_BYTES,
           );
           if (imported.attachment) {
             try {
